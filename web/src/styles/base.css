@@ -1,0 +1,204 @@
+/* ==========================================================================
+   Base: reset, element defaults, focus, motion policy.
+   Nothing here uses a literal colour. Everything resolves through tokens.css.
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  font-weight: var(--weight-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'kern' 1;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  color: var(--ink);
+}
+
+p { line-height: var(--leading-body); }
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  transition: color var(--dur-fast) var(--ease);
+}
+a:hover { color: var(--accent-deep); text-decoration: underline; text-underline-offset: 3px; }
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+button:disabled { cursor: not-allowed; }
+
+input, textarea, select {
+  font: inherit;
+  color: var(--ink);
+  background: none;
+  border: none;
+  outline: none;
+}
+input::placeholder,
+textarea::placeholder { color: var(--ink-subtle); opacity: 1; }
+
+select option {
+  background: var(--surface-raised);
+  color: var(--ink);
+}
+
+svg { display: block; flex-shrink: 0; }
+img { max-width: 100%; display: block; }
+
+hr {
+  border: none;
+  border-top: var(--hairline) solid var(--border);
+}
+
+table { border-collapse: collapse; width: 100%; }
+
+::selection {
+  background: var(--accent-tint);
+  color: var(--accent-deep);
+}
+
+/* Focus: visible on every interactive element, never removed without a
+   replacement. 2px accent with 2px offset. */
+:focus-visible {
+  outline: var(--focus-ring-w) solid var(--accent);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+:focus:not(:focus-visible) { outline: none; }
+
+/* Skip link, first tab stop in the shell */
+.skip-link {
+  position: absolute;
+  left: var(--space-4);
+  top: var(--space-4);
+  z-index: var(--z-tooltip);
+  transform: translateY(-200%);
+  background: var(--surface-raised);
+  color: var(--ink);
+  border: var(--hairline) solid var(--border-strong);
+  border-radius: var(--radius-control);
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  box-shadow: var(--shadow-md);
+  transition: transform var(--dur-base) var(--ease);
+}
+.skip-link:focus { transform: translateY(0); text-decoration: none; }
+
+/* Scrollbars */
+* { scrollbar-width: thin; scrollbar-color: var(--scrollbar) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); background-clip: content-box; }
+
+/* --------------------------------------------------------------------------
+   Keyframes. Nothing bounces, nothing overshoots.
+   -------------------------------------------------------------------------- */
+
+@keyframes cd-spin { to { transform: rotate(360deg); } }
+
+@keyframes cd-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes cd-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cd-modal-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes cd-sheet-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes cd-sheet-bottom {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes cd-toast-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cd-skeleton {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@keyframes cd-dot {
+  0%, 80%, 100% { opacity: 0.25; transform: scale(0.75); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes cd-orb {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.4); opacity: 1; }
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion: drop everything non essential. State still changes, it just
+   changes instantly. Loading indicators keep a slow, non flashing pulse.
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .cd-spinner__track,
+  .cd-dot,
+  .cd-orb.is-active::after {
+    animation-duration: 1.6s !important;
+    animation-iteration-count: infinite !important;
+  }
+
+  .cd-skeleton { animation: none !important; background-image: none !important; }
+}

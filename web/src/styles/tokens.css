@@ -1,0 +1,213 @@
+/* ==========================================================================
+   Cadence design tokens
+
+   Every value the UI is allowed to use lives here. Components reference the
+   semantic utility classes in utilities.css, which reference these variables.
+   No component file contains a raw colour.
+
+   Adding a third theme is one new [data-theme="..."] block below and nothing
+   else: the theme independent scales (space, radius, type, motion, shadow
+   geometry) sit outside the theme blocks and are never redefined.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Theme independent scales
+   -------------------------------------------------------------------------- */
+
+:root {
+  /* Type families ------------------------------------------------------- */
+  --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-sans: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Type scale ----------------------------------------------------------
+     Headings tight (1.05). Body generous (1.65). Only the eyebrow is caps. */
+  --text-eyebrow: 0.6875rem;  /* 11px */
+  --text-caption: 0.75rem;    /* 12px */
+  --text-sm: 0.8125rem;       /* 13px */
+  --text-base: 0.9375rem;     /* 15px, reading size */
+  --text-lg: 1.0625rem;       /* 17px */
+  --text-xl: 1.25rem;         /* 20px */
+  --text-2xl: 1.5rem;         /* 24px */
+  --text-3xl: 1.875rem;       /* 30px */
+  --text-4xl: 2.375rem;       /* 38px */
+  --text-display: 3rem;       /* 48px */
+
+  --leading-tight: 1.05;
+  --leading-snug: 1.3;
+  --leading-normal: 1.45;
+  --leading-body: 1.65;
+  --leading-relaxed: 1.8;
+
+  --tracking-eyebrow: 0.12em;
+  --tracking-tight: -0.02em;
+  --tracking-snug: -0.01em;
+  --tracking-normal: 0;
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Space: single 4px scale --------------------------------------------- */
+  --space-0: 0;
+  --space-1: 0.25rem;   /* 4  */
+  --space-2: 0.5rem;    /* 8  */
+  --space-3: 0.75rem;   /* 12 */
+  --space-4: 1rem;      /* 16 */
+  --space-5: 1.25rem;   /* 20 */
+  --space-6: 1.5rem;    /* 24 */
+  --space-7: 1.75rem;   /* 28 */
+  --space-8: 2rem;      /* 32 */
+  --space-10: 2.5rem;   /* 40 */
+  --space-12: 3rem;     /* 48 */
+  --space-14: 3.5rem;   /* 56 */
+  --space-16: 4rem;     /* 64 */
+  --space-20: 5rem;     /* 80 */
+  --space-24: 6rem;     /* 96 */
+
+  /* Radius --------------------------------------------------------------- */
+  --radius-card: 22px;
+  --radius-control: 12px;
+  --radius-sm: 8px;
+  --radius-pill: 999px;
+
+  /* Motion --------------------------------------------------------------- */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1); /* ease out, nothing bounces */
+  --dur-fast: 160ms;
+  --dur-base: 200ms;
+  --dur-slow: 250ms;
+
+  /* Shell geometry, fixed once and never overridden per screen ------------ */
+  --shell-sidebar-w: 248px;
+  --shell-gutter: var(--space-6);
+  --shell-gutter-lg: var(--space-10);
+  --shell-max-w: 1120px;
+  --shell-card-gap: var(--space-6);
+  --shell-card-pad: var(--space-6);
+  --shell-mobile-nav-h: 64px;
+
+  /* Controls ------------------------------------------------------------- */
+  /* One control height across the app. The compact variants keep this height
+     and change only type size, glyph size and horizontal padding, so no
+     control anywhere falls below the touch minimum. */
+  --control-h: 44px;
+  --touch-target: 44px;
+  --focus-ring-w: 2px;
+  --focus-ring-offset: 2px;
+  --hairline: 1px;
+
+  --z-sticky: 20;
+  --z-drawer: 60;
+  --z-overlay: 70;
+  --z-modal: 80;
+  --z-toast: 90;
+  --z-tooltip: 100;
+}
+
+/* --------------------------------------------------------------------------
+   2. light-blue  (default and canonical)
+   -------------------------------------------------------------------------- */
+
+:root,
+[data-theme='light-blue'] {
+  color-scheme: light;
+
+  /* Surfaces and ink */
+  --bg: #f4efe4;
+  --surface: #fbf8f1;
+  --surface-raised: #ffffff;
+  --surface-sunken: #efe9dc;
+
+  --ink: #16181d;
+  --ink-muted: #5c5f66;   /* 6.03:1 on --surface, 5.58:1 on --bg */
+  /* Supplementary or large text only. Set so it clears 3:1 on every ground it
+     lands on: 3.67:1 on --surface, 3.40:1 on --bg, 3.22:1 on --surface-sunken. */
+  --ink-subtle: #7e818a;
+  --ink-inverse: #fbf8f1;
+
+  /* Accent */
+  --accent: #2f5bd0;      /* white on accent 5.95:1 */
+  --accent-deep: #24499f;
+  --accent-soft: #6e8fe0;
+  --accent-tint: #e6ebf9;
+  --on-accent: #ffffff;
+
+  /* Lines */
+  --border: rgba(22, 24, 29, 0.08);
+  --border-strong: rgba(22, 24, 29, 0.14);
+
+  /* Warm neutral interaction tints, never blue */
+  --hover-tint: rgba(22, 24, 29, 0.035);
+  --active-tint: rgba(22, 24, 29, 0.06);
+
+  /* Status: deep and desaturated, each 4.5:1 or better on its own tint */
+  --success: #2e6b4f;
+  --success-tint: #e3efe8;
+  --warning: #8a5a17;
+  --warning-tint: #f6eddd;
+  --danger: #a3342c;
+  --danger-tint: #f7e7e5;
+
+  /* Depth: wide, soft, low opacity. Lift, not drop. */
+  --shadow-sm: 0 1px 2px rgba(22, 24, 29, 0.04), 0 2px 8px rgba(22, 24, 29, 0.04);
+  --shadow-md: 0 2px 4px rgba(22, 24, 29, 0.04), 0 8px 24px rgba(22, 24, 29, 0.06);
+  --shadow-lg: 0 4px 8px rgba(22, 24, 29, 0.05), 0 20px 56px rgba(22, 24, 29, 0.10);
+
+  --press-inset: inset 0 1px 3px rgba(22, 24, 29, 0.16);
+  --overlay-scrim: rgba(22, 24, 29, 0.32);
+  --scrollbar: rgba(22, 24, 29, 0.16);
+  --scrollbar-hover: rgba(22, 24, 29, 0.28);
+  --skeleton-base: rgba(22, 24, 29, 0.055);
+  --skeleton-sheen: rgba(22, 24, 29, 0.028);
+}
+
+/* --------------------------------------------------------------------------
+   3. dark-blue
+   Warm neutral darks, accent lifted for contrast, status re derived.
+   Text on a filled accent flips to a deep ink so the pairing still passes.
+   -------------------------------------------------------------------------- */
+
+[data-theme='dark-blue'] {
+  color-scheme: dark;
+
+  --bg: #14130f;
+  --surface: #1c1b17;
+  --surface-raised: #24231e;
+  --surface-sunken: #100f0c;
+
+  --ink: #f4f1e9;
+  --ink-muted: #aba79c;   /* 7.08:1 on --surface */
+  --ink-subtle: #7e7a70;  /* 4.03:1 on --surface */
+  --ink-inverse: #16181d;
+
+  --accent: #8faef8;      /* 7.78:1 on --surface */
+  --accent-deep: #a9c2fa; /* hover lifts further in the dark theme */
+  --accent-soft: #5e7fc9;
+  --accent-tint: #1e2635;
+  --on-accent: #11151f;   /* 8.35:1 against --accent */
+
+  --border: rgba(244, 241, 233, 0.10);
+  --border-strong: rgba(244, 241, 233, 0.18);
+
+  --hover-tint: rgba(244, 241, 233, 0.05);
+  --active-tint: rgba(244, 241, 233, 0.09);
+
+  --success: #6bbf8f;
+  --success-tint: #1b2a22;
+  --warning: #e0ac63;
+  --warning-tint: #2c2418;
+  --danger: #ec8c82;
+  --danger-tint: #33211f;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.22);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.30), 0 8px 24px rgba(0, 0, 0, 0.32);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.34), 0 20px 56px rgba(0, 0, 0, 0.46);
+
+  --press-inset: inset 0 1px 3px rgba(0, 0, 0, 0.34);
+  --overlay-scrim: rgba(6, 6, 5, 0.62);
+  --scrollbar: rgba(244, 241, 233, 0.16);
+  --scrollbar-hover: rgba(244, 241, 233, 0.28);
+  --skeleton-base: rgba(244, 241, 233, 0.07);
+  --skeleton-sheen: rgba(244, 241, 233, 0.035);
+}
