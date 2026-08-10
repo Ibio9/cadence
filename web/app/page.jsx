@@ -1,588 +1,903 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, hhmm, parseT, fmtDur, todayKey } from '../lib/api';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { api } from '../lib/api';
 
-const PPM = 1.15;
-const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+// ─── Design tokens ───────────────────────────────────────────────────────────
+const C = {
+  bg:       '#0a0a0f',
+  surface:  '#0f1117',
+  card:     '#13161f',
+  border:   '#1e2433',
+  borderHi: '#2a3347',
+  blue:     '#3b82f6',
+  indigo:   '#6366f1',
+  txt:      '#e2e8f0',
+  txtDim:   '#94a3b8',
+  txtFaint: '#475569',
+  green:    '#22c55e',
+  amber:    '#f59e0b',
+  red:      '#ef4444',
+  purple:   '#a855f7',
+};
 
-export default function Cadence() {
-  const [state, setState] = useState(null);
-  const [cursor, setCursor] = useState(todayKey());
-  const [pane, setPane] = useState('inbox');
-  const [modal, setModal] = useState(null);
-  const [toast, setToast] = useState('');
-  const [error, setError] = useState('');
-  const [tick, setTick] = useState(0);
-  const capRef = useRef(null);
-  const spineRef = useRef(null);
+const s = {
+  // layout
+  fill: { display: 'flex', flexDirection: 'column', height: '100%', background: C.bg },
+  row:  { display: 'flex', alignItems: 'center' },
+  col:  { display: 'flex', flexDirection: 'column' },
+  // text
+  label: { fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.txtFaint },
+  // card
+  card: {
+    background: C.card, border: `1px solid ${C.border}`,
+    borderRadius: 10, padding: '16px',
+  },
+  // input
+  input: {
+    background: C.surface, border: `1px solid ${C.border}`,
+    borderRadius: 8, padding: '9px 13px', color: C.txt,
+    width: '100%', fontSize: 14,
+  },
+  // button primary
+  btnPrimary: {
+    background: C.blue, color: '#fff', borderRadius: 8,
+    padding: '9px 18px', fontWeight: 600, fontSize: 13,
+    cursor: 'pointer', border: 'none',
+    transition: 'opacity 0.15s',
+  },
+  // badge
+  badge: (color) => ({
+    background: color + '22', color, borderRadius: 5,
+    padding: '2px 8px', fontSize: 11, fontWeight: 600,
+    letterSpacing: '0.04em',
+  }),
+};
 
-  const refresh = useCallback(async (date = cursor) => {
-    try { setState(await api.state(date)); setError(''); }
-    catch (e) { setError(e.message); }
-  }, [cursor]);
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const todayKey = () => {
+  const d = new Date();
+  const z = new Date(d.getTime() - d.getTimezoneOffset() * 6e4);
+  return z.toISOString().slice(0, 10);
+};
 
-  useEffect(() => { refresh(cursor); }, [cursor, refresh]);
-  useEffect(() => { const t = setInterval(() => setTick((n) => n + 1), 60000); return () => clearInterval(t); }, []);
+const ls = {
+  get: (k, fallback) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch { return fallback; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
 
-  const say = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2400); };
+const formatTime = (date = new Date()) =>
+  date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
-  /* ---------- keyboard ---------- */
-  useEffect(() => {
-    const onKey = (e) => {
-      const typing = /INPUT|TEXTAREA/.test(document.activeElement?.tagName || '');
-      if (e.key === '/' && !typing) { e.preventDefault(); capRef.current?.focus(); }
-      if (e.key === 'Escape') { setModal(null); capRef.current?.blur(); }
-      if (e.key === 'j' && !typing && (e.metaKey || e.ctrlKey)) { e.preventDefault(); setPane('jarvis'); }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+const formatDate = (date = new Date()) =>
+  date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  const projects = state?.projects || [];
-  const proj = (id) => projects.find((p) => p.id === id) || { name: '—', color: '#5EA4FF' };
+const NOTE_CATEGORIES = ['Ideas', 'Study', 'Markets', 'Business', 'Personal', 'TARA', 'StudentSolve'];
+const CAT_COLORS = {
+  Ideas: C.indigo, Study: C.blue, Markets: C.green,
+  Business: C.amber, Personal: C.purple, TARA: C.red, StudentSolve: '#06b6d4',
+};
 
-  /* ---------- derived ---------- */
-  const blocks = useMemo(() => [...(state?.blocks || [])].sort((a, b) => a.startMin - b.startMin), [state]);
-  const isToday = cursor === todayKey();
+const SLOT_COLORS = {
+  'Study':      { bg: '#1e3a5f', border: '#3b82f6', text: '#93c5fd' },
+  'Build':      { bg: '#1a1f3a', border: '#6366f1', text: '#a5b4fc' },
+  'Training':   { bg: '#1a2e1a', border: '#22c55e', text: '#86efac' },
+  'Admin':      { bg: '#2a2000', border: '#f59e0b', text: '#fcd34d' },
+  'Break':      { bg: '#1a1a1a', border: '#475569', text: '#94a3b8' },
+  'Deep Work':  { bg: '#2a1a3a', border: '#a855f7', text: '#d8b4fe' },
+  'Markets':    { bg: '#1a2e1a', border: '#10b981', text: '#6ee7b7' },
+};
 
-  const streak = useMemo(() => {
-    const byDay = {};
-    for (const b of state?.history || []) {
-      byDay[b.date] ??= { held: 0, settled: 0 };
-      if (b.status !== 'pending') byDay[b.date].settled++;
-      if (b.status === 'done') byDay[b.date].held++;
-    }
-    let n = 0;
-    const d = new Date();
-    for (let i = 0; i < 60; i++) {
-      const day = byDay[todayKey(d)];
-      if (!day || !day.settled) { if (i === 0) { d.setDate(d.getDate() - 1); continue; } break; }
-      if (day.held / day.settled >= 0.7) n++; else if (i > 0) break;
-      d.setDate(d.getDate() - 1);
-    }
-    return n;
-  }, [state]);
+const DEFAULT_HABITS = [
+  { id: 'read',     emoji: '📚', label: 'Read 30 pages' },
+  { id: 'podcast',  emoji: '🎧', label: 'Podcast / lecture (30 min)' },
+  { id: 'tara',     emoji: '📝', label: 'TARA prep (min 45 min)' },
+  { id: 'alevel',   emoji: '📖', label: 'A-level study block (2 hrs)' },
+  { id: 'training', emoji: '🥊', label: 'Muay Thai / training' },
+  { id: 'markets',  emoji: '📊', label: 'Review markets (MNQ / NQ)' },
+  { id: 'walk',     emoji: '🏃', label: 'Movement / walk' },
+  { id: 'macros',   emoji: '🥗', label: 'Track macros (target 66kg)' },
+];
 
-  const stats = useMemo(() => {
-    const planned = blocks.reduce((a, b) => a + (b.endMin - b.startMin), 0) / 60;
-    const held = blocks.filter((b) => b.status === 'done').reduce((a, b) => a + (b.endMin - b.startMin), 0) / 60;
-    const settled = blocks.filter((b) => b.status !== 'pending').length;
-    const rate = settled ? Math.round((blocks.filter((b) => b.status === 'done').length / settled) * 100) : 0;
-    return { planned, held, rate };
-  }, [blocks]);
+const JARVIS_SYSTEM = (checklist, timetable) => `You are Jarvis — Ibrahim Malik's personal AI. You know him completely.
 
-  /* ---------- mutations ---------- */
-  const mutate = async (fn) => { try { await fn(); await refresh(); } catch (e) { say(e.message); } };
+Ibrahim is 17, at Harris Westminster Sixth Form. A-levels: Further Maths, Maths, Economics, Philosophy. Target: Oxford PPE via TARA (October 2026, aiming 8.0+), St Hilda's College. GCSEs: 9 A*s, 1 A.
 
-  const capture = async (e) => {
-    if (e.key !== 'Enter' || !e.target.value.trim()) return;
-    const text = e.target.value.trim();
-    e.target.value = '';
-    await mutate(() => api.create('inbox', { text }));
-    say('Captured to intel buffer');
-  };
+He has CFA Investment Foundations (89%, age 14), Bloomberg certified, UK Economics Olympiad top 23, GBEO finalist. Placements at BNP Paribas, Société Générale (algo trading desk), Trading Performance Centre (Quantower), Schroders. He trades MNQ futures, built NQConfluenceScalper in C#.
 
-  const markBlock = (b, status) =>
-    mutate(() => api.update('blocks', b.id, { status: b.status === status ? 'pending' : status }));
+His main build is StudentSolve — AI revision platform for UK GCSE/A-Level, September 2026 launch. Also: dental consent MCQ with his uncle (~£100/mo/practice), clinic blood results portal. He's done a lot of startup kill-tests (freight invoicing, MTD bookkeeping, tenancy deposits, probate copilot — all killed on saturation or distribution).
 
-  /* ---------- spine geometry ---------- */
-  const [lo, hi] = useMemo(() => {
-    let a = 360, z = 1440;
-    if (blocks.length) { a = Math.min(a, blocks[0].startMin - 30); z = Math.max(...blocks.map((b) => b.endMin)) + 30; }
-    return [Math.floor(a / 60) * 60, Math.min(1440, Math.ceil(z / 60) * 60)];
-  }, [blocks]);
-  const y = (m) => (m - lo) * PPM;
+He did Muay Thai at Tiger Muay Thai Phuket in July 2026. 66kg/180cm. Looking for a BJJ gym in NW London. Mensa. VEX Robotics National Champion 2023. 44 countries. PADI diver.
 
-  const gaps = useMemo(() => {
-    const out = [];
-    let cur = lo;
-    for (const b of blocks) { if (b.startMin - cur >= 25) out.push([cur, b.startMin]); cur = Math.max(cur, b.endMin); }
-    if (hi - cur >= 25) out.push([cur, hi]);
-    return out;
-  }, [blocks, lo, hi]);
+Currently reading Uncommon Knowledge. Just finished Liar's Poker, More Money Than God.
 
-  const nm = nowMin();
-  useEffect(() => {
-    if (!state || !isToday || !spineRef.current) return;
-    spineRef.current.scrollTop = y(nm) - spineRef.current.clientHeight / 2.6;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state?.date]);
+Real tension: StudentSolve launch (September) + TARA prep (October) + A-levels + multiple live builds. Be honest about this allocation problem when relevant, not just validating.
 
-  const shiftDay = (n) => { const d = new Date(cursor + 'T12:00:00'); d.setDate(d.getDate() + n); setCursor(todayKey(d)); };
+Today's checklist status: ${checklist}
+Today's timetable: ${timetable}
 
-  if (error && !state) return <Fatal message={error} />;
-  if (!state) return <Boot />;
+Be direct, specific, no filler. You know Ibrahim — don't explain things he already knows. Challenge him when warranted. When he asks about scheduling, use his actual timetable. When he asks about study, be aware of TARA and his A-level subjects. When he asks about markets, engage properly.`;
 
-  const dateObj = new Date(cursor + 'T12:00:00');
-  const heldPct = stats.planned ? Math.round((stats.held / stats.planned) * 100) : 0;
-
+// ─── Progress Ring ────────────────────────────────────────────────────────────
+function ProgressRing({ pct, size = 80, stroke = 7 }) {
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const dash = (pct / 100) * circ;
   return (
-    <div id="app">
-      <div className="bg" />
-      <div className="scan" />
-
-      {/* ============ TOP BAR ============ */}
-      <header id="topbar">
-        <div className="brand">
-          <Reactor className="reactor" />
-          <div className="brand-txt">
-            <div id="logo">CADENCE</div>
-            <div className="brand-sub">PERSONAL&nbsp;OS</div>
-          </div>
-        </div>
-
-        <div id="cmd">
-          <span className="cmd-prompt">▸</span>
-          <input ref={capRef} id="cap" autoComplete="off" onKeyDown={capture}
-            placeholder="Log anything to the intel buffer — thoughts, tasks, noise. Sort it later." />
-          <span className="kbd">/</span>
-        </div>
-
-        <div id="readouts">
-          <Gauge label="Held" value={<><b>{stats.held.toFixed(1)}</b><span className="u">/{stats.planned.toFixed(1)}h</span></>} pct={heldPct} />
-          <Gauge label="Hold rate" value={<><b>{stats.rate}</b><span className="u">%</span></>} pct={stats.rate} />
-          <Gauge label="Streak" value={<><b>{streak}</b><span className="u">d</span></>} pct={Math.min(streak / 14 * 100, 100)} accent="streak" />
-        </div>
-      </header>
-
-      {/* ============ SHELL ============ */}
-      <div id="shell">
-        <main id="main">
-          <div id="dayhead">
-            <div className="dh-l">
-              <h1 id="dtitle">{isToday ? 'Today' : dateObj.toLocaleDateString('en-GB', { weekday: 'long' })}</h1>
-              <div className="sub">{dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}</div>
-              {isToday && <span className="livechip">Live · {hhmm(nm)}</span>}
-            </div>
-            <div className="nav">
-              <button onClick={() => shiftDay(-1)} aria-label="Previous day">◄</button>
-              <button onClick={() => setCursor(todayKey())}>Today</button>
-              <button onClick={() => shiftDay(1)} aria-label="Next day">►</button>
-            </div>
-          </div>
-
-          <div id="spinewrap" ref={spineRef}>
-            <div id="spine" style={{ height: (hi - lo) * PPM }}>
-              {Array.from({ length: (hi - lo) / 60 + 1 }, (_, i) => lo + i * 60).map((m) => (
-                <div key={m} className="hour" style={{ top: y(m) }}><i>{hhmm(m)}</i></div>
-              ))}
-
-              {gaps.map(([a, b]) => (
-                <div key={a} className="empty" style={{ top: y(a) + 2, height: (b - a) * PPM - 6 }}
-                  onClick={() => setModal({ kind: 'block', data: { title: '', startMin: a, endMin: Math.min(b, a + 60), projectId: projects[0]?.id } })}>
-                  + Deploy · {fmtDur(b - a)} open — {hhmm(a)} to {hhmm(b)}
-                </div>
-              ))}
-
-              {blocks.map((b) => {
-                const p = proj(b.projectId);
-                const live = isToday && nm >= b.startMin && nm < b.endMin;
-                const cls = ['block', b.source === 'jarvis' ? 'jarvis' : '', b.fixed ? 'fixed' : '', b.status,
-                  live ? 'now' : '', isToday && nm >= b.endMin && b.status === 'pending' ? 'past' : ''].join(' ');
-                return (
-                  <div key={b.id} className={cls} style={{ top: y(b.startMin), height: Math.max((b.endMin - b.startMin) * PPM - 4, 34), '--accent': p.color }}
-                    onClick={() => setModal({ kind: 'block', data: b })}>
-                    <div className="t">{b.title}
-                      <span className="tag" style={{ color: p.color, borderColor: `${p.color}55` }}>{p.name}</span>
-                    </div>
-                    <div className="m">{hhmm(b.startMin)}–{hhmm(b.endMin)} · {fmtDur(b.endMin - b.startMin)}{b.source === 'jarvis' ? ' · proposed by jarvis' : ''}</div>
-                    <div className="acts" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => markBlock(b, 'done')}>hold</button>
-                      <button onClick={() => markBlock(b, 'missed')}>miss</button>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {isToday && nm >= lo && nm <= hi && (
-                <div id="nowline" style={{ top: y(nm) }} data-tick={tick}><b>{hhmm(nm)}</b></div>
-              )}
-            </div>
-          </div>
-        </main>
-
-        {/* ============ SIDE ============ */}
-        <aside id="side">
-          <div id="tabs">
-            {[['inbox', 'Intel'], ['tasks', 'Missions'], ['rhythm', 'Protocols'], ['jarvis', 'Jarvis']].map(([p, label]) => (
-              <button key={p} className={pane === p ? 'on' : ''} onClick={() => setPane(p)}>
-                {label}{p === 'inbox' && state?.inbox?.length ? <span className="c"> {state.inbox.length}</span> : null}
-              </button>
-            ))}
-          </div>
-
-          <div className={`pane ${pane === 'inbox' ? 'on' : ''}`}>
-            <Inbox state={state} mutate={mutate} setModal={setModal} projects={projects} say={say} />
-          </div>
-          <div className={`pane ${pane === 'tasks' ? 'on' : ''}`}>
-            <Tasks state={state} mutate={mutate} proj={proj} setModal={setModal} />
-          </div>
-          <div className={`pane ${pane === 'rhythm' ? 'on' : ''}`}>
-            <Rhythm state={state} proj={proj} setModal={setModal} />
-          </div>
-          <div className={`pane ${pane === 'jarvis' ? 'on' : ''}`} style={{ padding: 0, overflow: 'hidden' }}>
-            <Jarvis state={state} cursor={cursor} refresh={refresh} say={say} active={pane === 'jarvis'} />
-          </div>
-        </aside>
-      </div>
-
-      {modal && (
-        <Modal modal={modal} projects={projects} onClose={() => setModal(null)} mutate={mutate} say={say} />
-      )}
-      <div id="toast" className={toast ? 'on' : ''}>{toast}</div>
-    </div>
-  );
-}
-
-/* ================= HUD atoms ================= */
-
-function Gauge({ label, value, pct = 0, accent = '' }) {
-  return (
-    <div className={`gauge ${accent}`}>
-      <div className="gl">{label}</div>
-      <div className="gv">{value}</div>
-      <div className="bar" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
-    </div>
-  );
-}
-
-function Reactor({ className = 'reactor', color = '#28E4FF' }) {
-  return (
-    <svg className={className} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <defs>
-        <radialGradient id="reactorCore" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#EAFDFF" />
-          <stop offset="45%" stopColor={color} />
-          <stop offset="100%" stopColor="rgba(40,228,255,0)" />
-        </radialGradient>
-      </defs>
-      <circle cx="50" cy="50" r="47" fill="none" stroke={color} strokeOpacity="0.22" strokeWidth="1" />
-      <circle className="spin-slow" cx="50" cy="50" r="42" fill="none" stroke={color} strokeOpacity="0.5"
-        strokeWidth="2" strokeDasharray="3 7" />
-      <circle className="spin-rev" cx="50" cy="50" r="34" fill="none" stroke={color} strokeOpacity="0.7"
-        strokeWidth="3" strokeDasharray="14 12" strokeLinecap="round" />
-      <circle className="pulse-ring" cx="50" cy="50" r="24" fill="none" stroke={color} strokeWidth="1.5" strokeDasharray="2 5" />
-      <circle cx="50" cy="50" r="17" fill="url(#reactorCore)" />
-      <circle cx="50" cy="50" r="11" fill="none" stroke="#EAFDFF" strokeOpacity="0.85" strokeWidth="1.5" />
-      <circle cx="50" cy="50" r="4.5" fill="#EAFDFF" />
+    <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={C.border} strokeWidth={stroke} />
+      <circle
+        cx={size/2} cy={size/2} r={r} fill="none"
+        stroke={pct === 100 ? C.green : C.blue} strokeWidth={stroke}
+        strokeDasharray={`${dash} ${circ}`}
+        strokeLinecap="round"
+        style={{ transition: 'stroke-dasharray 0.4s ease' }}
+      />
     </svg>
   );
 }
 
-/* ================= panes ================= */
+// ─── Tab: Today ───────────────────────────────────────────────────────────────
+function TodayTab({ checklistState, setChecklistState }) {
+  const key = todayKey();
+  const [time, setTime] = useState(formatTime());
+  const [customInput, setCustomInput] = useState('');
+  const [timeLog, setTimeLog] = useState(() => ls.get('cadence_timelog_' + key, {}));
 
-function Inbox({ state, mutate, setModal, projects, say }) {
-  if (!state) return null;
-  if (!state.inbox.length)
-    return <div className="blank"><b>Buffer clear</b>Everything on your mind goes in the command line up top. Capture now, triage later — that&apos;s the protocol.</div>;
+  useEffect(() => {
+    const t = setInterval(() => setTime(formatTime()), 30000);
+    return () => clearInterval(t);
+  }, []);
 
-  return (
-    <>
-      <h3 className="ph">Incoming intel · {state.inbox.length}</h3>
-      {state.inbox.map((i) => (
-        <div className="row" key={i.id}>
-          <div className="txt">{i.text}</div>
-          <div className="meta">
-            <span>{new Date(i.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
-            <button onClick={async () => {
-              await mutate(async () => {
-                await api.create('tasks', { title: i.text, projectId: projects[0]?.id });
-                await api.remove('inbox', i.id);
-              });
-              say('Promoted to mission');
-            }}>→ mission</button>
-            <button onClick={async () => {
-              const start = Math.ceil(nowMin() / 30) * 30;
-              await mutate(() => api.remove('inbox', i.id));
-              setModal({ kind: 'block', data: { title: i.text, startMin: start, endMin: start + 60, projectId: projects[0]?.id } });
-            }}>→ deploy</button>
-            <button onClick={() => mutate(() => api.remove('inbox', i.id))}>discard</button>
-          </div>
-        </div>
-      ))}
-    </>
-  );
-}
+  const habits = checklistState.habits;
+  const checked = checklistState.checked;
 
-function Tasks({ state, mutate, proj, setModal }) {
-  if (!state) return null;
-  const open = state.tasks.filter((t) => !t.done);
-  const done = state.tasks.filter((t) => t.done);
+  const toggle = (id) => {
+    const next = checked.includes(id) ? checked.filter(x => x !== id) : [...checked, id];
+    const nextState = { ...checklistState, checked: next };
+    setChecklistState(nextState);
+    ls.set('cadence_checklist_' + key, nextState);
 
-  const Row = (t) => {
-    const p = proj(t.projectId);
-    return (
-      <div className={`row task ${t.done ? 'done' : ''}`} key={t.id}>
-        <div className="txt">{t.title}</div>
-        <div className="meta">
-          <span className="pill" style={{ color: p.color, borderColor: `${p.color}55` }}>{p.name}</span>
-          <span className="pill">{t.energy}</span>
-          <span className="pill">{fmtDur(t.est)}</span>
-          <button onClick={() => mutate(() => api.update('tasks', t.id, { done: !t.done }))}>{t.done ? 'reopen' : 'complete'}</button>
-          <button onClick={() => {
-            const start = Math.ceil(nowMin() / 30) * 30;
-            setModal({ kind: 'block', data: { title: t.title, startMin: start, endMin: start + t.est, projectId: t.projectId } });
-          }}>deploy</button>
-          <button onClick={() => mutate(() => api.remove('tasks', t.id))}>abort</button>
-        </div>
-      </div>
-    );
+    // update streaks
+    const streaks = ls.get('cadence_streaks', {});
+    if (!checked.includes(id)) {
+      streaks[id] = (streaks[id] || 0) + 1;
+    } else {
+      streaks[id] = Math.max(0, (streaks[id] || 1) - 1);
+    }
+    ls.set('cadence_streaks', streaks);
   };
 
-  return (
-    <>
-      <h3 className="ph">Active objectives · {open.length}</h3>
-      {open.length ? open.map(Row) : <div className="blank"><b>No active missions</b>Triage the intel buffer, or hand it to Jarvis to sort.</div>}
-      {done.length > 0 && <><h3 className="ph">Completed · {done.length}</h3>{done.slice(0, 8).map(Row)}</>}
-    </>
-  );
-}
+  const addCustom = () => {
+    const label = customInput.trim();
+    if (!label) return;
+    const id = 'custom_' + Date.now();
+    const nextHabits = [...habits, { id, emoji: '✏️', label }];
+    const nextState = { ...checklistState, habits: nextHabits };
+    setChecklistState(nextState);
+    ls.set('cadence_checklist_' + key, nextState);
+    setCustomInput('');
+  };
 
-function Rhythm({ state, proj, setModal }) {
-  if (!state) return null;
+  const streaks = ls.get('cadence_streaks', {});
+  const pct = habits.length ? Math.round((checked.length / habits.length) * 100) : 0;
+
+  const motLines = [
+    'TARA is 8 weeks out. Every session compounds.',
+    'StudentSolve launches in September. Today\'s code is tomorrow\'s users.',
+    'The Oxford interview rewards depth, not breadth. Go deep today.',
+    'Liar\'s Poker taught you: edge is everything. Build yours.',
+    'Markets open. MNQ is live. Stay sharp.',
+  ];
+  const mot = motLines[new Date().getDay() % motLines.length];
+
   return (
-    <>
-      <h3 className="ph">Standing protocols</h3>
-      <div className="blank" style={{ textAlign: 'left', padding: '0 0 14px' }}>
-        These recur indefinitely. Edit one here and it reshapes every future day — edit a block on the timeline and only that day changes.
+    <div style={{ ...s.col, gap: 20, padding: '24px', overflowY: 'auto', flex: 1 }}>
+      {/* Header */}
+      <div style={{ ...s.col, gap: 4 }}>
+        <div style={{ fontSize: 13, color: C.txtDim }}>{formatDate()}</div>
+        <div style={{ fontSize: 14, color: C.blue, fontStyle: 'italic' }}>{mot}</div>
       </div>
-      {state.rhythms.map((r) => {
-        const p = proj(r.projectId);
-        return (
-          <div className="row" key={r.id}>
-            <div className="txt">{r.title}</div>
-            <div className="meta">
-              <span>{hhmm(r.startMin)}–{hhmm(r.endMin)}</span>
-              <span className="pill" style={{ color: p.color, borderColor: `${p.color}55` }}>{p.name}</span>
-              <span>{r.days.map((d) => DAY_SHORT[d]).join(' ')}</span>
-              {r.fixed && <span className="pill" style={{ color: 'var(--amber)', borderColor: 'rgba(255,194,75,.4)' }}>locked</span>}
-              <button onClick={() => setModal({ kind: 'rhythm', data: r })}>modify</button>
+
+      {/* Stats row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        {[
+          { label: 'Done today', val: `${checked.length} / ${habits.length}` },
+          { label: 'Time', val: time },
+          { label: 'Streak (avg)', val: `${habits.length ? Math.round(Object.values(streaks).reduce((a,b)=>a+b,0)/Math.max(habits.length,1)) : 0}d` },
+        ].map(({ label, val }) => (
+          <div key={label} style={{ ...s.card, textAlign: 'center' }}>
+            <div style={{ ...s.label, marginBottom: 6 }}>{label}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: C.txt }}>{val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Progress + Checklist */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 20, alignItems: 'start' }}>
+        {/* Ring */}
+        <div style={{ ...s.card, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '20px 24px' }}>
+          <div style={{ position: 'relative' }}>
+            <ProgressRing pct={pct} size={90} stroke={8} />
+            <div style={{
+              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 18, fontWeight: 700, color: C.txt,
+            }}>
+              {pct}%
             </div>
           </div>
-        );
-      })}
-      <button className="addbtn"
-        onClick={() => setModal({ kind: 'rhythm', data: { title: '', startMin: 1080, endMin: 1140, days: [1, 2, 3, 4, 5], projectId: state.projects[0]?.id, fixed: true } })}>
-        + New protocol
-      </button>
-    </>
+          <div style={{ ...s.label }}>today</div>
+        </div>
+
+        {/* Habits list */}
+        <div style={{ ...s.col, gap: 8 }}>
+          {habits.map((h) => {
+            const done = checked.includes(h.id);
+            const streak = streaks[h.id] || 0;
+            return (
+              <div
+                key={h.id}
+                onClick={() => toggle(h.id)}
+                style={{
+                  ...s.card, ...s.row, gap: 12, cursor: 'pointer',
+                  borderColor: done ? C.blue + '55' : C.border,
+                  background: done ? C.blue + '0d' : C.card,
+                  padding: '12px 16px',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <div style={{
+                  width: 20, height: 20, borderRadius: 6,
+                  border: `2px solid ${done ? C.blue : C.borderHi}`,
+                  background: done ? C.blue : 'transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, transition: 'all 0.15s',
+                }}>
+                  {done && <svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4l3 3 6-6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                </div>
+                <span style={{ fontSize: 16 }}>{h.emoji}</span>
+                <span style={{ flex: 1, color: done ? C.txtDim : C.txt, textDecoration: done ? 'line-through' : 'none' }}>
+                  {h.label}
+                </span>
+                {streak > 0 && (
+                  <span style={{ ...s.badge(C.amber), fontSize: 11 }}>🔥 {streak}d</span>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Add custom */}
+          <div style={{ ...s.row, gap: 8, marginTop: 4 }}>
+            <input
+              style={{ ...s.input }}
+              placeholder="Add habit…"
+              value={customInput}
+              onChange={e => setCustomInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addCustom()}
+            />
+            <button style={{ ...s.btnPrimary, whiteSpace: 'nowrap' }} onClick={addCustom}>Add</button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
-/* ================= JARVIS ================= */
+// ─── Tab: Notes ───────────────────────────────────────────────────────────────
+function NotesTab() {
+  const [notes, setNotes] = useState(() => ls.get('cadence_notes', []));
+  const [search, setSearch] = useState('');
+  const [catFilter, setCatFilter] = useState('All');
+  const [capturing, setCapturing] = useState('');
+  const [capCat, setCapCat] = useState('Ideas');
+  const [expanded, setExpanded] = useState(null);
+  const [editBody, setEditBody] = useState('');
+  const [customCats, setCustomCats] = useState(() => ls.get('cadence_note_cats', []));
+  const [newCat, setNewCat] = useState('');
+  const saveTimer = useRef(null);
 
-function Typed({ text, onType }) {
-  const [n, setN] = useState(0);
-  useEffect(() => {
-    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (reduce || !text) { setN(text?.length || 0); return; }
-    setN(0);
-    let i = 0;
-    const step = Math.max(1, Math.round(text.length / 140));
-    const id = setInterval(() => {
-      i = Math.min(text.length, i + step);
-      setN(i);
-      onType?.();
-      if (i >= text.length) clearInterval(id);
-    }, 16);
-    return () => clearInterval(id);
-  }, [text]); // eslint-disable-line react-hooks/exhaustive-deps
-  const done = n >= (text?.length || 0);
-  return <>{text.slice(0, n)}{!done && <span className="caret" />}</>;
-}
+  const allCats = [...NOTE_CATEGORIES, ...customCats];
 
-function Jarvis({ state, cursor, refresh, say, active }) {
-  const [log, setLog] = useState([]);
-  const [busy, setBusy] = useState(false);
-  const inRef = useRef(null);
-  const logRef = useRef(null);
-
-  const scrollDown = () => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; };
-
-  // seed from server history only on first load; then manage locally so typing isn't cut off
-  useEffect(() => {
-    setLog((l) => (l.length === 0 && state?.chat?.length ? state.chat.map((m) => ({ role: m.role, text: m.text })) : l));
-  }, [state?.chat?.length]);
-  useEffect(scrollDown, [log]);
-  useEffect(() => { if (active) inRef.current?.focus(); }, [active]);
-
-  const send = async (text) => {
-    const message = (text ?? inRef.current.value).trim();
-    if (!message || busy) return;
-    if (inRef.current) inRef.current.value = '';
-    setLog((l) => [...l, { role: 'user', text: message }, { role: 'assistant', pending: true }]);
-    setBusy(true);
-    try {
-      const r = await api.jarvis(message, cursor);
-      setLog((l) => [...l.slice(0, -1), { role: 'assistant', text: r.text, animate: true }]);
-      if (r.applied) say(`Jarvis deployed ${r.applied} item${r.applied > 1 ? 's' : ''} — review before you commit`);
-      await refresh();
-    } catch (e) {
-      setLog((l) => [...l.slice(0, -1), { role: 'assistant', text: `Signal lost: ${e.message}. Your data is untouched.`, animate: true }]);
-    }
-    setBusy(false);
+  const save = (next) => {
+    setNotes(next);
+    ls.set('cadence_notes', next);
   };
 
+  const addNote = () => {
+    if (!capturing.trim()) return;
+    const note = {
+      id: Date.now(),
+      title: capturing.trim().split('\n')[0].slice(0, 60),
+      body: capturing.trim(),
+      category: capCat,
+      ts: Date.now(),
+    };
+    save([note, ...notes]);
+    setCapturing('');
+  };
+
+  const deleteNote = (id) => {
+    save(notes.filter(n => n.id !== id));
+    if (expanded === id) setExpanded(null);
+  };
+
+  const openNote = (note) => {
+    setExpanded(note.id);
+    setEditBody(note.body);
+  };
+
+  const handleEdit = (val) => {
+    setEditBody(val);
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      save(notes.map(n => n.id === expanded ? { ...n, body: val, title: val.split('\n')[0].slice(0, 60) } : n));
+    }, 600);
+  };
+
+  const addCat = () => {
+    if (!newCat.trim() || allCats.includes(newCat.trim())) return;
+    const next = [...customCats, newCat.trim()];
+    setCustomCats(next);
+    ls.set('cadence_note_cats', next);
+    setNewCat('');
+  };
+
+  const filtered = notes.filter(n => {
+    const matchCat = catFilter === 'All' || n.category === catFilter;
+    const matchSearch = !search || n.body.toLowerCase().includes(search.toLowerCase());
+    return matchCat && matchSearch;
+  });
+
+  const color = (cat) => CAT_COLORS[cat] || C.indigo;
+
+  const expandedNote = notes.find(n => n.id === expanded);
+
   return (
-    <div id="jwrap">
-      <div id="jcore">
-        <Reactor className="orb" color={busy ? '#FFC24B' : '#28E4FF'} />
-        <div className={`jstat ${busy ? 'busy' : ''}`}>
-          <div className="n">JARVIS</div>
-          <div className="s">{busy ? 'Processing…' : 'Online · standing by'}</div>
+    <div style={{ display: 'grid', gridTemplateColumns: expanded ? '1fr 1fr' : '1fr', height: '100%', overflow: 'hidden' }}>
+      {/* Left pane */}
+      <div style={{ ...s.col, gap: 0, overflow: 'hidden', borderRight: expanded ? `1px solid ${C.border}` : 'none' }}>
+        {/* Capture bar */}
+        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, ...s.col, gap: 10 }}>
+          <textarea
+            style={{ ...s.input, resize: 'none', minHeight: 60, borderRadius: 8, padding: '10px 13px' }}
+            placeholder="Capture a note… (Enter to save)"
+            value={capturing}
+            onChange={e => setCapturing(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) addNote(); }}
+          />
+          <div style={{ ...s.row, gap: 8 }}>
+            <select
+              style={{ ...s.input, width: 'auto', flex: 1, padding: '7px 12px', borderRadius: 8 }}
+              value={capCat} onChange={e => setCapCat(e.target.value)}
+            >
+              {allCats.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <button style={{ ...s.btnPrimary }} onClick={addNote}>Save ⌘↵</button>
+          </div>
+        </div>
+
+        {/* Search + filter */}
+        <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, ...s.col, gap: 10 }}>
+          <input
+            style={{ ...s.input }}
+            placeholder="Search notes…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <div style={{ ...s.row, gap: 6, flexWrap: 'wrap' }}>
+            {['All', ...allCats].map(c => (
+              <button
+                key={c}
+                onClick={() => setCatFilter(c)}
+                style={{
+                  padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  border: `1px solid ${catFilter === c ? color(c) : C.border}`,
+                  background: catFilter === c ? color(c) + '22' : 'transparent',
+                  color: catFilter === c ? color(c) : C.txtDim,
+                  transition: 'all 0.1s',
+                }}
+              >{c}</button>
+            ))}
+            <div style={{ ...s.row, gap: 4, marginLeft: 4 }}>
+              <input
+                style={{ ...s.input, width: 90, padding: '4px 8px', fontSize: 12, borderRadius: 6 }}
+                placeholder="+ category"
+                value={newCat}
+                onChange={e => setNewCat(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addCat()}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Notes list */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px', ...s.col, gap: 8 }}>
+          {filtered.length === 0 && (
+            <div style={{ color: C.txtFaint, fontSize: 13, marginTop: 20, textAlign: 'center' }}>
+              {search ? 'No notes match your search.' : 'No notes yet. Start capturing.'}
+            </div>
+          )}
+          {filtered.map(n => (
+            <div
+              key={n.id}
+              onClick={() => expanded === n.id ? setExpanded(null) : openNote(n)}
+              style={{
+                ...s.card, cursor: 'pointer', padding: '12px 14px',
+                borderColor: expanded === n.id ? color(n.category) + '55' : C.border,
+                background: expanded === n.id ? color(n.category) + '0a' : C.card,
+                transition: 'all 0.15s',
+              }}
+            >
+              <div style={{ ...s.row, justifyContent: 'space-between', marginBottom: 4 }}>
+                <div style={{ ...s.row, gap: 8 }}>
+                  <span style={{ ...s.badge(color(n.category)) }}>{n.category}</span>
+                </div>
+                <div style={{ ...s.row, gap: 8 }}>
+                  <span style={{ fontSize: 11, color: C.txtFaint }}>
+                    {new Date(n.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                  </span>
+                  <button
+                    onClick={e => { e.stopPropagation(); deleteNote(n.id); }}
+                    style={{ color: C.txtFaint, fontSize: 14, lineHeight: 1, padding: '0 2px' }}
+                  >×</button>
+                </div>
+              </div>
+              <div style={{ fontSize: 13, color: C.txt, fontWeight: 500, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {n.title || '(untitled)'}
+              </div>
+              <div style={{ fontSize: 12, color: C.txtDim, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                {n.body.slice(0, 200)}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      <div id="jlog" ref={logRef}>
-        {log.length === 0 && (
-          <div className="msg j">Systems online. Your skeleton is loaded and I&apos;m watching the day. Dump whatever&apos;s in your head into the command line up top — then tell me to fill your gaps.</div>
-        )}
-        {log.map((m, i) => {
-          if (m.pending) return <div key={i} className="msg j"><span className="think"><i /><i /><i /></span></div>;
+      {/* Right pane — note editor */}
+      {expanded && expandedNote && (
+        <div style={{ ...s.col, overflow: 'hidden' }}>
+          <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, ...s.row, justifyContent: 'space-between' }}>
+            <span style={{ ...s.badge(color(expandedNote.category)) }}>{expandedNote.category}</span>
+            <div style={{ ...s.row, gap: 10 }}>
+              <span style={{ fontSize: 11, color: C.txtFaint }}>auto-saving</span>
+              <button
+                onClick={() => deleteNote(expandedNote.id)}
+                style={{ color: C.red, fontSize: 13, fontWeight: 500 }}
+              >Delete</button>
+              <button onClick={() => setExpanded(null)} style={{ color: C.txtDim, fontSize: 20, lineHeight: 1 }}>×</button>
+            </div>
+          </div>
+          <textarea
+            style={{
+              flex: 1, background: 'transparent', color: C.txt, fontSize: 14,
+              padding: '20px', resize: 'none', lineHeight: 1.7,
+              fontFamily: 'inherit', border: 'none', outline: 'none',
+            }}
+            value={editBody}
+            onChange={e => handleEdit(e.target.value)}
+            autoFocus
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Tab: Timetable ───────────────────────────────────────────────────────────
+const HOURS = Array.from({ length: 18 }, (_, i) => i + 6); // 06:00–23:00
+const SLOT_TYPES = Object.keys(SLOT_COLORS);
+
+function TimetableTab() {
+  const key = 'cadence_timetable_' + todayKey();
+  const [slots, setSlots] = useState(() => ls.get(key, {}));
+  const [editHour, setEditHour] = useState(null);
+  const [editLabel, setEditLabel] = useState('');
+  const [editType, setEditType] = useState('Study');
+  const [generating, setGenerating] = useState(false);
+  const [genPrompt, setGenPrompt] = useState('');
+  const [genError, setGenError] = useState('');
+
+  const saveSlots = (next) => { setSlots(next); ls.set(key, next); };
+
+  const openEdit = (hour) => {
+    setEditHour(hour);
+    const existing = slots[hour];
+    setEditLabel(existing?.label || '');
+    setEditType(existing?.type || 'Study');
+  };
+
+  const saveSlot = () => {
+    if (!editLabel.trim()) {
+      const next = { ...slots };
+      delete next[editHour];
+      saveSlots(next);
+    } else {
+      saveSlots({ ...slots, [editHour]: { label: editLabel.trim(), type: editType } });
+    }
+    setEditHour(null);
+  };
+
+  const clearSlot = (hour) => {
+    const next = { ...slots };
+    delete next[hour];
+    saveSlots(next);
+  };
+
+  const generate = async () => {
+    if (!genPrompt.trim()) return;
+    setGenerating(true);
+    setGenError('');
+    try {
+      const sysPrompt = `You are scheduling Ibrahim Malik's day. He is 17, at Harris Westminster Sixth Form, A-levels Further Maths/Maths/Economics/Philosophy. Main priorities: StudentSolve (AI revision platform, September 2026 launch), TARA exam prep (Oxford PPE, October 2026), A-level study, markets (MNQ trading), and training (Muay Thai/BJJ). Wake typically 6-7am. Given his tasks for today, create a realistic hour-by-hour schedule from 06:00 to 23:00. Respond ONLY with a valid JSON object where keys are hours as numbers (6-22) and values are objects with "label" (string, brief task name) and "type" (one of: Study, Build, Training, Admin, Break, Deep Work, Markets). Example: {"7":{"label":"Morning routine","type":"Admin"},"8":{"label":"TARA past paper","type":"Deep Work"}}. No explanation, only the JSON object.`;
+
+      const result = await api.jarvis(`${sysPrompt}\n\nUser's tasks for today: ${genPrompt}`, todayKey());
+      // api.jarvis returns { reply } based on the API structure
+      const text = result?.reply || result?.message || JSON.stringify(result);
+      // extract JSON
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('No JSON in response');
+      const parsed = JSON.parse(match[0]);
+      // validate and normalise
+      const next = {};
+      for (const [k, v] of Object.entries(parsed)) {
+        const hour = parseInt(k, 10);
+        if (hour >= 6 && hour <= 22 && v?.label) {
+          next[hour] = { label: v.label, type: SLOT_TYPES.includes(v.type) ? v.type : 'Study' };
+        }
+      }
+      saveSlots(next);
+    } catch (e) {
+      setGenError('Generation failed: ' + e.message);
+    }
+    setGenerating(false);
+  };
+
+  const now = new Date();
+  const currentHour = now.getHours();
+
+  return (
+    <div style={{ ...s.col, height: '100%', overflow: 'hidden' }}>
+      {/* Generate bar */}
+      <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, ...s.col, gap: 10 }}>
+        <div style={{ ...s.row, gap: 8 }}>
+          <input
+            style={{ ...s.input, flex: 1 }}
+            placeholder="What do you need to get done today? Jarvis will schedule it…"
+            value={genPrompt}
+            onChange={e => setGenPrompt(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && generate()}
+            disabled={generating}
+          />
+          <button
+            style={{ ...s.btnPrimary, opacity: generating ? 0.6 : 1, whiteSpace: 'nowrap' }}
+            onClick={generate}
+            disabled={generating}
+          >
+            {generating ? 'Generating…' : 'Generate Schedule'}
+          </button>
+        </div>
+        {genError && <div style={{ color: C.red, fontSize: 12 }}>{genError}</div>}
+        <div style={{ ...s.row, gap: 8, flexWrap: 'wrap' }}>
+          {SLOT_TYPES.map(t => (
+            <div key={t} style={{ ...s.row, gap: 5, fontSize: 11 }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: SLOT_COLORS[t].border }} />
+              <span style={{ color: C.txtDim }}>{t}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Slot editor modal */}
+      {editHour !== null && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setEditHour(null)}>
+          <div
+            style={{ ...s.card, width: 340, padding: 24, ...s.col, gap: 14 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontWeight: 600, fontSize: 15 }}>
+              {String(editHour).padStart(2,'0')}:00 – {String(editHour+1).padStart(2,'0')}:00
+            </div>
+            <input
+              style={{ ...s.input }}
+              placeholder="What's happening this hour?"
+              value={editLabel}
+              onChange={e => setEditLabel(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveSlot()}
+              autoFocus
+            />
+            <select
+              style={{ ...s.input, padding: '9px 13px', borderRadius: 8 }}
+              value={editType} onChange={e => setEditType(e.target.value)}
+            >
+              {SLOT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <div style={{ ...s.row, gap: 8, justifyContent: 'flex-end' }}>
+              {slots[editHour] && (
+                <button
+                  style={{ color: C.red, fontSize: 13, padding: '8px 14px', borderRadius: 8, border: `1px solid ${C.red}33` }}
+                  onClick={() => { clearSlot(editHour); setEditHour(null); }}
+                >Clear</button>
+              )}
+              <button style={{ ...s.btnPrimary }} onClick={saveSlot}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hour grid */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px', ...s.col, gap: 4 }}>
+        {HOURS.map(hour => {
+          const slot = slots[hour];
+          const isNow = hour === currentHour;
+          const colors = slot ? SLOT_COLORS[slot.type] || SLOT_COLORS['Study'] : null;
           return (
-            <div key={i} className={`msg ${m.role === 'user' ? 'me' : 'j'}`}>
-              {m.animate ? <Typed text={m.text} onType={scrollDown} /> : m.text}
+            <div
+              key={hour}
+              onClick={() => openEdit(hour)}
+              style={{
+                ...s.row, gap: 12, padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+                border: `1px solid ${isNow ? C.blue : slot ? colors.border + '55' : C.border}`,
+                background: isNow && !slot ? C.blue + '0a' : slot ? colors.bg : 'transparent',
+                transition: 'all 0.1s',
+                minHeight: 44,
+              }}
+            >
+              <div style={{ width: 44, fontSize: 12, fontWeight: 600, color: isNow ? C.blue : C.txtFaint, flexShrink: 0 }}>
+                {String(hour).padStart(2,'0')}:00
+              </div>
+              {slot ? (
+                <>
+                  <div style={{ flex: 1, fontSize: 13, color: colors.text, fontWeight: 500 }}>{slot.label}</div>
+                  <span style={{ ...s.badge(colors.border), fontSize: 10 }}>{slot.type}</span>
+                </>
+              ) : (
+                <div style={{ flex: 1, fontSize: 12, color: C.txtFaint }}>
+                  {isNow ? '← now · click to add' : 'click to add'}
+                </div>
+              )}
             </div>
           );
         })}
       </div>
-
-      <div id="jquick">
-        <button onClick={() => send('Plan the rest of my day around what actually matters.')}>Fill my gaps</button>
-        <button onClick={() => send('Triage my inbox into tasks.')}>Triage intel</button>
-        <button onClick={() => send('How am I actually doing this week? Be straight with me.')}>Status report</button>
-      </div>
-
-      <div id="jbar">
-        <div className="jbar-in">
-          <textarea ref={inRef} id="jin" rows={1} placeholder="Talk to Jarvis…"
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} />
-        </div>
-        <button id="jsend" onClick={() => send()} disabled={busy} aria-label="Send">{busy ? '◌' : '➤'}</button>
-      </div>
     </div>
   );
 }
 
-/* ================= modal ================= */
+// ─── Tab: Jarvis ──────────────────────────────────────────────────────────────
+function JarvisTab({ checklistState }) {
+  const [messages, setMessages] = useState(() => ls.get('cadence_jarvis_history', []));
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const bottomRef = useRef(null);
+  const inputRef = useRef(null);
 
-function Modal({ modal, projects, onClose, mutate, say }) {
-  const { kind, data } = modal;
-  const [form, setForm] = useState({
-    title: data.title || '',
-    start: hhmm(data.startMin ?? 540),
-    end: hhmm(data.endMin ?? 600),
-    projectId: data.projectId || projects[0]?.id,
-    fixed: data.fixed ?? true,
-    days: data.days || [1, 2, 3, 4, 5],
-  });
-  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
-  const isNew = !data.id;
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
 
-  const submit = async () => {
-    const startMin = parseT(form.start), endMin = parseT(form.end);
-    if (endMin <= startMin) return say('End time must be after start');
-    if (kind === 'rhythm' && !form.days.length) return say('Pick at least one day');
-
-    const payload = kind === 'rhythm'
-      ? { title: form.title || 'Untitled', startMin, endMin, days: form.days, projectId: form.projectId, fixed: form.fixed === 'true' || form.fixed === true }
-      : { title: form.title || 'Untitled', startMin, endMin, projectId: form.projectId, date: data.date || todayKey(), source: data.source === 'jarvis' ? 'me' : (data.source || 'me') };
-
-    const collection = kind === 'rhythm' ? 'rhythms' : 'blocks';
-    await mutate(() => isNew ? api.create(collection, payload) : api.update(collection, data.id, payload));
-    if (kind === 'rhythm') say('Protocol updated from tomorrow');
-    onClose();
+  const getChecklistStatus = () => {
+    const { habits, checked } = checklistState;
+    const done = habits.filter(h => checked.includes(h.id)).map(h => h.label);
+    const todo = habits.filter(h => !checked.includes(h.id)).map(h => h.label);
+    return `Done: ${done.join(', ') || 'none'}. Still to do: ${todo.join(', ') || 'all done'}. Progress: ${checked.length}/${habits.length}`;
   };
 
-  const del = async () => {
-    await mutate(() => api.remove(kind === 'rhythm' ? 'rhythms' : 'blocks', data.id));
-    onClose();
+  const getTimetableStatus = () => {
+    const key = 'cadence_timetable_' + todayKey();
+    const slots = ls.get(key, {});
+    const entries = Object.entries(slots)
+      .sort(([a], [b]) => +a - +b)
+      .map(([h, v]) => `${String(h).padStart(2,'0')}:00 ${v.label} (${v.type})`);
+    return entries.length ? entries.join(', ') : 'No timetable set';
+  };
+
+  const send = async () => {
+    const text = input.trim();
+    if (!text || loading) return;
+
+    const userMsg = { role: 'user', content: text, ts: Date.now() };
+    const nextMsgs = [...messages, userMsg];
+    setMessages(nextMsgs);
+    setInput('');
+    setLoading(true);
+    setError('');
+
+    try {
+      const systemPrompt = JARVIS_SYSTEM(getChecklistStatus(), getTimetableStatus());
+      // Build context for API: inject system as first user message (api.jarvis takes single message)
+      const contextMsg = `[SYSTEM CONTEXT]\n${systemPrompt}\n\n[CONVERSATION SO FAR]\n${
+        messages.slice(-10).map(m => `${m.role === 'user' ? 'Ibrahim' : 'Jarvis'}: ${m.content}`).join('\n')
+      }\n\n[NEW MESSAGE]\nIbrahim: ${text}`;
+
+      const result = await api.jarvis(contextMsg, todayKey());
+      const reply = result?.reply || result?.message || (typeof result === 'string' ? result : JSON.stringify(result));
+
+      const jarvisMsg = { role: 'jarvis', content: reply, ts: Date.now() };
+      const finalMsgs = [...nextMsgs, jarvisMsg];
+      setMessages(finalMsgs);
+      ls.set('cadence_jarvis_history', finalMsgs.slice(-60));
+    } catch (e) {
+      setError(e.message);
+    }
+    setLoading(false);
+  };
+
+  const clearHistory = () => {
+    setMessages([]);
+    ls.set('cadence_jarvis_history', []);
   };
 
   return (
-    <div id="veil" className="on" onClick={(e) => e.target.id === 'veil' && onClose()}>
-      <div id="modal">
-        <h2>{isNew ? (kind === 'rhythm' ? 'New protocol' : 'Deploy block') : (kind === 'rhythm' ? 'Edit protocol' : 'Edit block')}</h2>
-
-        <div className="f">
-          <label>Designation</label>
-          <input autoFocus value={form.title} onChange={set('title')} placeholder="Further Maths — polar coordinates" />
+    <div style={{ ...s.col, height: '100%', overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, ...s.row, justifyContent: 'space-between' }}>
+        <div style={{ ...s.row, gap: 10 }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.green, boxShadow: `0 0 6px ${C.green}` }} />
+          <span style={{ fontWeight: 600, fontSize: 14 }}>Jarvis</span>
+          <span style={{ color: C.txtFaint, fontSize: 12 }}>— knows your day</span>
         </div>
+        <button onClick={clearHistory} style={{ color: C.txtFaint, fontSize: 12 }}>Clear history</button>
+      </div>
 
-        <div className="f2">
-          <div className="f"><label>Start</label><input type="time" value={form.start} onChange={set('start')} /></div>
-          <div className="f"><label>End</label><input type="time" value={form.end} onChange={set('end')} /></div>
-        </div>
-
-        {kind === 'rhythm' && (
-          <div className="f">
-            <label>Days</label>
-            <div className="days">
-              {DAY_LETTERS.map((d, i) => (
-                <button key={i} className={form.days.includes(i) ? 'on' : ''}
-                  onClick={() => setForm({ ...form, days: form.days.includes(i) ? form.days.filter((x) => x !== i) : [...form.days, i].sort() })}>
-                  {d}
-                </button>
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px', ...s.col, gap: 16 }}>
+        {messages.length === 0 && (
+          <div style={{ color: C.txtFaint, fontSize: 13, textAlign: 'center', marginTop: 40 }}>
+            Jarvis is ready. Ask about your schedule, TARA prep, StudentSolve, markets — anything.
+          </div>
+        )}
+        {messages.map((m, i) => {
+          const isUser = m.role === 'user';
+          return (
+            <div key={i} style={{ ...s.row, justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+              {!isUser && (
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%', background: C.indigo + '33',
+                  border: `1px solid ${C.indigo}55`, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', fontSize: 13, flexShrink: 0, marginRight: 10, alignSelf: 'flex-end',
+                }}>J</div>
+              )}
+              <div style={{
+                maxWidth: '75%',
+                background: isUser ? C.blue + '22' : C.card,
+                border: `1px solid ${isUser ? C.blue + '44' : C.border}`,
+                borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                padding: '10px 14px',
+                fontSize: 14, lineHeight: 1.65, color: C.txt,
+                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              }}>
+                {m.content}
+              </div>
+            </div>
+          );
+        })}
+        {loading && (
+          <div style={{ ...s.row, gap: 10 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%', background: C.indigo + '33',
+              border: `1px solid ${C.indigo}55`, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', fontSize: 13, flexShrink: 0,
+            }}>J</div>
+            <div style={{
+              background: C.card, border: `1px solid ${C.border}`,
+              borderRadius: '14px 14px 14px 4px', padding: '12px 16px',
+              ...s.row, gap: 5,
+            }}>
+              {[0,1,2].map(i => (
+                <div key={i} style={{
+                  width: 6, height: 6, borderRadius: '50%', background: C.blue,
+                  animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+                }} />
               ))}
             </div>
           </div>
         )}
-
-        <div className="f">
-          <label>Project</label>
-          <select value={form.projectId} onChange={set('projectId')}>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </div>
-
-        {kind === 'rhythm' && (
-          <div className="f">
-            <label>Discipline</label>
-            <select value={String(form.fixed)} onChange={set('fixed')}>
-              <option value="true">Locked — this one is non-negotiable</option>
-              <option value="false">Flexible — move it when needed</option>
-            </select>
-          </div>
+        {error && (
+          <div style={{ color: C.red, fontSize: 12, textAlign: 'center' }}>Error: {error}</div>
         )}
+        <div ref={bottomRef} />
+      </div>
 
-        <div className="mact">
-          {!isNew && <button className="del" onClick={del}>Delete</button>}
-          <button onClick={onClose}>Cancel</button>
-          <button className="go" onClick={submit}>Save</button>
+      {/* Input */}
+      <div style={{ padding: '14px 20px', borderTop: `1px solid ${C.border}`, ...s.row, gap: 10 }}>
+        <input
+          ref={inputRef}
+          style={{ ...s.input, flex: 1, padding: '11px 16px' }}
+          placeholder="Ask Jarvis anything…"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+          disabled={loading}
+        />
+        <button
+          style={{ ...s.btnPrimary, opacity: loading || !input.trim() ? 0.5 : 1 }}
+          onClick={send}
+          disabled={loading || !input.trim()}
+        >Send</button>
+      </div>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 80%, 100% { opacity: 0.3; transform: scale(0.85); }
+          40% { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── Root ─────────────────────────────────────────────────────────────────────
+const TABS = [
+  { id: 'today',     label: 'Today' },
+  { id: 'notes',     label: 'Notes' },
+  { id: 'timetable', label: 'Timetable' },
+  { id: 'jarvis',    label: 'Jarvis' },
+];
+
+export default function Cadence() {
+  const [tab, setTab] = useState('today');
+
+  const defaultChecklist = { habits: DEFAULT_HABITS, checked: [] };
+  const [checklistState, setChecklistState] = useState(() => {
+    const stored = ls.get('cadence_checklist_' + todayKey(), null);
+    if (stored && stored.habits) return stored;
+    return defaultChecklist;
+  });
+
+  // Merge new default habits in if stored habits don't have them
+  useEffect(() => {
+    const stored = ls.get('cadence_checklist_' + todayKey(), null);
+    if (!stored) return;
+    const existingIds = (stored.habits || []).map(h => h.id);
+    const missing = DEFAULT_HABITS.filter(h => !existingIds.includes(h.id));
+    if (missing.length) {
+      const next = { ...stored, habits: [...DEFAULT_HABITS, ...(stored.habits || []).filter(h => h.id.startsWith('custom_'))] };
+      setChecklistState(next);
+      ls.set('cadence_checklist_' + todayKey(), next);
+    }
+  }, []);
+
+  return (
+    <div style={{ ...s.fill }}>
+      {/* Top bar */}
+      <div style={{
+        ...s.row, height: 52, borderBottom: `1px solid ${C.border}`,
+        padding: '0 20px', gap: 0, flexShrink: 0,
+        background: C.surface,
+      }}>
+        <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.04em', color: C.txt, marginRight: 28 }}>
+          CADENCE
+        </div>
+        <div style={{ ...s.row, gap: 4, flex: 1 }}>
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              style={{
+                padding: '6px 16px', borderRadius: 7, fontSize: 13, fontWeight: 500,
+                color: tab === t.id ? C.txt : C.txtDim,
+                background: tab === t.id ? C.card : 'transparent',
+                border: `1px solid ${tab === t.id ? C.border : 'transparent'}`,
+                cursor: 'pointer', transition: 'all 0.12s',
+              }}
+            >{t.label}</button>
+          ))}
+        </div>
+        <div style={{ fontSize: 12, color: C.txtFaint }}>
+          {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
-    </div>
-  );
-}
 
-/* ================= boot + fatal ================= */
-
-function Boot() {
-  return (
-    <div id="boot">
-      <Reactor className="reactor" />
-      <div className="bootlbl">Initialising Cadence</div>
-      <div className="bootbar"><i /></div>
-    </div>
-  );
-}
-
-function Fatal({ message }) {
-  return (
-    <div id="app">
-      <div className="bg" />
-      <div id="fatal">
-        <h1>Signal lost</h1>
-        <p>
-          Cadence can&apos;t reach its server.<br />{message}
-        </p>
-        <p style={{ marginTop: 18 }}>
-          Check that <b>NEXT_PUBLIC_API_URL</b> points at your Railway service and that{' '}
-          <b>NEXT_PUBLIC_CADENCE_TOKEN</b> matches <b>CADENCE_TOKEN</b> on the server.
-        </p>
+      {/* Tab content */}
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {tab === 'today'     && <TodayTab checklistState={checklistState} setChecklistState={setChecklistState} />}
+        {tab === 'notes'     && <NotesTab />}
+        {tab === 'timetable' && <TimetableTab />}
+        {tab === 'jarvis'    && <JarvisTab checklistState={checklistState} />}
       </div>
     </div>
   );
