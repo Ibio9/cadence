@@ -1,54 +1,105 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,700;1,400;1,700&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 
-/* ── Light mode (default) ── */
+/* ── Light mode ── */
 :root {
-  --bg:              #FAFAFA;
+  --bg:              #F5F0E8;
+  --sidebar-bg:      #F0EBE3;
   --surface:         #FFFFFF;
-  --surface-el:      #F5F5F5;
-  --border:          #E5E5E5;
-  --text-1:          #0A0A0A;
-  --text-2:          #6B6B6B;
-  --text-3:          #A0A0A0;
-  --accent:          #2563EB;
-  --accent-hover:    #1D4ED8;
-  --accent-light:    #EFF6FF;
+  --surface-el:      #F7F3EE;
+  --border:          #E8E2D9;
+  --text-1:          #1A1A1A;
+  --text-2:          #6B6560;
+  --text-3:          #9B9590;
+  --accent:          #2952E3;
+  --accent-hover:    #1E3DB8;
+  --accent-light:    #EEF2FF;
   --success:         #16A34A;
   --destructive:     #DC2626;
-  --scrollbar:       #D4D4D4;
-  --scrollbar-hover: #A3A3A3;
+  --scrollbar:       #D9D3CB;
+  --scrollbar-hover: #B8B2AA;
 }
 
 /* ── Dark mode ── */
 [data-theme="dark"] {
-  --bg:              #0A0A0A;
-  --surface:         #141414;
-  --surface-el:      #1C1C1C;
+  --bg:              #0F0F0F;
+  --sidebar-bg:      #141414;
+  --surface:         #1C1C1C;
+  --surface-el:      #242424;
   --border:          #2A2A2A;
-  --text-1:          #FAFAFA;
+  --text-1:          #F5F5F5;
   --text-2:          #A0A0A0;
   --text-3:          #6B6B6B;
-  --accent:          #3B82F6;
-  --accent-hover:    #60A5FA;
-  --accent-light:    #1E3A5F;
+  --accent:          #4F75FF;
+  --accent-hover:    #6B8FFF;
+  --accent-light:    #1A2540;
   --success:         #22C55E;
   --destructive:     #EF4444;
   --scrollbar:       #2A2A2A;
   --scrollbar-hover: #3A3A3A;
 }
 
+/* ── Breathing background ── */
+@keyframes breathe {
+  0%, 100% { background-color: #F5F0E8; }
+  50%       { background-color: #EDE8E0; }
+}
+@keyframes breathe-dark {
+  0%, 100% { background-color: #0F0F0F; }
+  50%       { background-color: #131313; }
+}
+
+/* ── Siri orb animations ── */
+@keyframes blobMorph {
+  0%   {
+    border-radius: 50%;
+    background: #2952E3;
+    box-shadow: 0 0 32px 10px rgba(41,82,227,0.45);
+  }
+  25%  {
+    border-radius: 60% 40% 70% 30% / 50% 60% 40% 50%;
+    background: #6366F1;
+    box-shadow: 0 0 44px 14px rgba(99,102,241,0.45);
+  }
+  50%  {
+    border-radius: 40% 60% 30% 70% / 60% 40% 60% 40%;
+    background: #3B82F6;
+    box-shadow: 0 0 38px 12px rgba(59,130,246,0.45);
+  }
+  75%  {
+    border-radius: 70% 30% 50% 50% / 40% 70% 30% 60%;
+    background: #6366F1;
+    box-shadow: 0 0 44px 14px rgba(99,102,241,0.45);
+  }
+  100% {
+    border-radius: 50%;
+    background: #2952E3;
+    box-shadow: 0 0 32px 10px rgba(41,82,227,0.45);
+  }
+}
+
+@keyframes orbIdle {
+  0%, 100% { opacity: 0.28; transform: scale(1); }
+  50%       { opacity: 0.38; transform: scale(1.06); }
+}
+
+/* ── Base ── */
 body {
   background: var(--bg);
   color: var(--text-1);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
-  transition: background 0.2s ease, color 0.2s ease;
+  animation: breathe 8s ease-in-out infinite;
+}
+
+[data-theme="dark"] body {
+  animation: breathe-dark 8s ease-in-out infinite;
 }
 
 button  { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
@@ -63,17 +114,15 @@ a { color: inherit; text-decoration: none; }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
 
-/* ── Focus ── */
+/* ── Focus / selection ── */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-
-/* ── Selection ── */
 ::selection { background: var(--accent-light); color: var(--accent); }
 
 /* ── Custom checkbox ── */
 .cadence-checkbox {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
   border: 1.5px solid var(--border);
   background: transparent;
   display: flex;
@@ -93,18 +142,18 @@ a { color: inherit; text-decoration: none; }
   0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
   40%           { opacity: 1;    transform: scale(1); }
 }
-
-@keyframes jarvis-border-pulse {
-  0%, 100% { opacity: 0.5; }
-  50%       { opacity: 1; }
-}
-
 @keyframes indicator-pulse {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.3; }
 }
-
 @keyframes banner-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes fadeSlideIn {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
