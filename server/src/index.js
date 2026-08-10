@@ -10,6 +10,7 @@ app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') ?? '*' }));
 
 const TOKEN = process.env.CADENCE_TOKEN;
 app.use('/api', (req, res, next) => {
+  if (req.method === 'OPTIONS') return next();
   if (!TOKEN) return res.status(500).json({ error: 'CADENCE_TOKEN is not set on the server.' });
   if (req.get('x-cadence-token') !== TOKEN) return res.status(401).json({ error: 'Bad token.' });
   next();
