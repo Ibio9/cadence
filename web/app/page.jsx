@@ -1,164 +1,250 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { api } from '../lib/api';
 
-// ─── Design tokens ───────────────────────────────────────────────────────────
-const C = {
-  bg:       '#0a0a0f',
-  surface:  '#0f1117',
-  card:     '#13161f',
-  border:   '#1e2433',
-  borderHi: '#2a3347',
-  blue:     '#3b82f6',
-  indigo:   '#6366f1',
-  txt:      '#e2e8f0',
-  txtDim:   '#94a3b8',
-  txtFaint: '#475569',
-  green:    '#22c55e',
-  amber:    '#f59e0b',
-  red:      '#ef4444',
-  purple:   '#a855f7',
+// ─── LocalStorage helpers ─────────────────────────────────────────────────────
+const ls = {
+  get: (k, fb) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch { return fb; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 
-const s = {
-  // layout
-  fill: { display: 'flex', flexDirection: 'column', height: '100%', background: C.bg },
-  row:  { display: 'flex', alignItems: 'center' },
-  col:  { display: 'flex', flexDirection: 'column' },
-  // text
-  label: { fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.txtFaint },
-  // card
-  card: {
-    background: C.card, border: `1px solid ${C.border}`,
-    borderRadius: 10, padding: '16px',
-  },
-  // input
-  input: {
-    background: C.surface, border: `1px solid ${C.border}`,
-    borderRadius: 8, padding: '9px 13px', color: C.txt,
-    width: '100%', fontSize: 14,
-  },
-  // button primary
-  btnPrimary: {
-    background: C.blue, color: '#fff', borderRadius: 8,
-    padding: '9px 18px', fontWeight: 600, fontSize: 13,
-    cursor: 'pointer', border: 'none',
-    transition: 'opacity 0.15s',
-  },
-  // badge
-  badge: (color) => ({
-    background: color + '22', color, borderRadius: 5,
-    padding: '2px 8px', fontSize: 11, fontWeight: 600,
-    letterSpacing: '0.04em',
-  }),
-};
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Date helpers ────────────────────────────────────────────────────────────
 const todayKey = () => {
   const d = new Date();
   const z = new Date(d.getTime() - d.getTimezoneOffset() * 6e4);
   return z.toISOString().slice(0, 10);
 };
 
-const ls = {
-  get: (k, fallback) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch { return fallback; } },
-  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
-};
+const formatDateLong = (d = new Date()) =>
+  d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
-const formatTime = (date = new Date()) =>
-  date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+const fmtHHMM = (h, m = 0) =>
+  String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
 
-const formatDate = (date = new Date()) =>
-  date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+// ─── API response parser ──────────────────────────────────────────────────────
+// Server returns { text: "...", applied: 0 } — extract .text
+const parseJarvisReply = (result) =>
+  result?.text || result?.reply || result?.message ||
+  (typeof result === 'string' ? result : JSON.stringify(result));
 
-const NOTE_CATEGORIES = ['Ideas', 'Study', 'Markets', 'Business', 'Personal', 'TARA', 'StudentSolve'];
+// ─── Constants ───────────────────────────────────────────────────────────────
+const PRAYER_IDS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+
+const DEFAULT_HABITS = [
+  { id: 'fajr',     label: 'Fajr',                     prayer: true  },
+  { id: 'dhuhr',    label: 'Dhuhr',                    prayer: true  },
+  { id: 'asr',      label: 'Asr',                      prayer: true  },
+  { id: 'maghrib',  label: 'Maghrib',                   prayer: true  },
+  { id: 'isha',     label: 'Isha',                      prayer: true  },
+  { id: 'read',     label: 'Read 30 pages',             prayer: false },
+  { id: 'podcast',  label: 'Podcast / lecture (30 min)',prayer: false },
+  { id: 'tara',     label: 'TARA prep (45 min)',        prayer: false },
+  { id: 'alevel',   label: 'A-level study block',       prayer: false },
+  { id: 'gym',      label: 'Gym / Training',            prayer: false },
+  { id: 'markets',  label: 'Review markets',            prayer: false },
+  { id: 'macros',   label: 'Track macros',              prayer: false },
+];
+
+const NOTE_CATEGORIES = ['Ideas', 'Study', 'Markets', 'Business', 'Personal', 'TARA', 'StudentSolve', 'To Do'];
+
 const CAT_COLORS = {
-  Ideas: C.indigo, Study: C.blue, Markets: C.green,
-  Business: C.amber, Personal: C.purple, TARA: C.red, StudentSolve: '#06b6d4',
+  Ideas:        '#7C3AED',
+  Study:        '#2563EB',
+  Markets:      '#16A34A',
+  Business:     '#D97706',
+  Personal:     '#DB2777',
+  TARA:         '#DC2626',
+  StudentSolve: '#0891B2',
+  'To Do':      '#EA580C',
 };
 
 const SLOT_COLORS = {
-  'Study':      { bg: '#1e3a5f', border: '#3b82f6', text: '#93c5fd' },
-  'Build':      { bg: '#1a1f3a', border: '#6366f1', text: '#a5b4fc' },
-  'Training':   { bg: '#1a2e1a', border: '#22c55e', text: '#86efac' },
-  'Admin':      { bg: '#2a2000', border: '#f59e0b', text: '#fcd34d' },
-  'Break':      { bg: '#1a1a1a', border: '#475569', text: '#94a3b8' },
-  'Deep Work':  { bg: '#2a1a3a', border: '#a855f7', text: '#d8b4fe' },
-  'Markets':    { bg: '#1a2e1a', border: '#10b981', text: '#6ee7b7' },
+  'Study':     { border: '#2563EB', light: 'rgba(37,99,235,0.08)',  dark: 'rgba(59,130,246,0.12)' },
+  'Build':     { border: '#7C3AED', light: 'rgba(124,58,237,0.08)', dark: 'rgba(139,92,246,0.12)' },
+  'Training':  { border: '#16A34A', light: 'rgba(22,163,74,0.08)',  dark: 'rgba(34,197,94,0.12)'  },
+  'Admin':     { border: '#6B7280', light: 'rgba(107,114,128,0.06)',dark: 'rgba(107,114,128,0.10)' },
+  'Break':     { border: '#D1D5DB', light: 'rgba(0,0,0,0.03)',      dark: 'rgba(255,255,255,0.03)' },
+  'Deep Work': { border: '#1E3A8A', light: 'rgba(30,58,138,0.08)',  dark: 'rgba(30,58,138,0.15)'  },
+  'Markets':   { border: '#D97706', light: 'rgba(217,119,6,0.08)',  dark: 'rgba(245,158,11,0.12)' },
 };
 
-const DEFAULT_HABITS = [
-  { id: 'read',     emoji: '📚', label: 'Read 30 pages' },
-  { id: 'podcast',  emoji: '🎧', label: 'Podcast / lecture (30 min)' },
-  { id: 'tara',     emoji: '📝', label: 'TARA prep (min 45 min)' },
-  { id: 'alevel',   emoji: '📖', label: 'A-level study block (2 hrs)' },
-  { id: 'training', emoji: '🥊', label: 'Muay Thai / training' },
-  { id: 'markets',  emoji: '📊', label: 'Review markets (MNQ / NQ)' },
-  { id: 'walk',     emoji: '🏃', label: 'Movement / walk' },
-  { id: 'macros',   emoji: '🥗', label: 'Track macros (target 66kg)' },
-];
+const SLOT_TYPES = Object.keys(SLOT_COLORS);
+const HOURS = Array.from({ length: 18 }, (_, i) => i + 6); // 06–23
 
-const JARVIS_SYSTEM = (checklist, timetable) => `You are Jarvis — Ibrahim Malik's personal AI. You know him completely.
+// ─── Jarvis system prompt ─────────────────────────────────────────────────────
+const buildJarvisSystem = (checklist, timetable) => `You are Jarvis — Ibrahim Malik's personal AI.
 
-Ibrahim is 17, at Harris Westminster Sixth Form. A-levels: Further Maths, Maths, Economics, Philosophy. Target: Oxford PPE via TARA (October 2026, aiming 8.0+), St Hilda's College. GCSEs: 9 A*s, 1 A.
+Ibrahim is 17, Harris Westminster Sixth Form. A-levels: Further Maths, Maths, Economics, Philosophy. Target: Oxford PPE via TARA (October 2026, 8.0+ target), St Hilda's College, LMH backup. GCSEs: 9 A*s, 1 A.
 
-He has CFA Investment Foundations (89%, age 14), Bloomberg certified, UK Economics Olympiad top 23, GBEO finalist. Placements at BNP Paribas, Société Générale (algo trading desk), Trading Performance Centre (Quantower), Schroders. He trades MNQ futures, built NQConfluenceScalper in C#.
+Finance: CFA Investment Foundations at 89% (age 14). Bloomberg certified. UK Economics Olympiad top 23, 100% finance round. GBEO finalist. JLI Economics shortlist 2026. Placements: BNP Paribas, Société Générale (algo trading), Trading Performance Centre (Quantower), Schroders. Trades MNQ futures, built NQConfluenceScalper in C#.
 
-His main build is StudentSolve — AI revision platform for UK GCSE/A-Level, September 2026 launch. Also: dental consent MCQ with his uncle (~£100/mo/practice), clinic blood results portal. He's done a lot of startup kill-tests (freight invoicing, MTD bookkeeping, tenancy deposits, probate copilot — all killed on saturation or distribution).
+Main build: StudentSolve — AI revision platform (OCR/AQA/Edexcel), September 2026 launch, £4.99/mo freemium, TikTok creator outreach live. Also: dental consent MCQ with uncle (~£100/mo/practice), clinic blood results portal.
 
-He did Muay Thai at Tiger Muay Thai Phuket in July 2026. 66kg/180cm. Looking for a BJJ gym in NW London. Mensa. VEX Robotics National Champion 2023. 44 countries. PADI diver.
+Muay Thai + MMA, Tiger Muay Thai Phuket July 2026. 66kg/180cm. Looking for BJJ gym NW London. Mensa. VEX Robotics National Champion 2023. 44 countries. Reading Uncommon Knowledge.
 
-Currently reading Uncommon Knowledge. Just finished Liar's Poker, More Money Than God.
+Critical tension: StudentSolve September launch + TARA October + A-levels + multiple builds. Be direct about allocation. Don't just validate.
 
-Real tension: StudentSolve launch (September) + TARA prep (October) + A-levels + multiple live builds. Be honest about this allocation problem when relevant, not just validating.
-
-Today's checklist status: ${checklist}
+Today's checklist: ${checklist}
 Today's timetable: ${timetable}
 
-Be direct, specific, no filler. You know Ibrahim — don't explain things he already knows. Challenge him when warranted. When he asks about scheduling, use his actual timetable. When he asks about study, be aware of TARA and his A-level subjects. When he asks about markets, engage properly.`;
+Be direct, specific, no filler. Know him well. Challenge when warranted.`;
 
-// ─── Progress Ring ────────────────────────────────────────────────────────────
-function ProgressRing({ pct, size = 80, stroke = 7 }) {
+// ─── SVG Icons ────────────────────────────────────────────────────────────────
+const SunIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+    <circle cx="8" cy="8" r="3"/>
+    <line x1="8" y1="1" x2="8" y2="2.5"/>
+    <line x1="8" y1="13.5" x2="8" y2="15"/>
+    <line x1="1" y1="8" x2="2.5" y2="8"/>
+    <line x1="13.5" y1="8" x2="15" y2="8"/>
+    <line x1="3.05" y1="3.05" x2="4.1" y2="4.1"/>
+    <line x1="11.9" y1="11.9" x2="12.95" y2="12.95"/>
+    <line x1="12.95" y1="3.05" x2="11.9" y2="4.1"/>
+    <line x1="4.1" y1="11.9" x2="3.05" y2="12.95"/>
+  </svg>
+);
+
+const MoonIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M13.5 9.5A6 6 0 0 1 6.5 2.5a6 6 0 1 0 7 7z"/>
+  </svg>
+);
+
+const SendIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="14" y1="2" x2="7" y2="9"/>
+    <polygon points="14,2 9,14 7,9 2,7" fill="currentColor" stroke="none"/>
+  </svg>
+);
+
+const CheckIcon = () => (
+  <svg width="10" height="8" viewBox="0 0 10 8" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="1,4 3.5,6.5 9,1"/>
+  </svg>
+);
+
+const PlusIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+    <line x1="7" y1="1" x2="7" y2="13"/>
+    <line x1="1" y1="7" x2="13" y2="7"/>
+  </svg>
+);
+
+// ─── ProgressRing ─────────────────────────────────────────────────────────────
+function ProgressRing({ pct, size = 96, stroke = 8, isDark }) {
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   const dash = (pct / 100) * circ;
+  const color = pct === 100 ? 'var(--success)' : 'var(--accent)';
   return (
-    <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={C.border} strokeWidth={stroke} />
+    <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', display: 'block' }}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--border)" strokeWidth={stroke}/>
       <circle
         cx={size/2} cy={size/2} r={r} fill="none"
-        stroke={pct === 100 ? C.green : C.blue} strokeWidth={stroke}
+        stroke={color} strokeWidth={stroke}
         strokeDasharray={`${dash} ${circ}`}
         strokeLinecap="round"
-        style={{ transition: 'stroke-dasharray 0.4s ease' }}
+        style={{ transition: 'stroke-dasharray 0.5s ease' }}
       />
     </svg>
   );
 }
 
-// ─── Tab: Today ───────────────────────────────────────────────────────────────
+// ─── Sidebar ─────────────────────────────────────────────────────────────────
+const NAV_TABS = [
+  { id: 'today',     label: 'Today' },
+  { id: 'notes',     label: 'Notes' },
+  { id: 'timetable', label: 'Timetable' },
+  { id: 'jarvis',    label: 'Jarvis' },
+];
+
+function Sidebar({ tab, setTab, theme, toggleTheme }) {
+  return (
+    <div style={{
+      width: 220, flexShrink: 0, height: '100vh',
+      background: 'var(--surface)',
+      borderRight: '1px solid var(--border)',
+      display: 'flex', flexDirection: 'column',
+      padding: '24px 12px',
+    }}>
+      {/* Wordmark */}
+      <div style={{
+        fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em',
+        color: 'var(--text-1)', marginBottom: 28, paddingLeft: 10,
+      }}>
+        Cadence
+      </div>
+
+      {/* Nav */}
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+        {NAV_TABS.map(t => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '8px 12px', borderRadius: 8,
+                fontSize: 13, fontWeight: active ? 500 : 400,
+                color: active ? 'white' : 'var(--text-2)',
+                background: active ? 'var(--accent)' : 'transparent',
+                transition: 'all 0.12s',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--text-1)'; }}
+              onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--text-2)'; }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Bottom */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 4 }}>
+        <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>Ibrahim</span>
+        <button
+          onClick={toggleTheme}
+          style={{
+            width: 32, height: 32, borderRadius: 8,
+            background: 'var(--surface-el)',
+            border: '1px solid var(--border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--text-2)', cursor: 'pointer',
+            transition: 'background 0.15s, color 0.15s',
+          }}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── TodayTab ─────────────────────────────────────────────────────────────────
 function TodayTab({ checklistState, setChecklistState }) {
   const key = todayKey();
-  const [time, setTime] = useState(formatTime());
-  const [customInput, setCustomInput] = useState('');
-  const [timeLog, setTimeLog] = useState(() => ls.get('cadence_timelog_' + key, {}));
+  const [editingHabit, setEditingHabit] = useState(null); // id of habit being renamed
+  const [editLabel, setEditLabel] = useState('');
+  const [addingHabit, setAddingHabit] = useState(false);
+  const [newHabitLabel, setNewHabitLabel] = useState('');
+  const editInputRef = useRef(null);
+  const addInputRef = useRef(null);
 
-  useEffect(() => {
-    const t = setInterval(() => setTime(formatTime()), 30000);
-    return () => clearInterval(t);
-  }, []);
+  const { habits, checked } = checklistState;
 
-  const habits = checklistState.habits;
-  const checked = checklistState.checked;
+  // Save helper
+  const saveState = useCallback((next) => {
+    setChecklistState(next);
+    ls.set('cadence_checklist_' + key, next);
+  }, [key, setChecklistState]);
 
-  const toggle = (id) => {
+  const toggle = useCallback((id, e) => {
+    e?.stopPropagation();
     const next = checked.includes(id) ? checked.filter(x => x !== id) : [...checked, id];
-    const nextState = { ...checklistState, checked: next };
-    setChecklistState(nextState);
-    ls.set('cadence_checklist_' + key, nextState);
-
-    // update streaks
     const streaks = ls.get('cadence_streaks', {});
     if (!checked.includes(id)) {
       streaks[id] = (streaks[id] || 0) + 1;
@@ -166,125 +252,226 @@ function TodayTab({ checklistState, setChecklistState }) {
       streaks[id] = Math.max(0, (streaks[id] || 1) - 1);
     }
     ls.set('cadence_streaks', streaks);
+    saveState({ ...checklistState, checked: next });
+  }, [checked, checklistState, saveState]);
+
+  const startEditHabit = (id, label, e) => {
+    e.stopPropagation();
+    setEditingHabit(id);
+    setEditLabel(label);
+    setTimeout(() => editInputRef.current?.focus(), 0);
   };
 
-  const addCustom = () => {
-    const label = customInput.trim();
-    if (!label) return;
+  const commitHabitEdit = () => {
+    if (!editLabel.trim()) { setEditingHabit(null); return; }
+    const nextHabits = habits.map(h => h.id === editingHabit ? { ...h, label: editLabel.trim() } : h);
+    saveState({ ...checklistState, habits: nextHabits });
+    setEditingHabit(null);
+  };
+
+  const addHabit = () => {
+    const label = newHabitLabel.trim();
+    if (!label) { setAddingHabit(false); return; }
     const id = 'custom_' + Date.now();
-    const nextHabits = [...habits, { id, emoji: '✏️', label }];
-    const nextState = { ...checklistState, habits: nextHabits };
-    setChecklistState(nextState);
-    ls.set('cadence_checklist_' + key, nextState);
-    setCustomInput('');
+    const nextHabits = [...habits, { id, label, prayer: false }];
+    saveState({ ...checklistState, habits: nextHabits });
+    setNewHabitLabel('');
+    setAddingHabit(false);
+  };
+
+  const removeHabit = (id, e) => {
+    e.stopPropagation();
+    const nextHabits = habits.filter(h => h.id !== id);
+    const nextChecked = checked.filter(c => c !== id);
+    saveState({ ...checklistState, habits: nextHabits, checked: nextChecked });
   };
 
   const streaks = ls.get('cadence_streaks', {});
+  const prayers = habits.filter(h => h.prayer);
+  const others  = habits.filter(h => !h.prayer);
+  const prayersDone = prayers.filter(h => checked.includes(h.id)).length;
   const pct = habits.length ? Math.round((checked.length / habits.length) * 100) : 0;
 
-  const motLines = [
-    'TARA is 8 weeks out. Every session compounds.',
-    'StudentSolve launches in September. Today\'s code is tomorrow\'s users.',
-    'The Oxford interview rewards depth, not breadth. Go deep today.',
-    'Liar\'s Poker taught you: edge is everything. Build yours.',
-    'Markets open. MNQ is live. Stay sharp.',
-  ];
-  const mot = motLines[new Date().getDay() % motLines.length];
+  useEffect(() => {
+    if (addingHabit) setTimeout(() => addInputRef.current?.focus(), 0);
+  }, [addingHabit]);
+
+  const renderHabit = (h) => {
+    const done = checked.includes(h.id);
+    const streak = streaks[h.id] || 0;
+    const isEditing = editingHabit === h.id;
+
+    return (
+      <div
+        key={h.id}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '9px 12px', borderRadius: 8,
+          border: '1px solid var(--border)',
+          background: done ? 'var(--accent-light)' : 'var(--surface)',
+          transition: 'background 0.15s, border-color 0.15s',
+          cursor: 'pointer',
+        }}
+        onClick={() => toggle(h.id)}
+      >
+        {/* Checkbox */}
+        <div
+          className={`cadence-checkbox${done ? ' checked' : ''}`}
+          style={{ borderColor: done ? 'var(--accent)' : 'var(--border)' }}
+        >
+          {done && <CheckIcon />}
+        </div>
+
+        {/* Label / edit field */}
+        {isEditing ? (
+          <input
+            ref={editInputRef}
+            value={editLabel}
+            onChange={e => setEditLabel(e.target.value)}
+            onBlur={commitHabitEdit}
+            onKeyDown={e => { if (e.key === 'Enter') commitHabitEdit(); if (e.key === 'Escape') setEditingHabit(null); }}
+            onClick={e => e.stopPropagation()}
+            style={{
+              flex: 1, fontSize: 13, color: 'var(--text-1)',
+              background: 'var(--surface-el)', borderRadius: 5,
+              padding: '2px 6px', border: '1px solid var(--accent)',
+            }}
+          />
+        ) : (
+          <span
+            onClick={e => startEditHabit(h.id, h.label, e)}
+            style={{
+              flex: 1, fontSize: 13,
+              color: done ? 'var(--text-2)' : 'var(--text-1)',
+              textDecoration: done ? 'line-through' : 'none',
+              textDecorationColor: 'var(--text-3)',
+              cursor: 'text',
+            }}
+            title="Click to rename"
+          >
+            {h.label}
+          </span>
+        )}
+
+        {/* Streak */}
+        {streak > 1 && (
+          <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
+            {streak}d
+          </span>
+        )}
+
+        {/* Remove custom habits */}
+        {h.id.startsWith('custom_') && (
+          <button
+            onClick={e => removeHabit(h.id, e)}
+            style={{ color: 'var(--text-3)', fontSize: 14, padding: '0 2px', lineHeight: 1 }}
+          >
+            ×
+          </button>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <div style={{ ...s.col, gap: 20, padding: '24px', overflowY: 'auto', flex: 1 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', padding: 32, gap: 28, maxWidth: 880, width: '100%' }}>
       {/* Header */}
-      <div style={{ ...s.col, gap: 4 }}>
-        <div style={{ fontSize: 13, color: C.txtDim }}>{formatDate()}</div>
-        <div style={{ fontSize: 14, color: C.blue, fontStyle: 'italic' }}>{mot}</div>
-      </div>
-
-      {/* Stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-        {[
-          { label: 'Done today', val: `${checked.length} / ${habits.length}` },
-          { label: 'Time', val: time },
-          { label: 'Streak (avg)', val: `${habits.length ? Math.round(Object.values(streaks).reduce((a,b)=>a+b,0)/Math.max(habits.length,1)) : 0}d` },
-        ].map(({ label, val }) => (
-          <div key={label} style={{ ...s.card, textAlign: 'center' }}>
-            <div style={{ ...s.label, marginBottom: 6 }}>{label}</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: C.txt }}>{val}</div>
-          </div>
-        ))}
+      <div>
+        <h1 style={{ fontSize: 28, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-1)', lineHeight: 1.2 }}>
+          {formatDateLong()}
+        </h1>
       </div>
 
       {/* Progress + Checklist */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 20, alignItems: 'start' }}>
-        {/* Ring */}
-        <div style={{ ...s.card, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '20px 24px' }}>
-          <div style={{ position: 'relative' }}>
-            <ProgressRing pct={pct} size={90} stroke={8} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 24, alignItems: 'start' }}>
+        {/* Ring card */}
+        <div style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 12, padding: '24px 20px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+        }}>
+          <div style={{ position: 'relative', width: 96, height: 96 }}>
+            <ProgressRing pct={pct} size={96} stroke={8}/>
             <div style={{
-              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 18, fontWeight: 700, color: C.txt,
+              position: 'absolute', inset: 0, display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              flexDirection: 'column', gap: 0,
             }}>
-              {pct}%
+              <span style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-1)' }}>{pct}%</span>
             </div>
           </div>
-          <div style={{ ...s.label }}>today</div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-1)' }}>{checked.length}/{habits.length}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>complete</div>
+          </div>
         </div>
 
-        {/* Habits list */}
-        <div style={{ ...s.col, gap: 8 }}>
-          {habits.map((h) => {
-            const done = checked.includes(h.id);
-            const streak = streaks[h.id] || 0;
-            return (
-              <div
-                key={h.id}
-                onClick={() => toggle(h.id)}
-                style={{
-                  ...s.card, ...s.row, gap: 12, cursor: 'pointer',
-                  borderColor: done ? C.blue + '55' : C.border,
-                  background: done ? C.blue + '0d' : C.card,
-                  padding: '12px 16px',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <div style={{
-                  width: 20, height: 20, borderRadius: 6,
-                  border: `2px solid ${done ? C.blue : C.borderHi}`,
-                  background: done ? C.blue : 'transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0, transition: 'all 0.15s',
-                }}>
-                  {done && <svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4l3 3 6-6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                </div>
-                <span style={{ fontSize: 16 }}>{h.emoji}</span>
-                <span style={{ flex: 1, color: done ? C.txtDim : C.txt, textDecoration: done ? 'line-through' : 'none' }}>
-                  {h.label}
-                </span>
-                {streak > 0 && (
-                  <span style={{ ...s.badge(C.amber), fontSize: 11 }}>🔥 {streak}d</span>
-                )}
+        {/* Habits */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Salah group */}
+          {prayers.length > 0 && (
+            <div style={{ marginBottom: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)' }}>Salah</span>
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{prayersDone}/{prayers.length} complete</span>
               </div>
-            );
-          })}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {prayers.map(renderHabit)}
+              </div>
+            </div>
+          )}
 
-          {/* Add custom */}
-          <div style={{ ...s.row, gap: 8, marginTop: 4 }}>
-            <input
-              style={{ ...s.input }}
-              placeholder="Add habit…"
-              value={customInput}
-              onChange={e => setCustomInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addCustom()}
-            />
-            <button style={{ ...s.btnPrimary, whiteSpace: 'nowrap' }} onClick={addCustom}>Add</button>
+          {/* Discipline */}
+          {prayers.length > 0 && others.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)' }}>Discipline</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {others.map(renderHabit)}
           </div>
+
+          {/* Add habit */}
+          {addingHabit ? (
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <input
+                ref={addInputRef}
+                value={newHabitLabel}
+                onChange={e => setNewHabitLabel(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') addHabit(); if (e.key === 'Escape') setAddingHabit(false); }}
+                onBlur={addHabit}
+                placeholder="Habit name"
+                style={{
+                  flex: 1, fontSize: 13, padding: '8px 12px',
+                  background: 'var(--surface)', border: '1px solid var(--accent)',
+                  borderRadius: 8, color: 'var(--text-1)',
+                }}
+              />
+            </div>
+          ) : (
+            <button
+              onClick={() => setAddingHabit(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 12px', marginTop: 4,
+                fontSize: 13, color: 'var(--text-3)',
+                border: '1px dashed var(--border)', borderRadius: 8,
+                transition: 'color 0.12s, border-color 0.12s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-1)'; e.currentTarget.style.borderColor = 'var(--text-3)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+            >
+              <PlusIcon /> Add habit
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Tab: Notes ───────────────────────────────────────────────────────────────
-function NotesTab() {
+// ─── NotesTab ────────────────────────────────────────────────────────────────
+function NotesTab({ slots, setSlots }) {
   const [notes, setNotes] = useState(() => ls.get('cadence_notes', []));
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('All');
@@ -294,380 +481,524 @@ function NotesTab() {
   const [editBody, setEditBody] = useState('');
   const [customCats, setCustomCats] = useState(() => ls.get('cadence_note_cats', []));
   const [newCat, setNewCat] = useState('');
+  const [scheduling, setScheduling] = useState(false);
+  const [scheduleBanner, setScheduleBanner] = useState('');
   const saveTimer = useRef(null);
 
   const allCats = [...NOTE_CATEGORIES, ...customCats];
 
-  const save = (next) => {
-    setNotes(next);
-    ls.set('cadence_notes', next);
+  const saveNotes = (next) => { setNotes(next); ls.set('cadence_notes', next); };
+
+  const scheduleAsTask = async (taskText) => {
+    setScheduling(true);
+    try {
+      const tKey = 'cadence_timetable_' + todayKey();
+      const currentSlots = ls.get(tKey, {});
+      const slotSummary = Object.entries(currentSlots).length
+        ? Object.entries(currentSlots).sort(([a],[b])=>+a-+b)
+            .map(([h,v]) => `${fmtHHMM(+h)}: ${v.label}`).join(', ')
+        : 'Empty';
+
+      const msg = `Today's timetable: ${slotSummary}. I need to add this task: "${taskText}". Reply with ONLY the best start hour as a number (e.g. 15) — no other text.`;
+      const result = await api.jarvis(msg, todayKey());
+      const text = parseJarvisReply(result);
+      const match = text.match(/\b([6-9]|1[0-9]|2[0-2])\b/);
+      const hour = match ? parseInt(match[1], 10) : null;
+
+      if (hour) {
+        const tKey2 = 'cadence_timetable_' + todayKey();
+        const nextSlots = { ...ls.get(tKey2, {}), [hour]: { label: taskText.slice(0, 50), type: 'Admin' } };
+        ls.set(tKey2, nextSlots);
+        setSlots(nextSlots);
+        setScheduleBanner(`Scheduled for ${fmtHHMM(hour)} today`);
+        setTimeout(() => setScheduleBanner(''), 5000);
+      } else {
+        setScheduleBanner('Could not auto-schedule — add it to your timetable manually');
+        setTimeout(() => setScheduleBanner(''), 4000);
+      }
+    } catch {
+      setScheduleBanner('Auto-schedule failed');
+      setTimeout(() => setScheduleBanner(''), 3000);
+    }
+    setScheduling(false);
   };
 
-  const addNote = () => {
-    if (!capturing.trim()) return;
+  const addNote = async () => {
+    const text = capturing.trim();
+    if (!text) return;
     const note = {
       id: Date.now(),
-      title: capturing.trim().split('\n')[0].slice(0, 60),
-      body: capturing.trim(),
+      title: text.split('\n')[0].slice(0, 80),
+      body: text,
       category: capCat,
       ts: Date.now(),
     };
-    save([note, ...notes]);
+    saveNotes([note, ...notes]);
     setCapturing('');
+    if (capCat === 'To Do') {
+      await scheduleAsTask(text);
+    }
   };
 
   const deleteNote = (id) => {
-    save(notes.filter(n => n.id !== id));
+    saveNotes(notes.filter(n => n.id !== id));
     if (expanded === id) setExpanded(null);
   };
 
-  const openNote = (note) => {
-    setExpanded(note.id);
-    setEditBody(note.body);
-  };
+  const openNote = (note) => { setExpanded(note.id); setEditBody(note.body); };
 
   const handleEdit = (val) => {
     setEditBody(val);
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      save(notes.map(n => n.id === expanded ? { ...n, body: val, title: val.split('\n')[0].slice(0, 60) } : n));
+      saveNotes(notes.map(n => n.id === expanded
+        ? { ...n, body: val, title: val.split('\n')[0].slice(0, 80) } : n));
     }, 600);
   };
 
   const addCat = () => {
-    if (!newCat.trim() || allCats.includes(newCat.trim())) return;
-    const next = [...customCats, newCat.trim()];
+    const c = newCat.trim();
+    if (!c || allCats.includes(c)) return;
+    const next = [...customCats, c];
     setCustomCats(next);
     ls.set('cadence_note_cats', next);
     setNewCat('');
   };
 
-  const filtered = notes.filter(n => {
+  const filtered = useMemo(() => notes.filter(n => {
     const matchCat = catFilter === 'All' || n.category === catFilter;
     const matchSearch = !search || n.body.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
-  });
+  }), [notes, catFilter, search]);
 
-  const color = (cat) => CAT_COLORS[cat] || C.indigo;
-
+  const catColor = (cat) => CAT_COLORS[cat] || '#6B7280';
   const expandedNote = notes.find(n => n.id === expanded);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: expanded ? '1fr 1fr' : '1fr', height: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Left pane */}
-      <div style={{ ...s.col, gap: 0, overflow: 'hidden', borderRight: expanded ? `1px solid ${C.border}` : 'none' }}>
-        {/* Capture bar */}
-        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, ...s.col, gap: 10 }}>
+      <div style={{
+        display: 'flex', flexDirection: 'column', flex: 1,
+        overflow: 'hidden',
+        borderRight: expanded ? '1px solid var(--border)' : 'none',
+        minWidth: 0,
+      }}>
+        {/* Schedule banner */}
+        {(scheduleBanner || scheduling) && (
+          <div style={{
+            padding: '10px 20px',
+            background: 'var(--accent-light)', borderBottom: '1px solid var(--border)',
+            fontSize: 12, color: 'var(--accent)',
+            display: 'flex', alignItems: 'center', gap: 8,
+            animation: 'banner-in 0.2s ease',
+          }}>
+            {scheduling ? (
+              <>
+                <div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid var(--accent)', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }}/>
+                Finding best time slot...
+              </>
+            ) : (
+              <><span>+</span> {scheduleBanner}</>
+            )}
+          </div>
+        )}
+
+        {/* Capture */}
+        <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <textarea
-            style={{ ...s.input, resize: 'none', minHeight: 60, borderRadius: 8, padding: '10px 13px' }}
-            placeholder="Capture a note… (Enter to save)"
+            placeholder="Capture a thought..."
             value={capturing}
             onChange={e => setCapturing(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) addNote(); }}
+            onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') addNote(); }}
+            style={{
+              width: '100%', resize: 'none', minHeight: 72,
+              background: 'var(--surface-el)', border: '1px solid var(--border)',
+              borderRadius: 10, padding: '12px 14px',
+              fontSize: 13, color: 'var(--text-1)', lineHeight: 1.6,
+              transition: 'border-color 0.15s',
+            }}
+            onFocus={e => { e.target.style.borderColor = 'var(--accent)'; }}
+            onBlur={e => { e.target.style.borderColor = 'var(--border)'; }}
           />
-          <div style={{ ...s.row, gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <select
-              style={{ ...s.input, width: 'auto', flex: 1, padding: '7px 12px', borderRadius: 8 }}
-              value={capCat} onChange={e => setCapCat(e.target.value)}
+              value={capCat}
+              onChange={e => setCapCat(e.target.value)}
+              style={{
+                flex: 1, padding: '8px 10px',
+                background: 'var(--surface-el)', border: '1px solid var(--border)',
+                borderRadius: 8, fontSize: 13, color: 'var(--text-1)',
+              }}
             >
               {allCats.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-            <button style={{ ...s.btnPrimary }} onClick={addNote}>Save ⌘↵</button>
+            <button
+              onClick={addNote}
+              disabled={scheduling}
+              style={{
+                padding: '8px 16px', background: 'var(--accent)', color: 'white',
+                borderRadius: 8, fontSize: 13, fontWeight: 500,
+                transition: 'background 0.15s', flexShrink: 0,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-hover)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent)'; }}
+            >
+              Save
+            </button>
           </div>
         </div>
 
         {/* Search + filter */}
-        <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, ...s.col, gap: 10 }}>
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <input
-            style={{ ...s.input }}
-            placeholder="Search notes…"
+            placeholder="Search notes..."
             value={search}
             onChange={e => setSearch(e.target.value)}
+            style={{
+              width: '100%', padding: '8px 12px',
+              background: 'var(--surface-el)', border: '1px solid var(--border)',
+              borderRadius: 8, fontSize: 13, color: 'var(--text-1)',
+            }}
           />
-          <div style={{ ...s.row, gap: 6, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             {['All', ...allCats].map(c => (
               <button
                 key={c}
                 onClick={() => setCatFilter(c)}
                 style={{
-                  padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                  border: `1px solid ${catFilter === c ? color(c) : C.border}`,
-                  background: catFilter === c ? color(c) + '22' : 'transparent',
-                  color: catFilter === c ? color(c) : C.txtDim,
-                  transition: 'all 0.1s',
+                  padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500,
+                  border: `1px solid ${catFilter === c ? catColor(c) : 'var(--border)'}`,
+                  background: catFilter === c ? catColor(c) + '18' : 'transparent',
+                  color: catFilter === c ? catColor(c) : 'var(--text-2)',
+                  transition: 'all 0.1s', cursor: 'pointer',
                 }}
               >{c}</button>
             ))}
-            <div style={{ ...s.row, gap: 4, marginLeft: 4 }}>
-              <input
-                style={{ ...s.input, width: 90, padding: '4px 8px', fontSize: 12, borderRadius: 6 }}
-                placeholder="+ category"
-                value={newCat}
-                onChange={e => setNewCat(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addCat()}
-              />
-            </div>
+            <input
+              placeholder="+ new category"
+              value={newCat}
+              onChange={e => setNewCat(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addCat()}
+              style={{
+                fontSize: 12, padding: '4px 8px',
+                background: 'transparent', border: '1px dashed var(--border)',
+                borderRadius: 6, color: 'var(--text-3)', width: 100,
+              }}
+            />
           </div>
         </div>
 
         {/* Notes list */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px', ...s.col, gap: 8 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
           {filtered.length === 0 && (
-            <div style={{ color: C.txtFaint, fontSize: 13, marginTop: 20, textAlign: 'center' }}>
-              {search ? 'No notes match your search.' : 'No notes yet. Start capturing.'}
+            <div style={{ fontSize: 13, color: 'var(--text-3)', textAlign: 'center', marginTop: 32 }}>
+              {search ? 'No notes match.' : 'No notes yet.'}
             </div>
           )}
-          {filtered.map(n => (
-            <div
-              key={n.id}
-              onClick={() => expanded === n.id ? setExpanded(null) : openNote(n)}
-              style={{
-                ...s.card, cursor: 'pointer', padding: '12px 14px',
-                borderColor: expanded === n.id ? color(n.category) + '55' : C.border,
-                background: expanded === n.id ? color(n.category) + '0a' : C.card,
-                transition: 'all 0.15s',
-              }}
-            >
-              <div style={{ ...s.row, justifyContent: 'space-between', marginBottom: 4 }}>
-                <div style={{ ...s.row, gap: 8 }}>
-                  <span style={{ ...s.badge(color(n.category)) }}>{n.category}</span>
+          <div style={{ columns: 2, columnGap: 12 }}>
+            {filtered.map(n => (
+              <div
+                key={n.id}
+                onClick={() => expanded === n.id ? setExpanded(null) : openNote(n)}
+                style={{
+                  breakInside: 'avoid', marginBottom: 12, cursor: 'pointer',
+                  background: 'var(--surface)', border: `1px solid ${expanded === n.id ? catColor(n.category) + '70' : 'var(--border)'}`,
+                  borderRadius: 10, padding: '12px 14px',
+                  transition: 'border-color 0.15s',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: catColor(n.category), display: 'inline-block', flexShrink: 0 }}/>
+                    <span style={{ fontSize: 11, fontWeight: 500, color: catColor(n.category) }}>{n.category}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                      {new Date(n.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                    </span>
+                    <button
+                      onClick={e => { e.stopPropagation(); deleteNote(n.id); }}
+                      style={{ color: 'var(--text-3)', fontSize: 14, lineHeight: 1, padding: '0 1px' }}
+                    >×</button>
+                  </div>
                 </div>
-                <div style={{ ...s.row, gap: 8 }}>
-                  <span style={{ fontSize: 11, color: C.txtFaint }}>
-                    {new Date(n.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                  </span>
-                  <button
-                    onClick={e => { e.stopPropagation(); deleteNote(n.id); }}
-                    style={{ color: C.txtFaint, fontSize: 14, lineHeight: 1, padding: '0 2px' }}
-                  >×</button>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-1)', marginBottom: 3, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                  {n.title || '(untitled)'}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-2)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                  {n.body}
                 </div>
               </div>
-              <div style={{ fontSize: 13, color: C.txt, fontWeight: 500, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {n.title || '(untitled)'}
-              </div>
-              <div style={{ fontSize: 12, color: C.txtDim, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                {n.body.slice(0, 200)}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Right pane — note editor */}
+      {/* Note editor pane */}
       {expanded && expandedNote && (
-        <div style={{ ...s.col, overflow: 'hidden' }}>
-          <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, ...s.row, justifyContent: 'space-between' }}>
-            <span style={{ ...s.badge(color(expandedNote.category)) }}>{expandedNote.category}</span>
-            <div style={{ ...s.row, gap: 10 }}>
-              <span style={{ fontSize: 11, color: C.txtFaint }}>auto-saving</span>
-              <button
-                onClick={() => deleteNote(expandedNote.id)}
-                style={{ color: C.red, fontSize: 13, fontWeight: 500 }}
-              >Delete</button>
-              <button onClick={() => setExpanded(null)} style={{ color: C.txtDim, fontSize: 20, lineHeight: 1 }}>×</button>
+        <div style={{ width: 380, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: catColor(expandedNote.category), display: 'inline-block' }}/>
+              <span style={{ fontSize: 12, fontWeight: 500, color: catColor(expandedNote.category) }}>{expandedNote.category}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>auto-saving</span>
+              <button onClick={() => deleteNote(expandedNote.id)} style={{ fontSize: 12, color: 'var(--destructive)', fontWeight: 500 }}>Delete</button>
+              <button onClick={() => setExpanded(null)} style={{ fontSize: 18, color: 'var(--text-3)', lineHeight: 1 }}>×</button>
             </div>
           </div>
           <textarea
-            style={{
-              flex: 1, background: 'transparent', color: C.txt, fontSize: 14,
-              padding: '20px', resize: 'none', lineHeight: 1.7,
-              fontFamily: 'inherit', border: 'none', outline: 'none',
-            }}
+            autoFocus
             value={editBody}
             onChange={e => handleEdit(e.target.value)}
-            autoFocus
+            style={{
+              flex: 1, resize: 'none', padding: '20px 16px',
+              background: 'transparent', color: 'var(--text-1)',
+              fontSize: 13, lineHeight: 1.7, fontFamily: 'inherit',
+            }}
           />
         </div>
       )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
 
-// ─── Tab: Timetable ───────────────────────────────────────────────────────────
-const HOURS = Array.from({ length: 18 }, (_, i) => i + 6); // 06:00–23:00
-const SLOT_TYPES = Object.keys(SLOT_COLORS);
-
-function TimetableTab() {
-  const key = 'cadence_timetable_' + todayKey();
-  const [slots, setSlots] = useState(() => ls.get(key, {}));
+// ─── TimetableTab ─────────────────────────────────────────────────────────────
+function TimetableTab({ slots, setSlots }) {
+  const tKey = 'cadence_timetable_' + todayKey();
   const [editHour, setEditHour] = useState(null);
   const [editLabel, setEditLabel] = useState('');
   const [editType, setEditType] = useState('Study');
   const [generating, setGenerating] = useState(false);
   const [genPrompt, setGenPrompt] = useState('');
   const [genError, setGenError] = useState('');
+  const [genBadge, setGenBadge] = useState(false);
+  const [nowMinute, setNowMinute] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
 
-  const saveSlots = (next) => { setSlots(next); ls.set(key, next); };
+  useEffect(() => {
+    const t = setInterval(() => {
+      const d = new Date();
+      setNowMinute(d.getHours() * 60 + d.getMinutes());
+    }, 60000);
+    return () => clearInterval(t);
+  }, []);
+
+  const saveSlots = (next) => { setSlots(next); ls.set(tKey, next); };
 
   const openEdit = (hour) => {
     setEditHour(hour);
-    const existing = slots[hour];
-    setEditLabel(existing?.label || '');
-    setEditType(existing?.type || 'Study');
+    const ex = slots[hour];
+    setEditLabel(ex?.label || '');
+    setEditType(ex?.type || 'Study');
   };
 
   const saveSlot = () => {
     if (!editLabel.trim()) {
-      const next = { ...slots };
-      delete next[editHour];
-      saveSlots(next);
+      const next = { ...slots }; delete next[editHour]; saveSlots(next);
     } else {
       saveSlots({ ...slots, [editHour]: { label: editLabel.trim(), type: editType } });
     }
     setEditHour(null);
   };
 
-  const clearSlot = (hour) => {
-    const next = { ...slots };
-    delete next[hour];
-    saveSlots(next);
-  };
-
   const generate = async () => {
     if (!genPrompt.trim()) return;
-    setGenerating(true);
-    setGenError('');
+    setGenerating(true); setGenError('');
     try {
-      const sysPrompt = `You are scheduling Ibrahim Malik's day. He is 17, at Harris Westminster Sixth Form, A-levels Further Maths/Maths/Economics/Philosophy. Main priorities: StudentSolve (AI revision platform, September 2026 launch), TARA exam prep (Oxford PPE, October 2026), A-level study, markets (MNQ trading), and training (Muay Thai/BJJ). Wake typically 6-7am. Given his tasks for today, create a realistic hour-by-hour schedule from 06:00 to 23:00. Respond ONLY with a valid JSON object where keys are hours as numbers (6-22) and values are objects with "label" (string, brief task name) and "type" (one of: Study, Build, Training, Admin, Break, Deep Work, Markets). Example: {"7":{"label":"Morning routine","type":"Admin"},"8":{"label":"TARA past paper","type":"Deep Work"}}. No explanation, only the JSON object.`;
-
-      const result = await api.jarvis(`${sysPrompt}\n\nUser's tasks for today: ${genPrompt}`, todayKey());
-      // api.jarvis returns { reply } based on the API structure
-      const text = result?.reply || result?.message || JSON.stringify(result);
-      // extract JSON
+      const sys = `Create a realistic schedule for Ibrahim Malik (17, Harris Westminster, A-levels Further Maths/Maths/Economics/Philosophy, building StudentSolve, TARA prep October 2026, trades MNQ futures, Muay Thai training). Given his tasks, produce a JSON object only. Keys are hours as numbers (6-22), values are {"label":"...","type":"..."}. Types: Study, Build, Training, Admin, Break, Deep Work, Markets. Tasks: ${genPrompt}`;
+      const result = await api.jarvis(sys, todayKey());
+      const text = parseJarvisReply(result);
       const match = text.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error('No JSON in response');
+      if (!match) throw new Error('No JSON found in response');
       const parsed = JSON.parse(match[0]);
-      // validate and normalise
       const next = {};
       for (const [k, v] of Object.entries(parsed)) {
         const hour = parseInt(k, 10);
         if (hour >= 6 && hour <= 22 && v?.label) {
-          next[hour] = { label: v.label, type: SLOT_TYPES.includes(v.type) ? v.type : 'Study' };
+          next[hour] = { label: String(v.label), type: SLOT_TYPES.includes(v.type) ? v.type : 'Study' };
         }
       }
       saveSlots(next);
+      setGenBadge(true);
+      setTimeout(() => setGenBadge(false), 8000);
     } catch (e) {
       setGenError('Generation failed: ' + e.message);
     }
     setGenerating(false);
   };
 
-  const now = new Date();
-  const currentHour = now.getHours();
+  // Current time line position
+  const startMinute = 6 * 60;
+  const endMinute = 23 * 60;
+  const ROW_H = 44;
+  const nowPct = Math.min(Math.max((nowMinute - startMinute) / (endMinute - startMinute), 0), 1);
+  const nowTop = nowPct * (HOURS.length * ROW_H);
+  const inRange = nowMinute >= startMinute && nowMinute <= endMinute;
 
   return (
-    <div style={{ ...s.col, height: '100%', overflow: 'hidden' }}>
-      {/* Generate bar */}
-      <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, ...s.col, gap: 10 }}>
-        <div style={{ ...s.row, gap: 8 }}>
-          <input
-            style={{ ...s.input, flex: 1 }}
-            placeholder="What do you need to get done today? Jarvis will schedule it…"
-            value={genPrompt}
-            onChange={e => setGenPrompt(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && generate()}
-            disabled={generating}
-          />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {/* Generate panel */}
+      <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)' }}>
+              Generate schedule
+            </label>
+            <input
+              placeholder="What do you need to get done today?"
+              value={genPrompt}
+              onChange={e => setGenPrompt(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && generate()}
+              disabled={generating}
+              style={{
+                padding: '8px 12px', background: 'var(--surface-el)',
+                border: '1px solid var(--border)', borderRadius: 8,
+                fontSize: 13, color: 'var(--text-1)',
+              }}
+            />
+          </div>
           <button
-            style={{ ...s.btnPrimary, opacity: generating ? 0.6 : 1, whiteSpace: 'nowrap' }}
             onClick={generate}
             disabled={generating}
+            style={{
+              padding: '8px 16px', background: 'var(--accent)', color: 'white',
+              borderRadius: 8, fontSize: 13, fontWeight: 500, flexShrink: 0,
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => { if (!generating) e.currentTarget.style.background = 'var(--accent-hover)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent)'; }}
           >
-            {generating ? 'Generating…' : 'Generate Schedule'}
+            {generating ? 'Generating...' : 'Generate'}
           </button>
+          {genBadge && (
+            <span style={{ fontSize: 11, color: 'var(--text-3)', padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6 }}>
+              Generated by Jarvis
+            </span>
+          )}
         </div>
-        {genError && <div style={{ color: C.red, fontSize: 12 }}>{genError}</div>}
-        <div style={{ ...s.row, gap: 8, flexWrap: 'wrap' }}>
+        {genError && <div style={{ fontSize: 12, color: 'var(--destructive)' }}>{genError}</div>}
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           {SLOT_TYPES.map(t => (
-            <div key={t} style={{ ...s.row, gap: 5, fontSize: 11 }}>
-              <div style={{ width: 8, height: 8, borderRadius: 2, background: SLOT_COLORS[t].border }} />
-              <span style={{ color: C.txtDim }}>{t}</span>
+            <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: SLOT_COLORS[t].border }}/>
+              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{t}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Slot editor modal */}
+      {/* Edit modal */}
       {editHour !== null && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }} onClick={() => setEditHour(null)}>
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setEditHour(null)}
+        >
           <div
-            style={{ ...s.card, width: 340, padding: 24, ...s.col, gap: 14 }}
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, width: 340, display: 'flex', flexDirection: 'column', gap: 14 }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ fontWeight: 600, fontSize: 15 }}>
-              {String(editHour).padStart(2,'0')}:00 – {String(editHour+1).padStart(2,'0')}:00
+            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-1)' }}>
+              {fmtHHMM(editHour)} – {fmtHHMM(editHour + 1)}
             </div>
             <input
-              style={{ ...s.input }}
+              autoFocus
               placeholder="What's happening this hour?"
               value={editLabel}
               onChange={e => setEditLabel(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && saveSlot()}
-              autoFocus
+              style={{ padding: '9px 12px', background: 'var(--surface-el)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, color: 'var(--text-1)' }}
             />
             <select
-              style={{ ...s.input, padding: '9px 13px', borderRadius: 8 }}
-              value={editType} onChange={e => setEditType(e.target.value)}
+              value={editType}
+              onChange={e => setEditType(e.target.value)}
+              style={{ padding: '9px 12px', background: 'var(--surface-el)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, color: 'var(--text-1)' }}
             >
               {SLOT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
-            <div style={{ ...s.row, gap: 8, justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               {slots[editHour] && (
                 <button
-                  style={{ color: C.red, fontSize: 13, padding: '8px 14px', borderRadius: 8, border: `1px solid ${C.red}33` }}
-                  onClick={() => { clearSlot(editHour); setEditHour(null); }}
+                  style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--destructive)', color: 'var(--destructive)', fontSize: 13 }}
+                  onClick={() => { const n = { ...slots }; delete n[editHour]; saveSlots(n); setEditHour(null); }}
                 >Clear</button>
               )}
-              <button style={{ ...s.btnPrimary }} onClick={saveSlot}>Save</button>
+              <button
+                style={{ padding: '8px 16px', background: 'var(--accent)', color: 'white', borderRadius: 8, fontSize: 13, fontWeight: 500 }}
+                onClick={saveSlot}
+              >Save</button>
             </div>
           </div>
         </div>
       )}
 
       {/* Hour grid */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px', ...s.col, gap: 4 }}>
-        {HOURS.map(hour => {
-          const slot = slots[hour];
-          const isNow = hour === currentHour;
-          const colors = slot ? SLOT_COLORS[slot.type] || SLOT_COLORS['Study'] : null;
-          return (
-            <div
-              key={hour}
-              onClick={() => openEdit(hour)}
-              style={{
-                ...s.row, gap: 12, padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
-                border: `1px solid ${isNow ? C.blue : slot ? colors.border + '55' : C.border}`,
-                background: isNow && !slot ? C.blue + '0a' : slot ? colors.bg : 'transparent',
-                transition: 'all 0.1s',
-                minHeight: 44,
-              }}
-            >
-              <div style={{ width: 44, fontSize: 12, fontWeight: 600, color: isNow ? C.blue : C.txtFaint, flexShrink: 0 }}>
-                {String(hour).padStart(2,'0')}:00
-              </div>
-              {slot ? (
-                <>
-                  <div style={{ flex: 1, fontSize: 13, color: colors.text, fontWeight: 500 }}>{slot.label}</div>
-                  <span style={{ ...s.badge(colors.border), fontSize: 10 }}>{slot.type}</span>
-                </>
-              ) : (
-                <div style={{ flex: 1, fontSize: 12, color: C.txtFaint }}>
-                  {isNow ? '← now · click to add' : 'click to add'}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+        <div style={{ position: 'relative' }}>
+          {HOURS.map((hour, idx) => {
+            const slot = slots[hour];
+            const isNow = new Date().getHours() === hour;
+            const colors = slot ? SLOT_COLORS[slot.type] || SLOT_COLORS['Study'] : null;
+
+            return (
+              <div
+                key={hour}
+                onClick={() => openEdit(hour)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 16,
+                  height: ROW_H, cursor: 'pointer',
+                  borderBottom: idx < HOURS.length - 1 ? '1px solid var(--border)' : 'none',
+                  transition: 'background 0.1s',
+                }}
+                onMouseEnter={e => { if (!slot) e.currentTarget.style.background = 'var(--surface-el)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                {/* Time label */}
+                <div style={{ width: 50, fontSize: 12, fontWeight: isNow ? 600 : 400, color: isNow ? 'var(--accent)' : 'var(--text-3)', flexShrink: 0 }}>
+                  {fmtHHMM(hour)}
                 </div>
-              )}
+
+                {/* Slot */}
+                <div style={{ flex: 1, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', paddingLeft: slot ? 10 : 0, gap: 10, position: 'relative',
+                  background: slot ? colors.light : 'transparent',
+                  borderLeft: slot ? `3px solid ${colors.border}` : '3px solid transparent',
+                }}>
+                  {slot ? (
+                    <>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-1)', flex: 1 }}>{slot.label}</span>
+                      <span style={{ fontSize: 11, color: colors.border, fontWeight: 500, marginRight: 4 }}>{slot.type}</span>
+                    </>
+                  ) : (
+                    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                      {isNow ? 'Now — click to add' : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Current time indicator */}
+          {inRange && (
+            <div style={{
+              position: 'absolute', left: 0, right: 0,
+              top: nowTop,
+              height: 1, background: 'var(--destructive)',
+              zIndex: 5, pointerEvents: 'none',
+            }}>
+              <div style={{ position: 'absolute', left: 44, top: -3, width: 6, height: 6, borderRadius: '50%', background: 'var(--destructive)' }}/>
             </div>
-          );
-        })}
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── Tab: Jarvis ──────────────────────────────────────────────────────────────
-function JarvisTab({ checklistState }) {
+// ─── JarvisTab ───────────────────────────────────────────────────────────────
+function JarvisTab({ checklistState, slots }) {
   const [messages, setMessages] = useState(() => ls.get('cadence_jarvis_history', []));
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -687,11 +1018,8 @@ function JarvisTab({ checklistState }) {
   };
 
   const getTimetableStatus = () => {
-    const key = 'cadence_timetable_' + todayKey();
-    const slots = ls.get(key, {});
-    const entries = Object.entries(slots)
-      .sort(([a], [b]) => +a - +b)
-      .map(([h, v]) => `${String(h).padStart(2,'0')}:00 ${v.label} (${v.type})`);
+    const entries = Object.entries(slots).sort(([a],[b]) => +a - +b)
+      .map(([h, v]) => `${fmtHHMM(+h)} ${v.label} (${v.type})`);
     return entries.length ? entries.join(', ') : 'No timetable set';
   };
 
@@ -707,14 +1035,14 @@ function JarvisTab({ checklistState }) {
     setError('');
 
     try {
-      const systemPrompt = JARVIS_SYSTEM(getChecklistStatus(), getTimetableStatus());
-      // Build context for API: inject system as first user message (api.jarvis takes single message)
-      const contextMsg = `[SYSTEM CONTEXT]\n${systemPrompt}\n\n[CONVERSATION SO FAR]\n${
+      const system = buildJarvisSystem(getChecklistStatus(), getTimetableStatus());
+      const context = `[SYSTEM]\n${system}\n\n[HISTORY]\n${
         messages.slice(-10).map(m => `${m.role === 'user' ? 'Ibrahim' : 'Jarvis'}: ${m.content}`).join('\n')
       }\n\n[NEW MESSAGE]\nIbrahim: ${text}`;
 
-      const result = await api.jarvis(contextMsg, todayKey());
-      const reply = result?.reply || result?.message || (typeof result === 'string' ? result : JSON.stringify(result));
+      const result = await api.jarvis(context, todayKey());
+      // Fix: extract .text from response (server returns {text: "...", applied: 0})
+      const reply = parseJarvisReply(result);
 
       const jarvisMsg = { role: 'jarvis', content: reply, ts: Date.now() };
       const finalMsgs = [...nextMsgs, jarvisMsg];
@@ -726,179 +1054,171 @@ function JarvisTab({ checklistState }) {
     setLoading(false);
   };
 
-  const clearHistory = () => {
-    setMessages([]);
-    ls.set('cadence_jarvis_history', []);
-  };
+  const clearHistory = () => { setMessages([]); ls.set('cadence_jarvis_history', []); };
 
   return (
-    <div style={{ ...s.col, height: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* Header */}
-      <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, ...s.row, justifyContent: 'space-between' }}>
-        <div style={{ ...s.row, gap: 10 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.green, boxShadow: `0 0 6px ${C.green}` }} />
-          <span style={{ fontWeight: 600, fontSize: 14 }}>Jarvis</span>
-          <span style={{ color: C.txtFaint, fontSize: 12 }}>— knows your day</span>
+      <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-1)' }}>Jarvis</span>
+          <div style={{
+            width: 7, height: 7, borderRadius: '50%',
+            background: loading ? 'var(--accent)' : 'var(--success)',
+            animation: loading ? 'indicator-pulse 1s ease-in-out infinite' : 'none',
+          }}/>
         </div>
-        <button onClick={clearHistory} style={{ color: C.txtFaint, fontSize: 12 }}>Clear history</button>
+        <button onClick={clearHistory} style={{ fontSize: 12, color: 'var(--text-3)' }}>Clear history</button>
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px', ...s.col, gap: 16 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         {messages.length === 0 && (
-          <div style={{ color: C.txtFaint, fontSize: 13, textAlign: 'center', marginTop: 40 }}>
-            Jarvis is ready. Ask about your schedule, TARA prep, StudentSolve, markets — anything.
+          <div style={{ fontSize: 13, color: 'var(--text-3)', textAlign: 'center', marginTop: 60, lineHeight: 1.8 }}>
+            Jarvis is ready.<br/>
+            Ask about your schedule, TARA prep, StudentSolve, markets — anything.
           </div>
         )}
+
         {messages.map((m, i) => {
           const isUser = m.role === 'user';
           return (
-            <div key={i} style={{ ...s.row, justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
-              {!isUser && (
-                <div style={{
-                  width: 28, height: 28, borderRadius: '50%', background: C.indigo + '33',
-                  border: `1px solid ${C.indigo}55`, display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', fontSize: 13, flexShrink: 0, marginRight: 10, alignSelf: 'flex-end',
-                }}>J</div>
-              )}
+            <div key={i} style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
               <div style={{
-                maxWidth: '75%',
-                background: isUser ? C.blue + '22' : C.card,
-                border: `1px solid ${isUser ? C.blue + '44' : C.border}`,
-                borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                maxWidth: '72%',
                 padding: '10px 14px',
-                fontSize: 14, lineHeight: 1.65, color: C.txt,
-                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                // Jarvis bubble: subtle animated border
+                ...(isUser ? {
+                  background: 'var(--accent)',
+                  color: 'white',
+                } : {
+                  background: 'var(--surface-el)',
+                  color: 'var(--text-1)',
+                  border: '1px solid var(--border)',
+                  animation: 'jarvis-border-pulse 3s ease-in-out infinite',
+                }),
               }}>
                 {m.content}
               </div>
             </div>
           );
         })}
+
         {loading && (
-          <div style={{ ...s.row, gap: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
             <div style={{
-              width: 28, height: 28, borderRadius: '50%', background: C.indigo + '33',
-              border: `1px solid ${C.indigo}55`, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', fontSize: 13, flexShrink: 0,
-            }}>J</div>
-            <div style={{
-              background: C.card, border: `1px solid ${C.border}`,
-              borderRadius: '14px 14px 14px 4px', padding: '12px 16px',
-              ...s.row, gap: 5,
+              padding: '12px 16px',
+              background: 'var(--surface-el)',
+              border: '1px solid var(--border)',
+              borderRadius: '16px 16px 16px 4px',
+              display: 'flex', gap: 5, alignItems: 'center',
             }}>
               {[0,1,2].map(i => (
                 <div key={i} style={{
-                  width: 6, height: 6, borderRadius: '50%', background: C.blue,
-                  animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
-                }} />
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: 'var(--accent)',
+                  animation: `thinking-pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+                }}/>
               ))}
             </div>
           </div>
         )}
+
         {error && (
-          <div style={{ color: C.red, fontSize: 12, textAlign: 'center' }}>Error: {error}</div>
+          <div style={{ fontSize: 12, color: 'var(--destructive)', textAlign: 'center' }}>
+            Error: {error}
+          </div>
         )}
-        <div ref={bottomRef} />
+
+        <div ref={bottomRef}/>
       </div>
 
       {/* Input */}
-      <div style={{ padding: '14px 20px', borderTop: `1px solid ${C.border}`, ...s.row, gap: 10 }}>
-        <input
-          ref={inputRef}
-          style={{ ...s.input, flex: 1, padding: '11px 16px' }}
-          placeholder="Ask Jarvis anything…"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-          disabled={loading}
-        />
-        <button
-          style={{ ...s.btnPrimary, opacity: loading || !input.trim() ? 0.5 : 1 }}
-          onClick={send}
-          disabled={loading || !input.trim()}
-        >Send</button>
+      <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', background: 'var(--surface-el)', border: '1px solid var(--border)', borderRadius: 24, padding: '6px 6px 6px 16px' }}>
+          <input
+            ref={inputRef}
+            placeholder="Ask Jarvis anything..."
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+            disabled={loading}
+            style={{ flex: 1, fontSize: 13, color: 'var(--text-1)', background: 'transparent' }}
+          />
+          <button
+            onClick={send}
+            disabled={loading || !input.trim()}
+            style={{
+              width: 34, height: 34, borderRadius: '50%',
+              background: input.trim() && !loading ? 'var(--accent)' : 'var(--border)',
+              color: input.trim() && !loading ? 'white' : 'var(--text-3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'background 0.15s',
+            }}
+          >
+            <SendIcon/>
+          </button>
+        </div>
       </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 80%, 100% { opacity: 0.3; transform: scale(0.85); }
-          40% { opacity: 1; transform: scale(1); }
-        }
-      `}</style>
     </div>
   );
 }
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
-const TABS = [
-  { id: 'today',     label: 'Today' },
-  { id: 'notes',     label: 'Notes' },
-  { id: 'timetable', label: 'Timetable' },
-  { id: 'jarvis',    label: 'Jarvis' },
-];
-
 export default function Cadence() {
   const [tab, setTab] = useState('today');
+  const [theme, setTheme] = useState('light');
 
-  const defaultChecklist = { habits: DEFAULT_HABITS, checked: [] };
+  // Theme init
+  useEffect(() => {
+    const saved = ls.get('cadence_theme', 'light');
+    setTheme(saved);
+    document.documentElement.setAttribute('data-theme', saved);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    ls.set('cadence_theme', next);
+    document.documentElement.setAttribute('data-theme', next);
+  }, [theme]);
+
+  // Checklist state (lifted)
   const [checklistState, setChecklistState] = useState(() => {
     const stored = ls.get('cadence_checklist_' + todayKey(), null);
-    if (stored && stored.habits) return stored;
-    return defaultChecklist;
+    if (stored?.habits?.length) return stored;
+    return { habits: DEFAULT_HABITS, checked: [] };
   });
 
-  // Merge new default habits in if stored habits don't have them
+  // Timetable state (lifted — needed by Notes for To Do scheduling)
+  const [slots, setSlots] = useState(() => ls.get('cadence_timetable_' + todayKey(), {}));
+
+  // Merge new default habits on mount
   useEffect(() => {
     const stored = ls.get('cadence_checklist_' + todayKey(), null);
     if (!stored) return;
     const existingIds = (stored.habits || []).map(h => h.id);
     const missing = DEFAULT_HABITS.filter(h => !existingIds.includes(h.id));
     if (missing.length) {
-      const next = { ...stored, habits: [...DEFAULT_HABITS, ...(stored.habits || []).filter(h => h.id.startsWith('custom_'))] };
+      const customs = (stored.habits || []).filter(h => h.id.startsWith('custom_'));
+      const next = { ...stored, habits: [...DEFAULT_HABITS, ...customs] };
       setChecklistState(next);
       ls.set('cadence_checklist_' + todayKey(), next);
     }
   }, []);
 
   return (
-    <div style={{ ...s.fill }}>
-      {/* Top bar */}
-      <div style={{
-        ...s.row, height: 52, borderBottom: `1px solid ${C.border}`,
-        padding: '0 20px', gap: 0, flexShrink: 0,
-        background: C.surface,
-      }}>
-        <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.04em', color: C.txt, marginRight: 28 }}>
-          CADENCE
-        </div>
-        <div style={{ ...s.row, gap: 4, flex: 1 }}>
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              style={{
-                padding: '6px 16px', borderRadius: 7, fontSize: 13, fontWeight: 500,
-                color: tab === t.id ? C.txt : C.txtDim,
-                background: tab === t.id ? C.card : 'transparent',
-                border: `1px solid ${tab === t.id ? C.border : 'transparent'}`,
-                cursor: 'pointer', transition: 'all 0.12s',
-              }}
-            >{t.label}</button>
-          ))}
-        </div>
-        <div style={{ fontSize: 12, color: C.txtFaint }}>
-          {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-        </div>
-      </div>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg)' }}>
+      <Sidebar tab={tab} setTab={setTab} theme={theme} toggleTheme={toggleTheme}/>
 
-      {/* Tab content */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {tab === 'today'     && <TodayTab checklistState={checklistState} setChecklistState={setChecklistState} />}
-        {tab === 'notes'     && <NotesTab />}
-        {tab === 'timetable' && <TimetableTab />}
-        {tab === 'jarvis'    && <JarvisTab checklistState={checklistState} />}
-      </div>
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+        {tab === 'today'     && <TodayTab checklistState={checklistState} setChecklistState={setChecklistState}/>}
+        {tab === 'notes'     && <NotesTab slots={slots} setSlots={setSlots}/>}
+        {tab === 'timetable' && <TimetableTab slots={slots} setSlots={setSlots}/>}
+        {tab === 'jarvis'    && <JarvisTab checklistState={checklistState} slots={slots}/>}
+      </main>
     </div>
   );
 }
