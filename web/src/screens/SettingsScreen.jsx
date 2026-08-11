@@ -30,7 +30,6 @@ const STORAGE_KEYS = [
   { key: 'cadence_theme', holds: 'Theme preference' },
   { key: 'cadence_checklist_<date>', holds: "One day's habits and ticks" },
   { key: 'cadence_streaks', holds: 'Run length per habit' },
-  { key: 'cadence_timetable_<date>', holds: "One day's hours" },
   { key: 'cadence_notes', holds: 'Every note' },
   { key: 'cadence_note_cats', holds: 'Categories you added' },
   { key: 'cadence_jarvis_history', holds: 'Last 60 messages' },

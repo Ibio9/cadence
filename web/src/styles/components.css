@@ -955,53 +955,64 @@
 }
 .cd-habit__actions { display: flex; align-items: center; gap: var(--space-1); flex-shrink: 0; }
 
-/* Timetable grid */
-.cd-slotrow {
+/* Timetable: the day as blocks from the database.
+   --block-colour is per-project data, not a token, so it is set inline from
+   the record. It is never the only signal: the project name is always written
+   out, and the colour lands on a rule rather than on text, because a colour
+   chosen in the database cannot be guaranteed to clear 4.5:1 on this ground. */
+.cd-blocklist { display: flex; flex-direction: column; }
+
+.cd-blockrow {
+  --block-colour: var(--border-strong);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-4);
-  width: 100%;
-  min-height: 52px;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-4) var(--shell-card-pad);
   border-bottom: var(--hairline) solid var(--border);
-  text-align: left;
-  transition: background-color var(--dur-fast) var(--ease);
+  border-left: 3px solid var(--block-colour);
 }
-.cd-slotrow:last-child { border-bottom: none; }
-.cd-slotrow:hover { background: var(--hover-tint); }
-.cd-slotrow__time {
-  width: 52px;
+.cd-blockrow:last-child { border-bottom: none; }
+.cd-blockrow.is-now { background: var(--accent-tint); }
+
+.cd-blockrow__time {
+  width: 58px;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   font-family: var(--font-mono);
-  font-size: var(--text-caption);
   font-variant-numeric: tabular-nums;
-  color: var(--ink-subtle);
 }
-.cd-slotrow.is-now .cd-slotrow__time { color: var(--accent); font-weight: var(--weight-medium); }
-.cd-slotrow__body {
-  flex: 1;
-  min-width: 0;
+.cd-blockrow__start { font-size: var(--text-sm); color: var(--ink); }
+.cd-blockrow__dur { font-size: var(--text-caption); color: var(--ink-subtle); }
+
+.cd-blockrow__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.cd-blockrow__title {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.cd-blockrow__meta {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  min-height: 32px;
-  padding: 0 var(--space-3);
-  border-left: 3px solid transparent;
-  border-radius: var(--radius-sm);
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-caption);
+  color: var(--ink-muted);
 }
-.cd-slotrow__body.is-filled { border-left-color: var(--accent); background: var(--accent-tint); }
-.cd-slotrow__body.is-filled.is-soft { border-left-color: var(--accent-soft); background: var(--surface-sunken); }
-.cd-nowline { position: absolute; left: 0; right: 0; height: 0; pointer-events: none; z-index: 1; }
-.cd-nowline__rule { position: absolute; left: 0; right: 0; height: 2px; background: var(--accent); }
-.cd-nowline__dot {
-  position: absolute;
-  left: var(--space-4);
-  top: -3px;
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: var(--accent);
+.cd-blockrow__project { flex-shrink: 0; font-weight: var(--weight-medium); }
+.cd-blockrow__marks { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
+
+.cd-nowmark { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--shell-card-pad); }
+.cd-nowmark__time {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--accent);
 }
+.cd-nowmark__rule { flex: 1; height: 2px; border-radius: var(--radius-pill); background: var(--accent); }
 
 /* Chat */
 .cd-bubble {

@@ -21,7 +21,7 @@ import {
   Skeleton,
   useToast,
 } from '../components/ui';
-import { buildJarvisSystem, fmtHHMM, ls, parseJarvisReply } from '../lib/store';
+import { buildJarvisSystem, ls, parseJarvisReply } from '../lib/store';
 
 const STARTERS = [
   'What should I drop today to protect TARA prep?',
@@ -47,7 +47,7 @@ function JarvisSkeleton() {
   );
 }
 
-export function JarvisScreen({ ready, checklistState, slots, todayKey }) {
+export function JarvisScreen({ ready, checklistState, todayKey }) {
   const { toast } = useToast();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -71,13 +71,6 @@ export function JarvisScreen({ ready, checklistState, slots, todayKey }) {
     return `Done: ${done.join(', ') || 'none'}. To do: ${todo.join(', ') || 'all done'}. Progress: ${checked.length}/${habits.length}`;
   };
 
-  const timetableStatus = () => {
-    const entries = Object.entries(slots)
-      .sort(([a], [b]) => +a - +b)
-      .map(([h, v]) => `${fmtHHMM(+h)} ${v.label} (${v.type})`);
-    return entries.length ? entries.join(', ') : 'No timetable set';
-  };
-
   const send = useCallback(
     async (rawText) => {
       const text = (rawText ?? input).trim();
@@ -93,7 +86,10 @@ export function JarvisScreen({ ready, checklistState, slots, todayKey }) {
       setLastAttempt(text);
 
       try {
-        const system = buildJarvisSystem(checklistStatus(), timetableStatus());
+        // The day itself is not sent from here. buildContext on the server
+        // serialises today's real blocks into every request, and a second,
+        // client-side copy of the timetable could only contradict it.
+        const system = buildJarvisSystem(checklistStatus());
         const context = `[SYSTEM]\n${system}\n\n[HISTORY]\n${history
           .slice(-10)
           .map((m) => `${m.role === 'user' ? 'Ibrahim' : 'Jarvis'}: ${m.content}`)
@@ -110,9 +106,9 @@ export function JarvisScreen({ ready, checklistState, slots, todayKey }) {
       }
       setLoading(false);
     },
-    // checklistStatus and timetableStatus read the latest props on every call
+    // checklistStatus reads the latest props on every call
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [input, loading, messages, todayKey, checklistState, slots],
+    [input, loading, messages, todayKey, checklistState],
   );
 
   const clearHistory = () => {

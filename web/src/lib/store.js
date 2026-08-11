@@ -41,8 +41,6 @@ export const getGreeting = () => {
   return 'Good evening';
 };
 
-export const fmtHHMM = (h, m = 0) => String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
-
 export const parseJarvisReply = (result) => {
   if (!result) return '';
   if (result.text) return result.text;
@@ -74,22 +72,13 @@ export const DEFAULT_HABITS = [
 export const NOTE_CATEGORIES = ['Ideas', 'Study', 'Markets', 'Business', 'Personal', 'TARA', 'StudentSolve', 'To Do'];
 
 /**
- * Slot types keep their names and their meaning. They no longer each get their
- * own hue: blue is the only accent in this design language, so a slot is told
- * apart by its type label rather than by colour. Break is the one type that
- * reads as recessive, so it uses the sunken ground instead of the accent tint.
+ * Model prompt, not UI copy. It is never rendered to the screen.
+ *
+ * The day is deliberately absent: buildContext on the server puts today's real
+ * blocks into every request, so a second copy assembled here could only go
+ * stale and contradict it.
  */
-export const SLOT_TYPES = ['Study', 'Build', 'Training', 'Admin', 'Break', 'Deep Work', 'Markets'];
-export const RECESSIVE_SLOT_TYPES = ['Break', 'Admin'];
-
-export const HOURS = Array.from({ length: 18 }, (_, i) => i + 6); // 06 to 23
-
-export const DEFAULT_TIMETABLE_PROMPT =
-  'Generate an optimal schedule for Ibrahim today based on his usual commitments: TARA prep, A-level study, Muay Thai training, reading, podcast, prayers, and market review.';
-
-// Model prompt, not UI copy. Left byte for byte as it was so the assistant's
-// behaviour does not change. It is never rendered to the screen.
-export const buildJarvisSystem = (checklist, timetable) => `You are Jarvis — Ibrahim Malik's personal AI. Be direct, specific, no filler.
+export const buildJarvisSystem = (checklist) => `You are Jarvis — Ibrahim Malik's personal AI. Be direct, specific, no filler.
 
 Ibrahim, 17. Harris Westminster Sixth Form. A-levels: Further Maths, Maths, Economics, Philosophy. Target: Oxford PPE via TARA (October 2026, 8.0+). St Hilda's College, LMH backup. GCSEs: 9 A*s, 1 A.
 
@@ -99,5 +88,4 @@ StudentSolve: AI revision platform, September 2026 launch, £4.99/mo. Also: dent
 
 Critical tension: StudentSolve launch September + TARA October + A-levels + multiple builds. Be direct about allocation.
 
-Today checklist: ${checklist}
-Today timetable: ${timetable}`;
+Today checklist: ${checklist}`;

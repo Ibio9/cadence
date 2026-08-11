@@ -31,7 +31,7 @@ import {
   Textarea,
   useToast,
 } from '../components/ui';
-import { fmtHHMM, ls, NOTE_CATEGORIES, parseJarvisReply } from '../lib/store';
+import { ls, NOTE_CATEGORIES } from '../lib/store';
 
 function NotesSkeleton() {
   return (
@@ -50,7 +50,7 @@ function NotesSkeleton() {
   );
 }
 
-export function NotesScreen({ ready, setSlots, todayKey }) {
+export function NotesScreen({ ready, todayKey }) {
   const { toast } = useToast();
 
   const [notes, setNotes] = useState([]);
@@ -85,35 +85,24 @@ export function NotesScreen({ ready, setSlots, todayKey }) {
       setScheduling(true);
       setScheduleFailed(null);
       try {
-        const currentSlots = ls.get('cadence_timetable_' + todayKey, {});
-        const slotSummary = Object.entries(currentSlots).length
-          ? Object.entries(currentSlots)
-              .sort(([a], [b]) => +a - +b)
-              .map(([h, v]) => `${fmtHHMM(+h)}: ${v.label}`)
-              .join(', ')
-          : 'Empty';
-        // Model prompt, not UI copy. Preserved verbatim so scheduling behaves
-        // exactly as before.
-        const msg = `Today's timetable: ${slotSummary}. I need to add this task: "${taskText}". Reply with ONLY the best start hour as a number (e.g. 15) — no other text.`;
+        // The server already holds today's blocks, the open gaps and the real
+        // project ids, and applies any block Jarvis returns. The client no
+        // longer keeps its own copy of the day or decides the placement.
+        const msg = `Add this to today as a block, in an open gap that fits it: "${taskText}"`;
         const result = await api.jarvis(msg, todayKey);
-        const text = parseJarvisReply(result);
-        const match = text.match(/\b([6-9]|1[0-9]|2[0-2])\b/);
-        const hour = match ? parseInt(match[1], 10) : null;
 
-        if (hour) {
-          const nextSlots = {
-            ...ls.get('cadence_timetable_' + todayKey, {}),
-            [hour]: { label: taskText.slice(0, 50), type: 'Admin' },
-          };
-          ls.set('cadence_timetable_' + todayKey, nextSlots);
-          setSlots(nextSlots);
-          toast({ tone: 'success', title: 'Placed on today', description: `Scheduled for ${fmtHHMM(hour)}.` });
+        if ((result?.applied ?? 0) > 0) {
+          toast({
+            tone: 'success',
+            title: 'Placed on today',
+            description: 'Open the timetable to see where it landed.',
+          });
         } else {
           setScheduleFailed(taskText);
           toast({
             tone: 'warning',
             title: 'Saved, but not scheduled',
-            description: 'Jarvis did not name an hour. Add it to the timetable yourself.',
+            description: 'Jarvis did not place it. Add it to the timetable yourself.',
             action: { label: 'Try again', onClick: () => scheduleAsTask(taskText) },
           });
         }
@@ -128,7 +117,7 @@ export function NotesScreen({ ready, setSlots, todayKey }) {
       }
       setScheduling(false);
     },
-    [todayKey, setSlots, toast],
+    [todayKey, toast],
   );
 
   const addNote = async () => {

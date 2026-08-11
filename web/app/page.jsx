@@ -28,8 +28,9 @@ function CadenceApp() {
   const [view, setView] = useState('today');
 
   const [checklistState, setChecklistState] = useState({ habits: DEFAULT_HABITS, checked: [] });
-  const [slots, setSlots] = useState({});
   const [todayKey, setTodayKey] = useState('');
+  // The day the Timetable is looking at. Starts on today, moves independently.
+  const [date, setDate] = useState('');
 
   useEffect(() => {
     const key = getTodayKey();
@@ -46,7 +47,7 @@ function CadenceApp() {
       if (missing.length) ls.set('cadence_checklist_' + key, next);
     }
 
-    setSlots(ls.get('cadence_timetable_' + key, {}));
+    setDate(key);
     setReady(true);
   }, []);
 
@@ -63,14 +64,14 @@ function CadenceApp() {
         />
       ) : null}
 
-      {view === 'notes' ? <NotesScreen ready={ready} setSlots={setSlots} todayKey={todayKey} /> : null}
+      {view === 'notes' ? <NotesScreen ready={ready} todayKey={todayKey} /> : null}
 
-      {view === 'timetable' ? (
-        <TimetableScreen ready={ready} slots={slots} setSlots={setSlots} todayKey={todayKey} />
+      {view === 'timetable' && date ? (
+        <TimetableScreen date={date} onDateChange={setDate} />
       ) : null}
 
       {view === 'jarvis' ? (
-        <JarvisScreen ready={ready} checklistState={checklistState} slots={slots} todayKey={todayKey} />
+        <JarvisScreen ready={ready} checklistState={checklistState} todayKey={todayKey} />
       ) : null}
 
       {view === 'settings' ? <SettingsScreen /> : null}
