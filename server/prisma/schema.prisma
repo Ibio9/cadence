@@ -35,6 +35,12 @@ model Block {
   id        String   @id @default(cuid())
   date      String                    // YYYY-MM-DD, local
   title     String
+  /// The one concrete line Focus opens with. Postgres can enforce NOT NULL but
+  /// not "concrete", so "" is the explicit unset state: Focus never renders an
+  /// empty objective, it proposes instead.
+  objective String   @default("")
+  /// Cached generated brief. Null until Focus generates one.
+  brief     Json?
   startMin  Int
   endMin    Int
   fixed     Boolean  @default(false)
