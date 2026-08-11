@@ -7,24 +7,30 @@
  * own theme by scoping data-theme to the preview, so both options show their
  * real page ground, card, accent and text sample whichever theme is active.
  *
- * Everything else on this screen is read only. Nothing here writes to the API
- * or changes stored app data.
+ * Habits are edited here rather than on Today, because Today's job is the next
+ * hour and a screen full of rename and delete controls is not that. Ticking
+ * still happens on Today; naming happens here.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Page } from '../components/shell/AppShell';
 import Icon from '../components/Icon';
 import {
   Badge,
+  Button,
   Card,
   CardBody,
   CardHeader,
+  IconButton,
+  Input,
   PageHeading,
   PartialNotice,
   Skeleton,
   Table,
+  useToast,
 } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
+import { useChecklist } from '../lib/useChecklist';
 
 const STORAGE_KEYS = [
   { key: 'cadence_theme', holds: 'Theme preference' },
@@ -69,8 +75,85 @@ function SettingsSkeleton() {
   );
 }
 
+/** One habit, renameable in place. Custom habits can also be removed. */
+function HabitLine({ habit, onRename, onRemove }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(habit.label);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  const commit = () => {
+    const next = draft.trim();
+    if (next) onRename(habit.id, next);
+    else setDraft(habit.label);
+    setEditing(false);
+  };
+
+  return (
+    <li className="cd-habitline">
+      {editing ? (
+        <Input
+          ref={inputRef}
+          label={`Rename ${habit.label}`}
+          hideLabel
+          wrapperClassName="flex-1 min-w-0"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit();
+            if (e.key === 'Escape') {
+              setDraft(habit.label);
+              setEditing(false);
+            }
+          }}
+        />
+      ) : (
+        <>
+          <span className="flex-1 min-w-0 text-base text-ink break-words">{habit.label}</span>
+          <IconButton size="sm" icon="edit" label={`Rename ${habit.label}`} onClick={() => setEditing(true)} />
+          {habit.id.startsWith('custom_') ? (
+            <IconButton
+              size="sm"
+              variant="danger"
+              icon="trash"
+              label={`Remove ${habit.label}`}
+              onClick={() => onRemove(habit.id)}
+            />
+          ) : null}
+        </>
+      )}
+    </li>
+  );
+}
+
 export function SettingsScreen() {
   const { theme, setTheme, themes, ready, persistError } = useTheme();
+  const { toast } = useToast();
+  const { habits, rename, add, remove } = useChecklist();
+  const [newLabel, setNewLabel] = useState('');
+  const [newError, setNewError] = useState('');
+
+  const addHabit = () => {
+    const label = newLabel.trim();
+    if (!label) {
+      setNewError('Give the habit a name so you can recognise it tomorrow.');
+      return;
+    }
+    add(label);
+    setNewLabel('');
+    setNewError('');
+  };
+
+  const removeHabit = (id) => {
+    const habit = habits.find((h) => h.id === id);
+    remove(id);
+    toast({ title: 'Habit removed', description: habit?.label });
+  };
+
   const [reducedMotion, setReducedMotion] = useState(false);
   const [apiBase, setApiBase] = useState('');
 
@@ -126,6 +209,46 @@ export function SettingsScreen() {
                 </button>
               );
             })}
+          </div>
+        </CardBody>
+      </Card>
+
+      {/* Habits */}
+      <Card as="section" aria-label="Habits">
+        <CardHeader
+          eyebrow="Habits"
+          title="What you hold every day"
+          description="These become the strip under today's blocks. Tick them there; name them here."
+        />
+        <CardBody className="flex flex-col gap-5">
+          {habits.length ? (
+            <ul className="cd-habitlines list-none">
+              {habits.map((h) => (
+                <HabitLine key={h.id} habit={h} onRename={rename} onRemove={removeHabit} />
+              ))}
+            </ul>
+          ) : (
+            <p className="text-base text-ink-muted max-w-prose">
+              Nothing yet. One habit you can actually hold beats ten you cannot.
+            </p>
+          )}
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <Input
+              label="Add a habit"
+              placeholder="Read 30 pages"
+              wrapperClassName="flex-1"
+              value={newLabel}
+              error={newError}
+              onChange={(e) => {
+                setNewLabel(e.target.value);
+                if (newError) setNewError('');
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && addHabit()}
+            />
+            <Button icon="plus" onClick={addHabit}>
+              Add
+            </Button>
           </div>
         </CardBody>
       </Card>

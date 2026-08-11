@@ -3,131 +3,133 @@
 /**
  * Today.
  *
- * The daily brief and the discipline checklist. States built in one pass:
- * loading (skeletons in the real shape), error (the brief failed, the
- * checklist still works), partial (checklist from local state, brief marked
- * unavailable), empty (no habits) and the happy path.
+ * The front door, and the day spine: the hours of today in order, the now
+ * marker where you actually are in them, and every block a link into Focus.
+ * Blocks come first because the blocks are the day. The habits sit underneath
+ * as one compact strip — they are ticks against a standard, not the plan.
+ *
+ * The spine is the database's day. The strip is local. Nothing on this screen
+ * invents either.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api } from '../../lib/api';
+import Link from 'next/link';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { fmtDur, hhmm, todayKey } from '../../lib/api';
 import { Page } from '../components/shell/AppShell';
 import Icon from '../components/Icon';
-import {
-  Badge,
-  Button,
-  Card,
-  CardBody,
-  CardDivider,
-  Checkbox,
-  EmptyState,
-  IconButton,
-  InlineError,
-  Input,
-  PageHeading,
-  ProgressRing,
-  Skeleton,
-  useToast,
-} from '../components/ui';
-import { formatDateLong, getGreeting, parseJarvisReply } from '../lib/store';
+import { Badge, Card, EmptyState, ErrorState, Skeleton } from '../components/ui';
+import { formatDateLong } from '../lib/store';
 import { useChecklist } from '../lib/useChecklist';
-
-const BRIEF_PROMPT =
-  "Give me one sharp, specific sentence about what Ibrahim should focus on most today. No preamble, just the sentence.";
-
-const BRIEF_FALLBACK = 'Stay focused on what matters, TARA and StudentSolve, in that order.';
+import { useDay } from '../lib/useDay';
 
 /* -------------------------------------------------------------------------- */
-/* Loading state                                                              */
+/* Loading: the real shape, so nothing moves when the day arrives             */
 /* -------------------------------------------------------------------------- */
 
 function TodaySkeleton() {
   return (
     <Page>
       <div className="flex flex-col gap-3">
-        <Skeleton width="7rem" height="0.7rem" rounded="pill" />
-        <Skeleton width="min(22rem, 90%)" height="2.4rem" rounded="pill" />
-        <Skeleton width="min(34rem, 100%)" height="0.9rem" rounded="pill" />
+        <Skeleton width="9rem" height="0.7rem" rounded="pill" />
+        <Skeleton width="min(14rem, 60%)" height="2.4rem" rounded="pill" />
       </div>
-      <Card>
-        <CardBody className="flex flex-col gap-3">
-          {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} height="46px" rounded="card" />
-          ))}
-        </CardBody>
-      </Card>
+      <ul className="cd-spine list-none">
+        {Array.from({ length: 4 }, (_, i) => (
+          <li key={i} className="cd-spinerow">
+            <Skeleton width="3rem" height="1rem" rounded="pill" />
+            <Skeleton width={i % 2 ? '55%' : '40%'} height="1.4rem" rounded="pill" />
+          </li>
+        ))}
+      </ul>
+      <Skeleton height="7rem" rounded="card" />
     </Page>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/* Habit row                                                                  */
+/* The spine                                                                  */
 /* -------------------------------------------------------------------------- */
 
-function HabitRow({ habit, done, streak, onToggle, onRename, onRemove }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(habit.label);
-  const inputRef = useRef(null);
+/** "in 3h 9m", or "now" once it has started. */
+function untilLabel(mins) {
+  if (mins <= 0) return 'now';
+  if (mins < 60) return `in ${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m ? `in ${h}h ${m}m` : `in ${h}h`;
+}
 
-  useEffect(() => {
-    if (editing) inputRef.current?.focus();
-  }, [editing]);
-
-  const commit = () => {
-    const next = draft.trim();
-    if (next) onRename(habit.id, next);
-    else setDraft(habit.label);
-    setEditing(false);
-  };
-
-  if (editing) {
-    return (
-      <li className="cd-habit py-2">
-        <Input
-          ref={inputRef}
-          label={`Rename ${habit.label}`}
-          wrapperClassName="flex-1 min-w-0"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commit();
-            if (e.key === 'Escape') {
-              setDraft(habit.label);
-              setEditing(false);
-            }
-          }}
-        />
-      </li>
-    );
-  }
+function SpineRow({ block, project, state, nowMin }) {
+  const until = state === 'next' && nowMin != null ? untilLabel(block.startMin - nowMin) : null;
 
   return (
-    <li className={done ? 'cd-habit is-done' : 'cd-habit'}>
-      <Checkbox
-        className="cd-habit__choice"
-        label={habit.label}
-        checked={done}
-        onChange={() => onToggle(habit.id)}
-      />
-      <div className="cd-habit__actions">
-        {streak > 1 ? (
-          <Badge tone="neutral" icon="flame" mono>
-            {streak}d
-          </Badge>
-        ) : null}
-        <IconButton size="sm" icon="edit" label={`Rename ${habit.label}`} onClick={() => setEditing(true)} />
-        {habit.id.startsWith('custom_') ? (
-          <IconButton
-            size="sm"
-            variant="danger"
-            icon="trash"
-            label={`Remove ${habit.label}`}
-            onClick={() => onRemove(habit.id)}
-          />
-        ) : null}
-      </div>
+    <li>
+      <Link
+        href={`/focus/${block.id}`}
+        className={`cd-spinerow is-${state}`}
+        style={project?.color ? { '--block-colour': project.color } : undefined}
+        aria-current={state === 'now' ? 'time' : undefined}
+      >
+        <span className="cd-spinerow__time">
+          <span className="cd-spinerow__start">{hhmm(block.startMin)}</span>
+          <span className="cd-spinerow__dur">{fmtDur(block.endMin - block.startMin)}</span>
+        </span>
+
+        <span className="cd-spinerow__body">
+          <span className="cd-spinerow__title">{block.title}</span>
+          <span className="cd-spinerow__meta">
+            {project ? <span className="cd-spinerow__project">{project.name}</span> : null}
+            <span className="truncate">{block.objective || 'No objective yet'}</span>
+          </span>
+        </span>
+
+        <span className="cd-spinerow__marks">
+          {state === 'now' ? <span className="cd-tag cd-tag--now">Now</span> : null}
+          {until ? <span className="cd-tag">{until}</span> : null}
+          {block.status === 'done' ? <Badge tone="success" icon="checkCircle">Held</Badge> : null}
+          {block.status === 'missed' ? <Badge tone="warning" icon="alertTriangle">Missed</Badge> : null}
+          <Icon name="chevronRight" size={16} className="cd-spinerow__go" />
+        </span>
+      </Link>
     </li>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* The habits strip                                                           */
+/* -------------------------------------------------------------------------- */
+
+function HabitStrip({ label, habits, checked, onToggle }) {
+  if (!habits.length) return null;
+  const done = habits.filter((h) => checked.includes(h.id)).length;
+
+  return (
+    <div className="cd-strip__group">
+      <p className="cd-strip__label">
+        {label}
+        <span className="cd-strip__count">
+          {done}/{habits.length}
+        </span>
+      </p>
+      <ul className="cd-strip__list list-none">
+        {habits.map((h) => {
+          const on = checked.includes(h.id);
+          return (
+            <li key={h.id}>
+              <button
+                type="button"
+                className={on ? 'cd-chip is-on' : 'cd-chip'}
+                aria-pressed={on}
+                onClick={() => onToggle(h.id)}
+              >
+                <Icon name={on ? 'check' : 'plus'} size={13} strokeWidth={2.5} />
+                <span>{h.label}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -136,203 +138,138 @@ function HabitRow({ habit, done, streak, onToggle, onRename, onRemove }) {
 /* -------------------------------------------------------------------------- */
 
 export function TodayScreen() {
-  const { toast } = useToast();
-  const { ready, day: todayKey, habits, checked, streaks, toggle, rename, add, remove } = useChecklist();
-  const [brief, setBrief] = useState('');
-  const [briefStatus, setBriefStatus] = useState('loading'); // loading | ready | error
-  const [adding, setAdding] = useState(false);
-  const [newLabel, setNewLabel] = useState('');
-  const [newError, setNewError] = useState('');
-  const addRef = useRef(null);
+  const { ready, habits, checked, toggle } = useChecklist();
 
-  const loadBrief = useCallback(() => {
-    if (!todayKey) return;
-    setBriefStatus('loading');
-    api
-      .jarvis(BRIEF_PROMPT, todayKey)
-      .then((r) => {
-        setBrief(parseJarvisReply(r));
-        setBriefStatus('ready');
-      })
-      .catch(() => {
-        setBrief(BRIEF_FALLBACK);
-        setBriefStatus('error');
-      });
-  }, [todayKey]);
+  const [date, setDate] = useState('');
+  useEffect(() => setDate(todayKey()), []);
+  const { state, status, error, reload } = useDay(date);
 
+  const [nowMin, setNowMin] = useState(null);
   useEffect(() => {
-    loadBrief();
-  }, [loadBrief]);
+    const tick = () => {
+      const d = new Date();
+      setNowMin(d.getHours() * 60 + d.getMinutes());
+    };
+    tick();
+    const t = setInterval(tick, 30000);
+    return () => clearInterval(t);
+  }, []);
 
-  useEffect(() => {
-    if (adding) addRef.current?.focus();
-  }, [adding]);
+  const blocks = useMemo(
+    () => [...(state?.blocks ?? [])].sort((a, b) => a.startMin - b.startMin),
+    [state],
+  );
 
-  const removeHabit = (id) => {
-    const habit = habits.find((h) => h.id === id);
-    remove(id);
-    toast({ title: 'Habit removed', description: habit ? habit.label : undefined });
-  };
+  const projectsById = useMemo(() => {
+    const map = {};
+    for (const p of state?.projects ?? []) map[p.id] = p;
+    return map;
+  }, [state]);
 
-  const addHabit = () => {
-    const label = newLabel.trim();
-    if (!label) {
-      setNewError('Give the habit a name so you can recognise it tomorrow.');
-      return;
+  /**
+   * Where the day is. One block can be `now`; if none is, the first one still
+   * ahead is `next`. Everything behind is `past` and everything else `later`.
+   */
+  const states = useMemo(() => {
+    const out = {};
+    if (nowMin == null) return out;
+    let markedNext = false;
+    for (const b of blocks) {
+      if (nowMin >= b.endMin) out[b.id] = 'past';
+      else if (nowMin >= b.startMin) out[b.id] = 'now';
+      else if (!markedNext) {
+        out[b.id] = 'next';
+        markedNext = true;
+      } else out[b.id] = 'later';
     }
-    add(label);
-    setNewLabel('');
-    setNewError('');
-    setAdding(false);
-  };
+    if (Object.values(out).includes('now')) {
+      for (const [id, s] of Object.entries(out)) if (s === 'next') out[id] = 'later';
+    }
+    return out;
+  }, [blocks, nowMin]);
 
   const prayers = useMemo(() => habits.filter((h) => h.prayer), [habits]);
   const others = useMemo(() => habits.filter((h) => !h.prayer), [habits]);
-  const prayersDone = prayers.filter((h) => checked.includes(h.id)).length;
-  const pct = habits.length ? Math.round((checked.length / habits.length) * 100) : 0;
 
-  if (!ready) return <TodaySkeleton />;
+  if (!date || (status === 'loading' && !state)) return <TodaySkeleton />;
 
-  const renderGroup = (list) => (
-    <ul className="flex flex-col gap-2 list-none">
-      {list.map((h) => (
-        <HabitRow
-          key={h.id}
-          habit={h}
-          done={checked.includes(h.id)}
-          streak={streaks[h.id] || 0}
-          onToggle={toggle}
-          onRename={rename}
-          onRemove={removeHabit}
-        />
-      ))}
-    </ul>
-  );
+  const held = blocks.filter((b) => b.status === 'done').length;
 
   return (
     <Page>
-      <PageHeading
-        eyebrow={formatDateLong()}
-        title={`${getGreeting()}, Ibrahim.`}
-        accent={briefStatus === 'error' ? null : brief}
-        accentLoading={briefStatus === 'loading'}
-        accentError={briefStatus === 'error' ? BRIEF_FALLBACK : null}
-        actions={
-          <div className="flex items-center gap-4">
-            <ProgressRing value={pct} label={`${pct} percent of today held`} />
-            <div className="flex flex-col">
-              <span className="font-mono text-sm text-ink">
-                {checked.length}/{habits.length}
-              </span>
-              <span className="text-caption text-ink-muted">held today</span>
-            </div>
-          </div>
-        }
-      />
+      <header className="cd-daybar">
+        <div className="min-w-0">
+          <p className="cd-eyebrow">{formatDateLong()}</p>
+          <h1 className="cd-daybar__title">Today</h1>
+        </div>
+        {blocks.length ? (
+          <p className="cd-daybar__count">
+            <span className="cd-daybar__held">{held}</span>
+            <span className="cd-daybar__of">of {blocks.length} held</span>
+          </p>
+        ) : null}
+      </header>
 
-      {/* Partial: the checklist is real and usable, the brief is not. */}
-      {briefStatus === 'error' ? (
-        <InlineError onRetry={loadBrief} retryLabel="Retry brief">
-          Jarvis did not answer, so today's brief is a standing reminder rather than a fresh one. Your checklist below
-          is unaffected.
-        </InlineError>
-      ) : null}
-
-      {habits.length === 0 ? (
+      {status === 'error' ? (
+        <Card>
+          <ErrorState
+            title="Today could not be loaded"
+            body="Your blocks are safe on the server. This is a connection problem, not lost work."
+            detail={error}
+            onRetry={reload}
+            retrying={status === 'loading'}
+          />
+        </Card>
+      ) : blocks.length === 0 ? (
         <Card>
           <EmptyState
-            icon="target"
-            title="Start with one thing you will hold"
-            body="A checklist is easier to keep than a plan. Add the first habit and the rest can follow tomorrow."
-            action={{ label: 'Add a habit', icon: 'plus', onClick: () => setAdding(true) }}
+            icon="calendarPlus"
+            title="Nothing is on today"
+            body="Your rhythms put training on the days you train. Everything else you put here yourself. Open the timetable and give the first hour a name."
+            action={{ label: 'Open the timetable', icon: 'timetable', href: '/timetable' }}
           />
-          {adding ? (
-            <CardBody className="pt-0">
-              <div className="flex flex-col gap-3 md:flex-row md:items-end">
-                <Input
-                  ref={addRef}
-                  label="Habit name"
-                  placeholder="Read 30 pages"
-                  wrapperClassName="flex-1"
-                  value={newLabel}
-                  error={newError}
-                  onChange={(e) => setNewLabel(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') addHabit();
-                    if (e.key === 'Escape') setAdding(false);
-                  }}
-                />
-                <Button onClick={addHabit}>Add habit</Button>
-              </div>
-            </CardBody>
-          ) : null}
         </Card>
       ) : (
-        <Card>
-          <CardBody className="flex flex-col gap-6">
-            {prayers.length > 0 ? (
-              <section aria-labelledby="group-salah">
-                <div className="flex items-center gap-3 mb-3">
-                  <h2 id="group-salah" className="text-eyebrow text-ink-subtle">
-                    Salah
-                  </h2>
-                  <span className="font-mono text-caption text-ink-muted">
-                    {prayersDone}/{prayers.length}
-                  </span>
-                  {prayersDone === prayers.length ? (
-                    <Badge tone="success">All held</Badge>
-                  ) : null}
-                </div>
-                {renderGroup(prayers)}
-              </section>
-            ) : null}
+        <ol className="cd-spine list-none" aria-label="The day">
+          {blocks.map((block, i) => {
+            const prev = blocks[i - 1];
+            const showNow =
+              nowMin != null && nowMin < block.startMin && (!prev || nowMin >= prev.endMin);
 
-            {prayers.length > 0 && others.length > 0 ? <CardDivider /> : null}
-
-            {others.length > 0 ? (
-              <section aria-labelledby="group-discipline">
-                <h2 id="group-discipline" className="text-eyebrow text-ink-subtle mb-3">
-                  Discipline
-                </h2>
-                {renderGroup(others)}
-              </section>
-            ) : null}
-
-            {adding ? (
-              <div className="flex flex-col gap-3 md:flex-row md:items-end">
-                <Input
-                  ref={addRef}
-                  label="Habit name"
-                  placeholder="Read 30 pages"
-                  wrapperClassName="flex-1"
-                  value={newLabel}
-                  error={newError}
-                  onChange={(e) => setNewLabel(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') addHabit();
-                    if (e.key === 'Escape') setAdding(false);
-                  }}
+            return (
+              <Fragment key={block.id}>
+                {showNow ? (
+                  <li className="cd-nowmark">
+                    <span className="cd-nowmark__time">{hhmm(nowMin)}</span>
+                    <span className="cd-nowmark__rule" />
+                    <span className="sr-only">is the time now</span>
+                  </li>
+                ) : null}
+                <SpineRow
+                  block={block}
+                  project={projectsById[block.projectId]}
+                  state={states[block.id] || 'later'}
+                  nowMin={nowMin}
                 />
-                <div className="flex gap-2">
-                  <Button variant="secondary" onClick={() => setAdding(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={addHabit}>Add</Button>
-                </div>
-              </div>
-            ) : (
-              <Button variant="secondary" icon="plus" className="self-start" onClick={() => setAdding(true)}>
-                Add habit
-              </Button>
-            )}
-          </CardBody>
-        </Card>
+              </Fragment>
+            );
+          })}
+        </ol>
       )}
 
-      <p className="flex items-center gap-2 text-caption text-ink-subtle">
-        <Icon name="keyboard" size={14} />
-        Tab through the list, Space to tick, Enter to rename.
-      </p>
+      {ready ? (
+        <section className="cd-strip" aria-label="Habits">
+          <HabitStrip label="Salah" habits={prayers} checked={checked} onToggle={toggle} />
+          <HabitStrip label="Discipline" habits={others} checked={checked} onToggle={toggle} />
+          {habits.length === 0 ? (
+            <p className="text-caption text-ink-muted">
+              No habits yet. <Link href="/settings">Add them in settings.</Link>
+            </p>
+          ) : null}
+        </section>
+      ) : (
+        <Skeleton height="7rem" rounded="card" />
+      )}
     </Page>
   );
 }

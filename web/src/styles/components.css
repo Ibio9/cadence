@@ -931,6 +931,167 @@
    Screen level pieces built on the primitives
    -------------------------------------------------------------------------- */
 
+/* --------------------------------------------------------------------------
+   Today: the day spine, then the habits strip.
+   -------------------------------------------------------------------------- */
+
+.cd-daybar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.cd-daybar__title {
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-3xl);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  color: var(--ink);
+  margin-top: var(--space-2);
+}
+@media (min-width: 768px) { .cd-daybar__title { font-size: var(--text-4xl); } }
+.cd-daybar__count { display: flex; align-items: baseline; gap: var(--space-2); flex-shrink: 0; }
+.cd-daybar__held {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-2xl);
+  color: var(--ink);
+}
+.cd-daybar__of { font-size: var(--text-caption); color: var(--ink-muted); }
+
+/* The spine. Rows sit directly on the page ground rather than inside a card:
+   the day is the page, not a widget on it. */
+.cd-spine { display: flex; flex-direction: column; }
+
+.cd-spinerow {
+  --block-colour: var(--border-strong);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-4) var(--space-3) var(--space-4) var(--space-4);
+  border-bottom: var(--hairline) solid var(--border);
+  border-left: 3px solid var(--block-colour);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+.cd-spinerow:hover { background: var(--hover-tint); text-decoration: none; }
+.cd-spinerow:focus-visible { outline: var(--focus-ring-w) solid var(--accent); outline-offset: -2px; }
+
+/* Behind you: still readable, no longer asking for anything. */
+.cd-spinerow.is-past { opacity: 0.55; }
+/* The hour you are in. */
+.cd-spinerow.is-now { background: var(--accent-tint); }
+.cd-spinerow.is-now:hover { background: var(--accent-tint); }
+
+.cd-spinerow__time {
+  width: 3.6rem;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.cd-spinerow__start { font-size: var(--text-sm); color: var(--ink); }
+.cd-spinerow.is-now .cd-spinerow__start { color: var(--accent); font-weight: var(--weight-medium); }
+.cd-spinerow__dur { font-size: var(--text-caption); color: var(--ink-subtle); }
+
+.cd-spinerow__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.cd-spinerow__title {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.cd-spinerow.is-now .cd-spinerow__title,
+.cd-spinerow.is-next .cd-spinerow__title { font-size: var(--text-lg); }
+.cd-spinerow.is-past .cd-spinerow__title { font-weight: var(--weight-normal); }
+.cd-spinerow__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-caption);
+  color: var(--ink-muted);
+}
+.cd-spinerow__project { flex-shrink: 0; font-weight: var(--weight-medium); }
+.cd-spinerow__marks { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
+.cd-spinerow__go { color: var(--ink-subtle); opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
+.cd-spinerow:hover .cd-spinerow__go,
+.cd-spinerow:focus-visible .cd-spinerow__go { opacity: 1; }
+
+/* A word, not a badge: these say when, and when needs no container. */
+.cd-tag {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-caption);
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+.cd-tag--now { color: var(--accent); font-weight: var(--weight-medium); }
+
+/* The strip. Every habit is one chip; five prayers are one line, not five rows. */
+.cd-strip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5) 0 0;
+  border-top: var(--hairline) solid var(--border);
+}
+.cd-strip__group { display: flex; flex-direction: column; gap: var(--space-2); }
+.cd-strip__label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ink-subtle);
+}
+.cd-strip__count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-normal);
+  color: var(--ink-muted);
+}
+.cd-strip__list { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.cd-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  border: var(--hairline) solid var(--border-strong);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.cd-chip svg { color: var(--ink-subtle); }
+.cd-chip:hover { border-color: var(--ink-subtle); color: var(--ink); }
+.cd-chip.is-on { background: var(--accent-tint); border-color: transparent; color: var(--ink); }
+.cd-chip.is-on svg { color: var(--accent); }
+
+/* Habit list in settings: a name, a rename, and a remove if you added it. */
+.cd-habitlines { display: flex; flex-direction: column; }
+.cd-habitline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  padding: var(--space-1) 0;
+  border-bottom: var(--hairline) solid var(--border);
+}
+.cd-habitline:last-child { border-bottom: none; }
+
 /* Habit row: a real checkbox plus row level actions */
 .cd-habit {
   display: flex;
