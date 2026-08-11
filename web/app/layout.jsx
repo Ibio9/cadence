@@ -4,16 +4,16 @@ import { Providers } from './providers';
 
 export const metadata = {
   title: 'Cadence',
-  description: 'A personal operating system. Today, notes, timetable and Jarvis in one place.',
+  description: 'The day, one block at a time.',
 };
 
 // The browser chrome colour is the one place a literal is unavoidable: a meta
-// tag cannot read a CSS variable. These two mirror --bg in each theme and are
-// the only literals outside src/styles/tokens.css.
+// tag cannot read a CSS variable. These two mirror --paper in each theme and
+// are the only literals outside src/styles/tokens.css.
 export const viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f4efe4' },
-    { media: '(prefers-color-scheme: dark)', color: '#14130f' },
+    { media: '(prefers-color-scheme: light)', color: '#efeae1' },
+    { media: '(prefers-color-scheme: dark)', color: '#14130e' },
   ],
 };
 

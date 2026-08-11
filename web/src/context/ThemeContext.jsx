@@ -3,36 +3,34 @@
 /**
  * Theme state for Cadence.
  *
- * Resolution order, highest first:
- *   1. the stored user preference (the app has no server side preference
- *      store, so localStorage is the persistence layer it already uses)
- *   2. localStorage
- *   3. light-blue
+ * Two themes, named for the substrate rather than for a hue: the light is
+ * printed on warm paper, the dark is printed on a deep warm neutral. The mint
+ * emission is byte for byte identical in both, because the dark theme inverts
+ * the substrate, not the logic.
  *
  * The attribute is written to <html> by the inline script in app/layout.jsx
- * before first paint, so there is no flash. This provider re reads the same
+ * before first paint, so there is no flash. This provider re-reads the same
  * key on mount and keeps the attribute in sync afterwards.
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 export const THEME_STORAGE_KEY = 'cadence_theme';
-export const DEFAULT_THEME = 'light-blue';
+export const DEFAULT_THEME = 'light';
 
 export const THEMES = [
-  {
-    id: 'light-blue',
-    name: 'Light blue',
-    description: 'Warm cream ground, cobalt accent. The default.',
-  },
-  {
-    id: 'dark-blue',
-    name: 'Dark blue',
-    description: 'Warm neutral darks, accent lifted for contrast.',
-  },
+  { id: 'light', name: 'Light', description: 'Warm paper. The default.' },
+  { id: 'dark', name: 'Dark', description: 'Deep warm neutral, the same mint light.' },
 ];
 
 const THEME_IDS = THEMES.map((t) => t.id);
+
+/**
+ * Values written by earlier builds, mapped forward. The old names described a
+ * hue that is no longer in the palette, but a stored preference should still
+ * mean what the person meant when they set it.
+ */
+const LEGACY = { 'light-blue': 'light', 'dark-blue': 'dark' };
 
 const ThemeContext = createContext(null);
 
@@ -41,13 +39,11 @@ function readStoredTheme() {
   try {
     const raw = window.localStorage.getItem(THEME_STORAGE_KEY);
     if (!raw) return DEFAULT_THEME;
-    // Tolerate both a bare string and the JSON encoded value the earlier
-    // build wrote, so an existing preference is not thrown away.
+    // Tolerate both a bare string and the JSON encoded value an earlier build
+    // wrote, so an existing preference is not thrown away.
     const value = raw.startsWith('"') ? JSON.parse(raw) : raw;
     if (THEME_IDS.includes(value)) return value;
-    if (value === 'dark') return 'dark-blue';
-    if (value === 'light') return 'light-blue';
-    return DEFAULT_THEME;
+    return LEGACY[value] || DEFAULT_THEME;
   } catch {
     return DEFAULT_THEME;
   }
@@ -82,7 +78,7 @@ export function ThemeProvider({ children }) {
   }, []);
 
   const toggleTheme = useCallback(() => {
-    setTheme(theme === 'dark-blue' ? 'light-blue' : 'dark-blue');
+    setTheme(theme === 'dark' ? 'light' : 'dark');
   }, [theme, setTheme]);
 
   const value = useMemo(
@@ -100,7 +96,7 @@ export function useTheme() {
 }
 
 /**
- * The pre paint script. Kept here so the token list and the storage key have
- * one home. Injected in app/layout.jsx head.
+ * The pre-paint script. Kept here so the theme list, the legacy mapping and
+ * the storage key have one home. Injected in app/layout.jsx head.
  */
-export const THEME_INIT_SCRIPT = `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)};var r=localStorage.getItem(k);var v=r&&r.charAt(0)==='"'?JSON.parse(r):r;var ok=${JSON.stringify(THEME_IDS)};if(v==='dark')v='dark-blue';if(v==='light')v='light-blue';document.documentElement.setAttribute('data-theme',ok.indexOf(v)>-1?v:${JSON.stringify(DEFAULT_THEME)});}catch(e){document.documentElement.setAttribute('data-theme',${JSON.stringify(DEFAULT_THEME)});}})();`;
+export const THEME_INIT_SCRIPT = `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)};var r=localStorage.getItem(k);var v=r&&r.charAt(0)==='"'?JSON.parse(r):r;var legacy=${JSON.stringify(LEGACY)};if(legacy[v])v=legacy[v];var ok=${JSON.stringify(THEME_IDS)};document.documentElement.setAttribute('data-theme',ok.indexOf(v)>-1?v:${JSON.stringify(DEFAULT_THEME)});}catch(e){document.documentElement.setAttribute('data-theme',${JSON.stringify(DEFAULT_THEME)});}})();`;

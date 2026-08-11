@@ -3,16 +3,18 @@
 /**
  * Focus.
  *
- * One block, alone on the screen. It is a real route (/focus/<id>), so it is
- * linkable, bookmarkable and survives a refresh: the clock's state lives on the
- * server, and everything typed here saves back to the same record.
+ * One block, alone. A real route (/focus/<id>), so it is linkable,
+ * bookmarkable and survives a refresh: the clock's state lives on the server,
+ * and everything typed here saves back to the same record.
  *
- * There is no shell around it on purpose. The one job of this screen is to make
- * the next hour the only thing you can see.
+ * No shell and no cards. The rail from Today comes with the block and turns
+ * horizontal at the top of the screen, where it becomes the session's own
+ * progress track — the same object, zoomed in. It is the only thing here that
+ * emits, and only while the clock is genuinely running.
  */
 
 import Link from 'next/link';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { fmtClock, fmtDur, hhmm } from '../../lib/api';
 import Icon from '../components/Icon';
 import {
@@ -25,6 +27,7 @@ import {
   Textarea,
   useToast,
 } from '../components/ui';
+import { playOpen } from '../lib/openBlock';
 import { proposeObjectives } from '../lib/proposals';
 import { formatDayLabel } from '../lib/useDay';
 import { isRunning, sessionPlan, useAutosave, useBlock, useElapsed } from '../lib/session';
@@ -37,18 +40,21 @@ function FocusSkeleton() {
   return (
     <div className="cd-focus">
       <div className="cd-focus__bar">
-        <Skeleton width="7rem" height="1rem" rounded="pill" />
+        <Skeleton width="6rem" height="1rem" rounded="pill" />
+      </div>
+      <div className="cd-sessionrail" />
+      <div className="flex flex-col gap-3">
+        <Skeleton width="8rem" height="0.75rem" rounded="pill" />
+        <Skeleton width="min(24rem, 85%)" height="2.6rem" rounded="pill" />
       </div>
       <div className="cd-focus__grid">
         <div className="flex flex-col gap-6">
-          <Skeleton width="9rem" height="0.75rem" rounded="pill" />
-          <Skeleton width="min(26rem, 90%)" height="3rem" rounded="pill" />
-          <Skeleton height="7rem" rounded="card" />
-          <Skeleton height="11rem" rounded="card" />
+          <Skeleton height="5rem" rounded="card" />
+          <Skeleton height="9rem" rounded="card" />
         </div>
         <div className="flex flex-col gap-6">
-          <Skeleton height="13rem" rounded="card" />
-          <Skeleton height="15rem" rounded="card" />
+          <Skeleton height="7rem" rounded="card" />
+          <Skeleton height="12rem" rounded="card" />
         </div>
       </div>
     </div>
@@ -60,7 +66,7 @@ function FocusShell({ children }) {
     <div className="cd-focus">
       <div className="cd-focus__bar">
         <Link href="/" className="cd-backlink">
-          <Icon name="arrowLeft" size={16} />
+          <Icon name="arrowLeft" size={15} />
           <span>The day</span>
         </Link>
       </div>
@@ -77,18 +83,47 @@ function SaveMark({ state }) {
   if (state === 'idle') return null;
   if (state === 'error') {
     return (
-      <span className="cd-savemark cd-savemark--error">
+      <span className="cd-savemark cd-savemark--error" role="alert">
         <Icon name="alertCircle" size={13} />
-        Not saved. Check your connection and type again.
+        Not saved. Check your connection, then type again.
       </span>
     );
   }
-  return <span className="cd-savemark">{state === 'saving' ? 'Saving' : 'Saved'}</span>;
+  return (
+    <span className="cd-savemark" role="status">
+      {state === 'saving' ? 'Saving' : 'Saved'}
+    </span>
+  );
+}
+
+/**
+ * The rail, horizontal. The unfilled part is the hour ahead; the filled part
+ * is what you have actually put in. It only carries light while the clock is
+ * running, and it turns to the warning colour once you are past the hour you
+ * gave it, because that is no longer something to celebrate.
+ */
+function SessionRail({ elapsed, planned, running }) {
+  const progress = planned > 0 ? Math.min(1, elapsed / planned) : 0;
+  const over = elapsed > planned;
+  return (
+    <div
+      className={`cd-sessionrail${running ? ' is-running' : ''}${over ? ' is-over' : ''}`}
+      style={{ '--progress': `${(progress * 100).toFixed(2)}%` }}
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={Math.round(planned / 60)}
+      aria-valuenow={Math.round(elapsed / 60)}
+      aria-valuetext={`${fmtDur(Math.round(elapsed / 60))} of ${fmtDur(Math.round(planned / 60))}`}
+      aria-label="Time on this block"
+    >
+      <span className={running ? 'cd-sessionrail__fill' : 'cd-sessionrail__fill'} />
+      <span className={running ? 'cd-sessionrail__bead cd-breathes' : 'cd-sessionrail__bead'} />
+    </div>
+  );
 }
 
 /** The clock. Elapsed against the block's planned length, and the three verbs. */
-function Clock({ block, onAct, busy }) {
-  const elapsed = useElapsed(block);
+function Clock({ block, elapsed, onAct, busy }) {
   const running = isRunning(block);
   const planned = (block.endMin - block.startMin) * 60;
   const over = elapsed - planned;
@@ -106,7 +141,7 @@ function Clock({ block, onAct, busy }) {
 
       <p className="cd-clock__against">
         {held
-          ? `Held. ${fmtDur(Math.round(elapsed / 60))} on the clock.`
+          ? `Held. ${fmtDur(Math.max(1, Math.round(elapsed / 60)))} on the clock.`
           : over > 60
             ? `${fmtDur(Math.round(over / 60))} past the hour you gave it.`
             : `of ${fmtDur(planned / 60)} planned.`}
@@ -120,13 +155,14 @@ function Clock({ block, onAct, busy }) {
         ) : (
           <>
             <Button
+              variant={running ? 'secondary' : 'go'}
               icon={running ? 'pause' : 'play'}
               loading={busy === 'start' || busy === 'pause'}
               onClick={() => onAct(running ? 'pause' : 'start')}
             >
               {running ? 'Pause' : elapsed > 0 ? 'Resume' : 'Start'}
             </Button>
-            <Button variant="secondary" icon="check" loading={busy === 'done'} onClick={() => onAct('done')}>
+            <Button variant="tertiary" loading={busy === 'done'} onClick={() => onAct('done')}>
               Done
             </Button>
           </>
@@ -139,11 +175,10 @@ function Clock({ block, onAct, busy }) {
 /**
  * The one concrete line this hour is for.
  *
- * Three states, and the empty one is the interesting one: rather than an
- * blank field, it offers three objectives already written from this block's
- * own title and project. Picking one is a click; writing your own is still
- * one click away. Deciding what the hour is for should not itself cost ten
- * minutes of the hour.
+ * Three states, and the empty one is the interesting one: rather than a blank
+ * field, it offers three objectives already written from this block's own
+ * title and project. Picking one is a click; writing your own is still one
+ * click away. Deciding what the hour is for should not cost ten minutes of it.
  */
 function Objective({ block, project, onSave }) {
   const [editing, setEditing] = useState(false);
@@ -183,8 +218,6 @@ function Objective({ block, project, onSave }) {
     );
   }
 
-  // Writing one out: either the field was asked for, or an objective already
-  // exists and is being changed.
   if (editing) {
     return (
       <section className="cd-objective" aria-labelledby="objective-heading">
@@ -220,8 +253,6 @@ function Objective({ block, project, onSave }) {
     );
   }
 
-  const proposals = proposeObjectives(block, project);
-
   return (
     <section className="cd-objective" aria-labelledby="objective-heading">
       <h2 id="objective-heading" className="cd-eyebrow">
@@ -229,7 +260,7 @@ function Objective({ block, project, onSave }) {
       </h2>
       <p className="cd-objective__ask">Pick what this hour is for.</p>
       <ul className="cd-proposals list-none">
-        {proposals.map((text) => (
+        {proposeObjectives(block, project).map((text) => (
           <li key={text}>
             <button
               type="button"
@@ -239,7 +270,7 @@ function Objective({ block, project, onSave }) {
               onClick={() => commit(text)}
             >
               <span className="cd-proposal__text">{text}</span>
-              {saving === text ? <Spinner size="sm" label="Setting" /> : <Icon name="arrowRight" size={16} />}
+              {saving === text ? <Spinner size="sm" label="Setting" /> : <Icon name="arrowRight" size={15} />}
             </button>
           </li>
         ))}
@@ -260,14 +291,13 @@ function Objective({ block, project, onSave }) {
 
 /** How the block's minutes are meant to go. Derived from its length, not fetched. */
 function Plan({ block }) {
-  const stages = sessionPlan(block);
   return (
     <section className="cd-plan" aria-labelledby="plan-heading">
       <h2 id="plan-heading" className="cd-eyebrow">
         The hour
       </h2>
       <ol className="cd-plan__list list-none">
-        {stages.map((stage) => (
+        {sessionPlan(block).map((stage) => (
           <li key={stage.label} className="cd-plan__stage">
             <span className="cd-plan__time">{hhmm(stage.from)}</span>
             <span className="cd-plan__label">{stage.label}</span>
@@ -287,12 +317,23 @@ export function FocusScreen({ id }) {
   const { toast } = useToast();
   const { block, status, error, reload, patch, act } = useBlock(id);
   const [busy, setBusy] = useState('');
+  const root = useRef(null);
+  const played = useRef(false);
 
   const saveMaterial = useCallback((value) => patch({ material: value }), [patch]);
   const saveNotes = useCallback((value) => patch({ notes: value }), [patch]);
 
   const material = useAutosave(block?.material, saveMaterial);
   const notes = useAutosave(block?.notes, saveNotes);
+  const elapsed = useElapsed(block);
+
+  // Play the block into place once, after the real content is on screen, so
+  // the finish position is measured rather than guessed.
+  useEffect(() => {
+    if (!block || played.current) return;
+    played.current = true;
+    playOpen(root.current);
+  }, [block]);
 
   const onAct = async (action) => {
     setBusy(action);
@@ -340,10 +381,10 @@ export function FocusScreen({ id }) {
   const planned = block.endMin - block.startMin;
 
   return (
-    <div className="cd-focus">
+    <div className="cd-focus" ref={root}>
       <div className="cd-focus__bar">
         <Link href="/" className="cd-backlink">
-          <Icon name="arrowLeft" size={16} />
+          <Icon name="arrowLeft" size={15} />
           <span>The day</span>
         </Link>
         <span className="cd-focus__where">
@@ -353,14 +394,15 @@ export function FocusScreen({ id }) {
         </span>
       </div>
 
+      <SessionRail elapsed={elapsed} planned={planned * 60} running={isRunning(block)} />
+
       <header className="cd-focus__head">
         <p className="cd-focus__when">
           <span className="cd-focus__window">
-            {hhmm(block.startMin)}–{hhmm(block.endMin)}
+            {hhmm(block.startMin)}–{hhmm(block.endMin)} · {fmtDur(planned)}
           </span>
-          <span className="cd-focus__length">{fmtDur(planned)}</span>
-          {block.status === 'done' ? <Badge tone="success" icon="checkCircle">Held</Badge> : null}
-          {block.status === 'missed' ? <Badge tone="warning" icon="alertTriangle">Missed</Badge> : null}
+          {block.status === 'done' ? <Badge tone="success">Held</Badge> : null}
+          {block.status === 'missed' ? <Badge tone="warning">Missed</Badge> : null}
         </p>
         <h1 className="cd-focus__title">{block.title}</h1>
       </header>
@@ -372,7 +414,7 @@ export function FocusScreen({ id }) {
         </div>
 
         <div className="cd-focus__col">
-          <Clock block={block} onAct={onAct} busy={busy} />
+          <Clock block={block} elapsed={elapsed} onAct={onAct} busy={busy} />
 
           <section className="cd-pane" aria-labelledby="material-heading">
             <h2 id="material-heading" className="cd-eyebrow">
@@ -394,9 +436,9 @@ export function FocusScreen({ id }) {
               Notes
             </h2>
             <Textarea
-              label="Session notes"
+              label="Notes"
               hideLabel
-              rows={10}
+              rows={9}
               placeholder="What you worked out, what you got stuck on, where to pick up."
               value={notes.value}
               onChange={(e) => notes.change(e.target.value)}

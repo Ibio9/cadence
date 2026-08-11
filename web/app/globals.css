@@ -4,9 +4,12 @@
  * Order matters. Components come before utilities so a utility class can
  * always override a component class without a specificity fight, which is the
  * same layering Tailwind uses.
+ *
+ * Three faces, one request. Fraunces comes as a variable font so the optical
+ * size axis is real rather than faked with a second weight.
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400;1,500&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400..700&display=swap');
 
 @import '../src/styles/tokens.css';
 @import '../src/styles/base.css';

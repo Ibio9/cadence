@@ -6,6 +6,10 @@
    edits. Every colour, space, radius, shadow and duration resolves through a
    token: there is no literal value below and no way to reach an arbitrary one.
 
+   There is deliberately no utility that puts --emission on a border, a fill or
+   a text colour. The only way to reach the light is .glow-* and .bloom, which
+   are shadows. That is the light rule, enforced by the absence of a class.
+
    Breakpoints: sm 640, md 768, lg 1024, xl 1280.
    ========================================================================== */
 
@@ -193,9 +197,16 @@
 .overflow-visible { overflow: visible; }
 
 /* --- type --------------------------------------------------------------- */
-.font-display { font-family: var(--font-display); }
+.font-display { font-family: var(--font-display); font-variation-settings: var(--display-opsz-md); }
+.font-display-lg { font-family: var(--font-display); font-variation-settings: var(--display-opsz-lg); }
+.font-display-sm { font-family: var(--font-display); font-variation-settings: var(--display-opsz-sm); }
 .font-sans { font-family: var(--font-sans); }
-.font-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; }
+.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: var(--numeric);
+  font-feature-settings: var(--numeric-features);
+  letter-spacing: var(--tracking-mono);
+}
 
 .text-eyebrow {
   font-size: var(--text-eyebrow);
@@ -236,7 +247,7 @@
 .text-center { text-align: center; }
 .text-right { text-align: right; }
 
-.tabular { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; }
+.tabular { font-variant-numeric: var(--numeric); font-feature-settings: var(--numeric-features); }
 .whitespace-nowrap { white-space: nowrap; }
 .whitespace-pre-wrap { white-space: pre-wrap; }
 .break-words { overflow-wrap: anywhere; word-break: break-word; }
@@ -254,47 +265,42 @@
 .text-ink-muted { color: var(--ink-muted); }
 .text-ink-subtle { color: var(--ink-subtle); }
 .text-ink-inverse { color: var(--ink-inverse); }
-.text-accent { color: var(--accent); }
-.text-accent-deep { color: var(--accent-deep); }
-.text-on-accent { color: var(--on-accent); }
-.text-success { color: var(--success); }
-.text-warning { color: var(--warning); }
-.text-danger { color: var(--danger); }
+.text-signal { color: var(--signal); }
+.text-on-signal { color: var(--on-signal); }
+.text-held { color: var(--held); }
+.text-warn { color: var(--warn); }
+.text-alarm { color: var(--alarm); }
 .text-current { color: currentColor; }
 
 /* --- surfaces ----------------------------------------------------------- */
-.bg-bg { background-color: var(--bg); }
+.bg-paper { background-color: var(--paper); }
 .bg-surface { background-color: var(--surface); }
 .bg-surface-raised { background-color: var(--surface-raised); }
 .bg-surface-sunken { background-color: var(--surface-sunken); }
-.bg-accent { background-color: var(--accent); }
-.bg-accent-deep { background-color: var(--accent-deep); }
-.bg-accent-tint { background-color: var(--accent-tint); }
-.bg-success { background-color: var(--success); }
-.bg-success-tint { background-color: var(--success-tint); }
-.bg-warning { background-color: var(--warning); }
-.bg-warning-tint { background-color: var(--warning-tint); }
-.bg-danger { background-color: var(--danger); }
-.bg-danger-tint { background-color: var(--danger-tint); }
+/* The cooled ground that sits under a glow. Four percent mint, and the only
+   place in the system where the light touches a fill. */
+.bg-cool { background-color: var(--cool); }
+.bg-signal { background-color: var(--signal); }
+.bg-held-ground { background-color: var(--held-ground); }
+.bg-warn-ground { background-color: var(--warn-ground); }
+.bg-alarm-ground { background-color: var(--alarm-ground); }
 .bg-hover { background-color: var(--hover-tint); }
 .bg-scrim { background-color: var(--overlay-scrim); }
 .bg-transparent { background-color: transparent; }
 .bg-current { background-color: currentColor; }
-.bg-border { background-color: var(--border); }
+.bg-rule { background-color: var(--rule); }
 
 /* --- borders ------------------------------------------------------------ */
-.border { border: var(--hairline) solid var(--border); }
+.border { border: var(--hairline) solid var(--rule); }
 .border-0 { border: 0; }
-.border-t { border-top: var(--hairline) solid var(--border); }
-.border-b { border-bottom: var(--hairline) solid var(--border); }
-.border-l { border-left: var(--hairline) solid var(--border); }
-.border-r { border-right: var(--hairline) solid var(--border); }
-.border-hairline { border-color: var(--border); }
-.border-strong { border-color: var(--border-strong); }
-.border-accent { border-color: var(--accent); }
-.border-success { border-color: var(--success); }
-.border-warning { border-color: var(--warning); }
-.border-danger { border-color: var(--danger); }
+.border-t { border-top: var(--hairline) solid var(--rule); }
+.border-b { border-bottom: var(--hairline) solid var(--rule); }
+.border-l { border-left: var(--hairline) solid var(--rule); }
+.border-r { border-right: var(--hairline) solid var(--rule); }
+.border-hairline { border-color: var(--rule); }
+.border-strong { border-color: var(--rule-strong); }
+.border-signal { border-color: var(--signal); }
+.border-alarm { border-color: var(--alarm); }
 .border-transparent { border-color: transparent; }
 .border-dashed { border-style: dashed; }
 .border-b-0 { border-bottom: 0; }
@@ -311,6 +317,18 @@
 .shadow-card { box-shadow: var(--shadow-sm); }
 .shadow-card-md { box-shadow: var(--shadow-md); }
 .shadow-card-lg { box-shadow: var(--shadow-lg); }
+
+/* --- emission ------------------------------------------------------------
+   The only way to reach the light. All three are shadows with a wide blur and
+   no hard edge, so a glow never has a findable boundary. .bloom adds the
+   radial falloff and belongs to the single largest emitter on a screen.
+   .cd-breathes makes a glow breathe, long and low, and is only applied while
+   something is genuinely running. */
+.glow-sm { box-shadow: var(--glow-sm); }
+.glow-md { box-shadow: var(--glow-md); }
+.glow-lg { box-shadow: var(--glow-lg); }
+.bloom { background-image: var(--bloom); }
+.cd-breathes { animation: cd-breathe var(--dur-breathe) var(--ease) infinite; }
 
 /* --- misc --------------------------------------------------------------- */
 .opacity-0 { opacity: 0; }

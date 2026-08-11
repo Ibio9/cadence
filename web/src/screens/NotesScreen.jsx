@@ -7,8 +7,8 @@
  * A note filed under To Do is handed to Jarvis to be placed on today's
  * timetable, and the result is reported in a toast either way.
  *
- * Categories no longer carry their own hue. Blue is the only accent in this
- * design language, so a category is told apart by its name in a neutral badge.
+ * Categories carry no colour of their own. Mint means "happening now" and
+ * nothing else, so a category is told apart by its name in a plain badge.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -189,7 +189,7 @@ export function NotesScreen({ ready, todayKey }) {
       <PageHeading
         eyebrow="Capture"
         title="Notes"
-        accent="Get it out of your head first. Sort it after."
+        lead="Get it out of your head first. Sort it after."
       />
 
       {/* Capture */}

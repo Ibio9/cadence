@@ -5,7 +5,7 @@
  *
  * Theme control as live preview cards, not a dropdown. Each card renders its
  * own theme by scoping data-theme to the preview, so both options show their
- * real page ground, card, accent and text sample whichever theme is active.
+ * real substrate, ink and emission whichever theme is currently active.
  *
  * Habits are edited here rather than on Today, because Today's job is the next
  * hour and a screen full of rename and delete controls is not that. Ticking
@@ -43,16 +43,14 @@ const STORAGE_KEYS = [
 
 function ThemePreview({ themeId }) {
   return (
-    <div data-theme={themeId} className="cd-themecard__preview bg-bg">
-      <div className="cd-card p-3 flex flex-col gap-2">
-        <p className="font-display text-sm text-ink leading-tight">Good morning, Ibrahim.</p>
-        <p className="font-display italic text-caption text-accent">One line, held in blue.</p>
-        <p className="text-caption text-ink-muted">Body copy sits here.</p>
-        <div className="flex items-center gap-2 pt-1">
-          <span className="cd-themecard__chip bg-accent" style={{ width: 28 }} />
-          <span className="cd-themecard__chip bg-accent-tint" style={{ width: 20 }} />
-          <span className="cd-themecard__chip bg-border" style={{ width: 16 }} />
-        </div>
+    /* The preview shows what the theme actually is: the substrate, a line of
+       ink on it, and one lit bead. */
+    <div data-theme={themeId} className="cd-themecard__preview bg-paper">
+      <p className="font-display text-base text-ink leading-tight">Economics</p>
+      <p className="text-caption text-ink-muted">Write one paragraph and stop.</p>
+      <div className="flex items-center gap-3 pt-2">
+        <span className="cd-themecard__chip bg-signal glow-sm" style={{ width: 9, height: 9 }} />
+        <span className="cd-themecard__chip bg-rule" style={{ flex: 1 }} />
       </div>
     </div>
   );
@@ -169,13 +167,13 @@ export function SettingsScreen() {
       <PageHeading
         eyebrow="Preferences"
         title="Settings"
-        accent="Set it once and the whole app follows."
+        lead="Set it once and the whole app follows."
       />
 
       {persistError ? (
         <PartialNotice>
           The theme is applied for this session but could not be saved. Private browsing or a full storage quota will
-          do that. It will fall back to light blue next time.
+          do that. It will open on light next time.
         </PartialNotice>
       ) : null}
 
@@ -204,7 +202,7 @@ export function SettingsScreen() {
                       <p className="text-base font-medium text-ink">{t.name}</p>
                       <p className="text-caption text-ink-muted">{t.description}</p>
                     </div>
-                    {active ? <Badge tone="accent" icon="checkCircle">In use</Badge> : null}
+                    {active ? <Badge tone="signal" icon="checkCircle">In use</Badge> : null}
                   </div>
                 </button>
               );
@@ -308,8 +306,8 @@ export function SettingsScreen() {
             ]}
             rows={[
               { keys: 'Tab', does: 'Move through every control in reading order' },
-              { keys: 'Space', does: 'Tick or untick a habit' },
-              { keys: 'Enter', does: 'Generate the timetable, or send to Jarvis' },
+              { keys: 'Enter', does: 'Open the block under the cursor, or send to Jarvis' },
+              { keys: 'Space', does: 'Mark a habit off' },
               { keys: 'Ctrl or Cmd + Enter', does: 'Save a note from the capture box' },
               { keys: 'Escape', does: 'Close a dialog or panel' },
             ]}

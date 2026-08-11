@@ -32,8 +32,8 @@ export default function DevUiPage() {
     <ToastProvider>
       <main>
         <h1 className="sr-only">Cadence primitive gallery</h1>
-        <Gallery themeId="light-blue" label="Theme: light-blue (default)" />
-        <Gallery themeId="dark-blue" label="Theme: dark-blue" />
+        <Gallery themeId="light" label="Light — warm paper. The default." />
+        <Gallery themeId="dark" label="Dark — the substrate inverts, the light does not." />
       </main>
     </ToastProvider>
   );

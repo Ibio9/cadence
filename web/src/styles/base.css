@@ -18,7 +18,7 @@ html {
 
 body {
   min-height: 100%;
-  background: var(--bg);
+  background: var(--paper);
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: var(--text-base);
@@ -27,12 +27,16 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  font-feature-settings: 'kern' 1;
+  /* Tabular figures are the default across the whole app, not a per component
+     opt in. The day is almost entirely numerals and none of them may move. */
+  font-variant-numeric: var(--numeric);
+  font-feature-settings: 'kern' 1, var(--numeric-features);
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
-  font-weight: var(--weight-bold);
+  font-variation-settings: var(--display-opsz-md);
+  font-weight: var(--weight-semibold);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-tight);
   color: var(--ink);
@@ -41,12 +45,14 @@ h1, h2, h3, h4, h5, h6 {
 p { line-height: var(--leading-body); }
 
 a {
-  color: var(--accent);
-  text-decoration: none;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--rule-strong);
   border-radius: var(--radius-sm);
-  transition: color var(--dur-fast) var(--ease);
+  transition: text-decoration-color var(--dur-fast) var(--ease);
 }
-a:hover { color: var(--accent-deep); text-decoration: underline; text-underline-offset: 3px; }
+a:hover { text-decoration-color: currentColor; }
 
 button {
   font: inherit;
@@ -77,20 +83,23 @@ img { max-width: 100%; display: block; }
 
 hr {
   border: none;
-  border-top: var(--hairline) solid var(--border);
+  border-top: var(--hairline) solid var(--rule);
 }
 
 table { border-collapse: collapse; width: 100%; }
 
 ::selection {
-  background: var(--accent-tint);
-  color: var(--accent-deep);
+  background: var(--cool);
+  color: var(--ink);
 }
 
 /* Focus: visible on every interactive element, never removed without a
-   replacement. 2px accent with 2px offset. */
+   replacement. --signal rather than --emission, because a focus ring has to
+   be seen rather than felt, and it has to clear contrast on any ground it
+   lands on. The glow that goes with a focused input is added in
+   components.css, on top of the ring, never instead of it. */
 :focus-visible {
-  outline: var(--focus-ring-w) solid var(--accent);
+  outline: var(--focus-ring-w) solid var(--signal);
   outline-offset: var(--focus-ring-offset);
   border-radius: var(--radius-sm);
 }
@@ -105,15 +114,16 @@ table { border-collapse: collapse; width: 100%; }
   transform: translateY(-200%);
   background: var(--surface-raised);
   color: var(--ink);
-  border: var(--hairline) solid var(--border-strong);
+  border: var(--hairline) solid var(--rule-strong);
   border-radius: var(--radius-control);
   padding: var(--space-3) var(--space-5);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
+  text-decoration: none;
   box-shadow: var(--shadow-md);
   transition: transform var(--dur-base) var(--ease);
 }
-.skip-link:focus { transform: translateY(0); text-decoration: none; }
+.skip-link:focus { transform: translateY(0); }
 
 /* Scrollbars */
 * { scrollbar-width: thin; scrollbar-color: var(--scrollbar) transparent; }
@@ -139,12 +149,12 @@ table { border-collapse: collapse; width: 100%; }
 }
 
 @keyframes cd-rise {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes cd-modal-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+  from { opacity: 0; transform: translateY(8px) scale(0.995); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
@@ -159,7 +169,7 @@ table { border-collapse: collapse; width: 100%; }
 }
 
 @keyframes cd-toast-in {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -173,14 +183,26 @@ table { border-collapse: collapse; width: 100%; }
   40% { opacity: 1; transform: scale(1); }
 }
 
-@keyframes cd-orb {
-  0%, 100% { transform: scale(1); opacity: 0.7; }
-  50% { transform: scale(1.4); opacity: 1; }
+/* Emission breathing. Long and low amplitude: the glow is alive, not
+   flashing. Only ever applied while something is genuinely running. */
+@keyframes cd-breathe {
+  0%, 100% { opacity: 0.78; }
+  50% { opacity: 1; }
+}
+
+/* The rail unrolling when a block opens into Focus. */
+@keyframes cd-rail-unroll {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 /* --------------------------------------------------------------------------
-   Reduced motion: drop everything non essential. State still changes, it just
-   changes instantly. Loading indicators keep a slow, non flashing pulse.
+   Reduced motion.
+
+   Everything non essential stops. Loading indicators keep a slow, non
+   flashing pulse so it is still clear something is working. A breathing glow
+   drops to a static glow at full strength: the emphasis is the information,
+   and it is never removed, only stilled.
    -------------------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
@@ -196,9 +218,12 @@ table { border-collapse: collapse; width: 100%; }
   .cd-spinner__track,
   .cd-dot,
   .cd-orb.is-active::after {
-    animation-duration: 1.6s !important;
+    animation-duration: 1.8s !important;
     animation-iteration-count: infinite !important;
   }
+
+  /* Still lit, just no longer breathing. */
+  .cd-breathes { animation: none !important; opacity: 1 !important; }
 
   .cd-skeleton { animation: none !important; background-image: none !important; }
 }

@@ -1,13 +1,36 @@
 /* ==========================================================================
    Cadence design tokens
 
-   Every value the UI is allowed to use lives here. Components reference the
-   semantic utility classes in utilities.css, which reference these variables.
-   No component file contains a raw colour.
+   Every value the interface is allowed to use lives in this file. Components
+   reference the semantic utility classes in utilities.css, which reference
+   these variables. No component file contains a raw colour, shadow or size.
 
-   Adding a third theme is one new [data-theme="..."] block below and nothing
-   else: the theme independent scales (space, radius, type, motion, shadow
-   geometry) sit outside the theme blocks and are never redefined.
+   THE PALETTE IS SIX NAMED VALUES PER THEME.
+
+   Each is named for the job it does in the interface, not for what colour it
+   is, and everything else below is derived from those six:
+
+     --paper      the substrate the day is printed on
+     --ink        everything you read first
+     --quiet      everything you read second
+     --emission   the light that means "this is happening now"
+     --signal     the ink that says "now" where a word or numeral carries it
+     --alarm      the ink that means something needs you
+
+   THE LIGHT RULE.
+
+   The surface is warm paper. Mint is light bleeding through it, never ink
+   printed on it. So --emission appears only in shadows and radial blooms, at
+   low opacity and wide blur, and never as a border, a fill or a text colour.
+   Where a word or a numeral genuinely has to carry the meaning, it uses
+   --signal, which is a different value chosen to clear 4.5:1 on its ground.
+
+   Mint radiates from meaning only: the block you are in, the now marker, a
+   running clock, Jarvis thinking, a focused input. Never chrome — not
+   borders, not resting cards, not headers, not nav, not dividers.
+
+   The dark theme inverts the substrate, not the logic. --emission is byte for
+   byte the same value in both themes.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -15,13 +38,40 @@
    -------------------------------------------------------------------------- */
 
 :root {
-  /* Type families ------------------------------------------------------- */
-  --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
-  --font-sans: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  /* Type families ---------------------------------------------------------
+     Three faces, deliberately paired, each with a job:
 
-  /* Type scale ----------------------------------------------------------
-     Headings tight (1.05). Body generous (1.65). Only the eyebrow is caps. */
+       display   Fraunces. A variable serif with a real optical size axis,
+                 drawn from old catalogue and almanac types. The person's
+                 voice: what I mean to do. Used for the day title, a block
+                 title in Focus, and the objective line. Nothing else.
+
+       sans      Public Sans. Shorter ascenders and less geometry than the
+                 usual UI grotesque; reads like a form you have to fill in
+                 correctly. The connective tissue.
+
+       mono      IBM Plex Mono. An instrument face, from engineering
+                 documentation rather than a code editor. The instrument's
+                 voice: what is measured. Every time, duration, count and
+                 score is set in it, always with tabular figures, because the
+                 day spine is almost entirely numerals and a ticking clock
+                 must never change width. */
+  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --font-sans: 'Public Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Fraunces axes. Large display sizes take a high optical size, which pulls
+     the contrast up and the serifs fine. Small sizes take a low one, which
+     keeps them sturdy. */
+  --display-opsz-lg: 'opsz' 120;
+  --display-opsz-md: 'opsz' 48;
+  --display-opsz-sm: 'opsz' 14;
+
+  /* Numerals. Applied everywhere a figure appears, not just in tables. */
+  --numeric: tabular-nums slashed-zero;
+  --numeric-features: 'tnum' 1, 'zero' 1;
+
+  /* Type scale ----------------------------------------------------------- */
   --text-eyebrow: 0.6875rem;  /* 11px */
   --text-caption: 0.75rem;    /* 12px */
   --text-sm: 0.8125rem;       /* 13px */
@@ -31,15 +81,16 @@
   --text-2xl: 1.5rem;         /* 24px */
   --text-3xl: 1.875rem;       /* 30px */
   --text-4xl: 2.375rem;       /* 38px */
-  --text-display: 3rem;       /* 48px */
+  --text-display: 3.25rem;    /* 52px */
 
   --leading-tight: 1.05;
   --leading-snug: 1.3;
   --leading-normal: 1.45;
-  --leading-body: 1.65;
+  --leading-body: 1.62;
   --leading-relaxed: 1.8;
 
-  --tracking-eyebrow: 0.12em;
+  --tracking-eyebrow: 0.14em;
+  --tracking-mono: 0.02em;   /* mono under 14px needs air */
   --tracking-tight: -0.02em;
   --tracking-snug: -0.01em;
   --tracking-normal: 0;
@@ -51,47 +102,55 @@
 
   /* Space: single 4px scale --------------------------------------------- */
   --space-0: 0;
-  --space-1: 0.25rem;   /* 4  */
-  --space-2: 0.5rem;    /* 8  */
-  --space-3: 0.75rem;   /* 12 */
-  --space-4: 1rem;      /* 16 */
-  --space-5: 1.25rem;   /* 20 */
-  --space-6: 1.5rem;    /* 24 */
-  --space-7: 1.75rem;   /* 28 */
-  --space-8: 2rem;      /* 32 */
-  --space-10: 2.5rem;   /* 40 */
-  --space-12: 3rem;     /* 48 */
-  --space-14: 3.5rem;   /* 56 */
-  --space-16: 4rem;     /* 64 */
-  --space-20: 5rem;     /* 80 */
-  --space-24: 6rem;     /* 96 */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 1.75rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-14: 3.5rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
 
-  /* Radius --------------------------------------------------------------- */
-  --radius-card: 22px;
-  --radius-control: 12px;
-  --radius-sm: 8px;
+  /* Radius. Paper does not have a 22px corner radius on everything, so the
+     card radius is much tighter than it was and most things have none. */
+  --radius-card: 10px;
+  --radius-control: 8px;
+  --radius-sm: 5px;
   --radius-pill: 999px;
 
-  /* Motion --------------------------------------------------------------- */
-  --ease: cubic-bezier(0.22, 0.61, 0.36, 1); /* ease out, nothing bounces */
-  --dur-fast: 160ms;
-  --dur-base: 200ms;
-  --dur-slow: 250ms;
+  /* The rail: the signature. One hairline that is literal time. */
+  --rail-w: 1px;
+  --rail-gutter: 4rem;      /* the time column to the left of the rail */
+  --rail-bead: 9px;
+  --rail-tick: 7px;
 
-  /* Shell geometry, fixed once and never overridden per screen ------------ */
-  --shell-sidebar-w: 248px;
-  --shell-gutter: var(--space-6);
+  /* Motion. Almost everything is instant or 160ms. The one orchestrated
+     moment is a block opening into Focus, which gets --dur-open. */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-open: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-fast: 140ms;
+  --dur-base: 180ms;
+  --dur-slow: 240ms;
+  --dur-open: 420ms;
+  --dur-breathe: 5200ms;    /* long and low: a glow breathing, not pulsing */
+
+  /* Shell geometry -------------------------------------------------------- */
+  --shell-sidebar-w: 208px;
+  --shell-gutter: var(--space-5);
   --shell-gutter-lg: var(--space-10);
-  --shell-max-w: 1120px;
-  --shell-card-gap: var(--space-6);
-  --shell-card-pad: var(--space-6);
-  --shell-mobile-nav-h: 64px;
+  --shell-max-w: 940px;
+  --shell-card-gap: var(--space-8);
+  --shell-card-pad: var(--space-5);
+  --shell-mobile-nav-h: 60px;
 
-  /* Controls ------------------------------------------------------------- */
-  /* One control height across the app. The compact variants keep this height
-     and change only type size, glyph size and horizontal padding, so no
-     control anywhere falls below the touch minimum. */
-  --control-h: 44px;
+  /* Controls -------------------------------------------------------------- */
+  --control-h: 42px;
   --touch-target: 44px;
   --focus-ring-w: 2px;
   --focus-ring-offset: 2px;
@@ -106,108 +165,183 @@
 }
 
 /* --------------------------------------------------------------------------
-   2. light-blue  (default and canonical)
+   2. light — warm paper. The default.
+
+   Contrast, measured against the ground each one actually lands on:
+     --ink    on --paper   14.8:1
+     --quiet  on --paper    5.7:1     on --surface 6.1:1
+     --signal on --paper    5.5:1     on --cool    5.3:1
+     --alarm  on --paper    5.7:1
    -------------------------------------------------------------------------- */
 
 :root,
-[data-theme='light-blue'] {
+[data-theme='light'] {
   color-scheme: light;
 
-  /* Surfaces and ink */
-  --bg: #f4efe4;
-  --surface: #fbf8f1;
-  --surface-raised: #ffffff;
-  --surface-sunken: #efe9dc;
+  /* ---- the six ---- */
+  --paper: #efeae1;
+  --ink: #191813;
+  --quiet: #5e5b51;
+  --emission: #43e3a9;
+  --signal: #0a6b4f;
+  --alarm: #9e3b2b;
 
-  --ink: #16181d;
-  --ink-muted: #5c5f66;   /* 6.03:1 on --surface, 5.58:1 on --bg */
-  /* Supplementary or large text only. Set so it clears 3:1 on every ground it
-     lands on: 3.67:1 on --surface, 3.40:1 on --bg, 3.22:1 on --surface-sunken. */
-  --ink-subtle: #7e818a;
-  --ink-inverse: #fbf8f1;
+  /* ---- derived: substrate ---- */
+  /* A card is paper lifted toward white; a well is paper pushed away from it.
+     Two levels, never three. */
+  --surface: #f7f4ed;
+  --surface-raised: #fffdf8;
+  --surface-sunken: #e7e1d6;
+  /* The very slightly cooler ground that sits under and around a glow. This
+     is the only place mint touches a fill, and it is 4% of it. */
+  --cool: #e9eae2;
 
-  /* Accent */
-  --accent: #2f5bd0;      /* white on accent 5.95:1 */
-  --accent-deep: #24499f;
-  --accent-soft: #6e8fe0;
-  --accent-tint: #e6ebf9;
-  --on-accent: #ffffff;
+  /* ---- derived: ink ---- */
+  --ink-muted: var(--quiet);
+  --ink-subtle: #83806f;    /* supplementary and large text only, 3.6:1 */
+  --ink-inverse: #f7f4ed;
+  --on-signal: #ffffff;     /* 5.9:1 on --signal */
 
-  /* Lines */
-  --border: rgba(22, 24, 29, 0.08);
-  --border-strong: rgba(22, 24, 29, 0.14);
+  /* ---- derived: structure ---- */
+  --rule: rgba(25, 24, 19, 0.11);
+  --rule-strong: rgba(25, 24, 19, 0.2);
+  --hover-tint: rgba(25, 24, 19, 0.04);
+  --active-tint: rgba(25, 24, 19, 0.07);
 
-  /* Warm neutral interaction tints, never blue */
-  --hover-tint: rgba(22, 24, 29, 0.035);
-  --active-tint: rgba(22, 24, 29, 0.06);
+  /* ---- derived: status. Never colour alone; always a word or a mark. ---- */
+  --held: var(--signal);
+  --held-ground: var(--cool);
+  --warn: #7c5312;
+  --warn-ground: #f0e8d8;
+  --alarm-ground: #f5e5e1;
 
-  /* Status: deep and desaturated, each 4.5:1 or better on its own tint */
-  --success: #2e6b4f;
-  --success-tint: #e3efe8;
-  --warning: #8a5a17;
-  --warning-tint: #f6eddd;
-  --danger: #a3342c;
-  --danger-tint: #f7e7e5;
+  /* ---- depth. Paper does not float much. ---- */
+  --shadow-sm: 0 1px 2px rgba(25, 24, 19, 0.05);
+  --shadow-md: 0 2px 6px rgba(25, 24, 19, 0.06), 0 10px 28px rgba(25, 24, 19, 0.07);
+  --shadow-lg: 0 4px 10px rgba(25, 24, 19, 0.07), 0 24px 64px rgba(25, 24, 19, 0.12);
 
-  /* Depth: wide, soft, low opacity. Lift, not drop. */
-  --shadow-sm: 0 1px 2px rgba(22, 24, 29, 0.04), 0 2px 8px rgba(22, 24, 29, 0.04);
-  --shadow-md: 0 2px 4px rgba(22, 24, 29, 0.04), 0 8px 24px rgba(22, 24, 29, 0.06);
-  --shadow-lg: 0 4px 8px rgba(22, 24, 29, 0.05), 0 20px 56px rgba(22, 24, 29, 0.10);
-
-  --press-inset: inset 0 1px 3px rgba(22, 24, 29, 0.16);
-  --overlay-scrim: rgba(22, 24, 29, 0.32);
-  --scrollbar: rgba(22, 24, 29, 0.16);
-  --scrollbar-hover: rgba(22, 24, 29, 0.28);
-  --skeleton-base: rgba(22, 24, 29, 0.055);
-  --skeleton-sheen: rgba(22, 24, 29, 0.028);
+  --press-inset: inset 0 1px 3px rgba(25, 24, 19, 0.16);
+  --overlay-scrim: rgba(25, 24, 19, 0.38);
+  --scrollbar: rgba(25, 24, 19, 0.18);
+  --scrollbar-hover: rgba(25, 24, 19, 0.3);
+  --skeleton-base: rgba(25, 24, 19, 0.06);
+  --skeleton-sheen: rgba(25, 24, 19, 0.03);
 }
 
 /* --------------------------------------------------------------------------
-   3. dark-blue
-   Warm neutral darks, accent lifted for contrast, status re derived.
-   Text on a filled accent flips to a deep ink so the pairing still passes.
+   3. dark — the substrate inverts, the light does not.
+
+   Contrast:
+     --ink    on --paper   15.4:1
+     --quiet  on --paper    7.0:1
+     --signal on --paper   11.3:1
+     --alarm  on --paper    8.1:1
    -------------------------------------------------------------------------- */
 
-[data-theme='dark-blue'] {
+[data-theme='dark'] {
   color-scheme: dark;
 
-  --bg: #14130f;
-  --surface: #1c1b17;
-  --surface-raised: #24231e;
-  --surface-sunken: #100f0c;
+  /* ---- the six. --emission is identical to the light theme's. ---- */
+  --paper: #14130e;
+  --ink: #efeae0;
+  --quiet: #a39d91;
+  --emission: #43e3a9;
+  --signal: #4fdca4;
+  --alarm: #e88c7b;
 
-  --ink: #f4f1e9;
-  --ink-muted: #aba79c;   /* 7.08:1 on --surface */
-  --ink-subtle: #7e7a70;  /* 4.03:1 on --surface */
-  --ink-inverse: #16181d;
+  --surface: #1d1c16;
+  --surface-raised: #24231b;
+  --surface-sunken: #0e0d09;
+  --cool: #161a17;
 
-  --accent: #8faef8;      /* 7.78:1 on --surface */
-  --accent-deep: #a9c2fa; /* hover lifts further in the dark theme */
-  --accent-soft: #5e7fc9;
-  --accent-tint: #1e2635;
-  --on-accent: #11151f;   /* 8.35:1 against --accent */
+  --ink-muted: var(--quiet);
+  --ink-subtle: #7b7669;
+  --ink-inverse: #14130e;
+  --on-signal: #06231a;     /* 9.6:1 on --signal */
 
-  --border: rgba(244, 241, 233, 0.10);
-  --border-strong: rgba(244, 241, 233, 0.18);
+  --rule: rgba(239, 234, 224, 0.12);
+  --rule-strong: rgba(239, 234, 224, 0.22);
+  --hover-tint: rgba(239, 234, 224, 0.055);
+  --active-tint: rgba(239, 234, 224, 0.095);
 
-  --hover-tint: rgba(244, 241, 233, 0.05);
-  --active-tint: rgba(244, 241, 233, 0.09);
+  --held: var(--signal);
+  --held-ground: var(--cool);
+  --warn: #dfae6b;
+  --warn-ground: #2a2317;
+  --alarm-ground: #2f1c18;
 
-  --success: #6bbf8f;
-  --success-tint: #1b2a22;
-  --warning: #e0ac63;
-  --warning-tint: #2c2418;
-  --danger: #ec8c82;
-  --danger-tint: #33211f;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.42), 0 10px 28px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.46), 0 24px 64px rgba(0, 0, 0, 0.56);
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.22);
-  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.30), 0 8px 24px rgba(0, 0, 0, 0.32);
-  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.34), 0 20px 56px rgba(0, 0, 0, 0.46);
+  --press-inset: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+  --overlay-scrim: rgba(4, 4, 3, 0.68);
+  --scrollbar: rgba(239, 234, 224, 0.18);
+  --scrollbar-hover: rgba(239, 234, 224, 0.3);
+  --skeleton-base: rgba(239, 234, 224, 0.075);
+  --skeleton-sheen: rgba(239, 234, 224, 0.035);
+}
 
-  --press-inset: inset 0 1px 3px rgba(0, 0, 0, 0.34);
-  --overlay-scrim: rgba(6, 6, 5, 0.62);
-  --scrollbar: rgba(244, 241, 233, 0.16);
-  --scrollbar-hover: rgba(244, 241, 233, 0.28);
-  --skeleton-base: rgba(244, 241, 233, 0.07);
-  --skeleton-sheen: rgba(244, 241, 233, 0.035);
+/* --------------------------------------------------------------------------
+   4. Emission
+
+   Soft radial falloff, never a hard ring. Each glow is two low opacity mint
+   shadows at wide blur, so the edge is never findable. The largest emitter
+   also gets --bloom, a radial gradient, because a shadow alone cannot make
+   light appear to come from inside the surface.
+
+   Budget, enforced by hand in the screens: one primary emitter per screen,
+   one secondary at roughly a third of the strength, everything else zero.
+   Total glowing surface stays under about a tenth of the viewport.
+
+   These sit outside the theme blocks because the light does not change
+   between themes — only what it falls on does.
+   -------------------------------------------------------------------------- */
+
+:root {
+  --emission-rgb: 67, 227, 169;
+
+  --glow-sm:
+    0 2px 14px -4px rgba(var(--emission-rgb), 0.24),
+    0 0 34px -12px rgba(var(--emission-rgb), 0.16);
+
+  --glow-md:
+    0 4px 26px -6px rgba(var(--emission-rgb), 0.3),
+    0 0 68px -16px rgba(var(--emission-rgb), 0.2);
+
+  --glow-lg:
+    0 6px 42px -8px rgba(var(--emission-rgb), 0.36),
+    0 0 120px -24px rgba(var(--emission-rgb), 0.24);
+
+  /* The bloom for the single largest emitter. Anchored left so the light
+     reads as coming off the rail rather than out of the middle of a box. */
+  --bloom: radial-gradient(
+    140% 180% at 0% 50%,
+    rgba(var(--emission-rgb), 0.15),
+    rgba(var(--emission-rgb), 0.05) 38%,
+    transparent 72%
+  );
+}
+
+/* The dark substrate takes light more readily, so the same geometry needs
+   less opacity to read as equally bright. */
+[data-theme='dark'] {
+  --glow-sm:
+    0 2px 14px -4px rgba(var(--emission-rgb), 0.2),
+    0 0 34px -12px rgba(var(--emission-rgb), 0.14);
+
+  --glow-md:
+    0 4px 26px -6px rgba(var(--emission-rgb), 0.26),
+    0 0 68px -16px rgba(var(--emission-rgb), 0.18);
+
+  --glow-lg:
+    0 6px 42px -8px rgba(var(--emission-rgb), 0.3),
+    0 0 120px -24px rgba(var(--emission-rgb), 0.2);
+
+  --bloom: radial-gradient(
+    140% 180% at 0% 50%,
+    rgba(var(--emission-rgb), 0.13),
+    rgba(var(--emission-rgb), 0.045) 38%,
+    transparent 72%
+  );
 }

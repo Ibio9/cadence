@@ -118,7 +118,7 @@ export function JarvisScreen() {
       <PageHeading
         eyebrow="Assistant"
         title="Jarvis"
-        accent="Primed with today's checklist and today's hours."
+        lead="Primed with today's checklist and today's hours."
         actions={
           messages.length > 0 ? (
             <Button variant="secondary" icon="trash" onClick={clearHistory}>
@@ -139,7 +139,7 @@ export function JarvisScreen() {
 
           {messages.length === 0 && !error ? (
             <div className="flex flex-col gap-4 py-4">
-              <p className="font-display italic text-lg text-accent">Ask the thing you are avoiding.</p>
+              <p className="font-display text-xl text-ink">Ask the thing you are avoiding.</p>
               <p className="text-base text-ink-muted max-w-prose">
                 Jarvis can see what you have held today and what is on your timetable. Start with one of these, or
                 write your own.
@@ -166,7 +166,7 @@ export function JarvisScreen() {
                         {m.content}
                       </div>
                       {failedTurn ? (
-                        <span className="text-caption text-danger flex items-center gap-2 justify-end">
+                        <span className="text-caption text-alarm flex items-center gap-2 justify-end">
                           Not answered
                         </span>
                       ) : null}

@@ -17,7 +17,7 @@ import Icon from '../Icon';
 
 const TONE_CLASS = {
   neutral: 'cd-badge--neutral',
-  accent: 'cd-badge--accent',
+  signal: 'cd-badge--signal',
   success: 'cd-badge--success',
   warning: 'cd-badge--warning',
   danger: 'cd-badge--danger',
@@ -28,7 +28,7 @@ const TONE_ICON = {
   success: 'checkCircle',
   warning: 'alertTriangle',
   danger: 'alertCircle',
-  accent: 'info',
+  signal: 'info',
 };
 
 export function Badge({ tone = 'neutral', icon, mono = false, className, children, ...rest }) {

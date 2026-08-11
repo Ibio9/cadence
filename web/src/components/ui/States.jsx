@@ -99,7 +99,7 @@ export function InlineError({ children, onRetry, retryLabel = 'Try again', retry
       <Icon name="alertCircle" size={16} />
       <div className="flex-1 min-w-0">{children}</div>
       {onRetry ? (
-        <button type="button" className="cd-btn cd-btn--sm cd-btn--tertiary text-danger" onClick={onRetry} disabled={retrying}>
+        <button type="button" className="cd-btn cd-btn--sm cd-btn--tertiary text-alarm" onClick={onRetry} disabled={retrying}>
           <span className="cd-btn__label">{retryLabel}</span>
         </button>
       ) : null}

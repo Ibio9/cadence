@@ -60,6 +60,41 @@ function Row({ label, children }) {
   );
 }
 
+/** The palette, named for the job each value does rather than its hue. */
+const SWATCHES = [
+  { token: '--paper', does: 'The substrate the day is printed on' },
+  { token: '--ink', does: 'Everything you read first' },
+  { token: '--quiet', does: 'Everything you read second' },
+  { token: '--emission', does: 'The light that means happening now' },
+  { token: '--signal', does: 'The ink that says now' },
+  { token: '--alarm', does: 'The ink that means something needs you' },
+];
+
+/* A day, on the rail: behind you, the hour you are in, and what is ahead.
+   Project colours are database values, so they are literals here too. */
+const RAIL_ROWS = [
+  {
+    time: '10:30', dur: '1h', state: 'past', colour: '#A83A32', mark: 'Held',
+    title: 'TARA — Section A under time', project: 'TARA',
+    objective: 'Do one section under the clock and mark it.',
+  },
+  {
+    time: '14:00', dur: '1.5h', state: 'now', colour: '#B8842B', mark: 'Now',
+    title: 'Economics — Market failure essay', project: 'Economics',
+    objective: 'Write one evaluation paragraph and stop.',
+  },
+  {
+    time: '16:00', dur: '1h', state: 'next', colour: '#9C5A46', mark: 'in 53m', bead: true,
+    title: 'Philosophy — Uncommon Knowledge', project: 'Philosophy',
+    objective: 'No objective yet',
+  },
+  {
+    time: '18:00', dur: '1h', state: 'later', colour: '#3E7D8C', mark: null,
+    title: 'BJJ No-Gi', project: 'Training',
+    objective: 'Go at the thing that beat you last session.',
+  },
+];
+
 const TABLE_COLUMNS = [
   { key: 'name', header: 'Session' },
   { key: 'type', header: 'Type' },
@@ -88,24 +123,159 @@ export function Gallery({ themeId, label }) {
   const [selectedRow, setSelectedRow] = useState(2);
 
   return (
-    <div data-theme={themeId} className="bg-bg text-ink">
+    <div data-theme={themeId} className="bg-paper text-ink">
       <div className="flex flex-col gap-12 p-6 md:p-card">
-        <p className="text-eyebrow text-accent">{label}</p>
+        <p className="text-eyebrow text-ink-subtle">{label}</p>
+
+        {/* Palette ------------------------------------------------------ */}
+        <Section title="Palette — six named values, everything else derived">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {SWATCHES.map((s) => (
+              <div key={s.token} className="flex items-center gap-3">
+                <span
+                  className="rounded-sm border shrink-0"
+                  style={{ background: `var(${s.token})`, width: 44, height: 44 }}
+                />
+                <span className="min-w-0">
+                  <span className="block font-mono text-caption text-ink">{s.token}</span>
+                  <span className="block text-caption text-ink-muted">{s.does}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        {/* Emission ----------------------------------------------------- */}
+        <Section title="Emission — the light rule">
+          <p className="text-sm text-ink-muted max-w-prose">
+            Mint is light bleeding through the paper, never ink printed on it. It reaches the screen only through
+            these three shadows and the bloom. There is no utility that paints it on a border, a fill or a text
+            colour. Where a mark has to be read rather than felt, it is drawn in <span className="font-mono">--signal</span>.
+          </p>
+          <Row label="glow-sm / glow-md / glow-lg">
+            {['glow-sm', 'glow-md', 'glow-lg'].map((g) => (
+              <span
+                key={g}
+                className={`bg-surface rounded-card border flex items-center justify-center text-caption text-ink-muted ${g}`}
+                style={{ width: 108, height: 68 }}
+              >
+                {g}
+              </span>
+            ))}
+          </Row>
+          <Row label="bloom + signal segment, the primary emitter">
+            <span
+              className="bloom rounded-sm glow-sm relative flex items-center px-4 text-sm text-ink"
+              style={{ width: 300, height: 68 }}
+            >
+              <span className="bg-signal rounded-pill absolute" style={{ left: 0, top: 0, bottom: 0, width: 3 }} />
+              <span className="pl-3">The hour you are in</span>
+            </span>
+          </Row>
+          <Row label="the bead, breathing while the day runs">
+            <span className="relative bg-rule" style={{ width: 220, height: 1 }}>
+              <span
+                className="cd-bead__dot cd-breathes"
+                style={{ left: '50%', top: '50%', position: 'absolute' }}
+              />
+            </span>
+          </Row>
+        </Section>
+
+        {/* The rail ----------------------------------------------------- */}
+        <Section title="The rail — the signature">
+          <ol className="cd-rail list-none">
+            {RAIL_ROWS.map((r) => (
+              <li key={r.time}>
+                {r.bead ? (
+                  <span className="cd-bead">
+                    <span className="cd-bead__time">15:07</span>
+                    <span className="cd-bead__dot cd-breathes" />
+                  </span>
+                ) : null}
+                <span className={`cd-railrow is-${r.state}`}>
+                  <span className="cd-railrow__time">
+                    {r.time}
+                    <span className="cd-railrow__dur">{r.dur}</span>
+                  </span>
+                  <span className="cd-railrow__tick" style={{ '--tick-colour': r.colour }} />
+                  <span className="cd-railrow__body">
+                    <span className="cd-railrow__title">{r.title}</span>
+                    <span className="cd-railrow__meta">
+                      <span className="cd-railrow__project">{r.project}</span>
+                      <span className="truncate">{r.objective}</span>
+                    </span>
+                  </span>
+                  <span className="cd-railrow__marks">
+                    {r.mark ? <span className={`cd-when${r.state === 'now' ? ' cd-when--now' : ''}`}>{r.mark}</span> : null}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </Section>
+
+        {/* Tally -------------------------------------------------------- */}
+        <Section title="Tally — habits are marked off, not tracked">
+          <div className="cd-tally" style={{ borderTop: 'none', paddingTop: 0 }}>
+            <div className="cd-tally__group">
+              <p className="cd-tally__label">
+                Salah<span className="cd-tally__count">2/5</span>
+              </p>
+              <ul className="cd-tally__list list-none">
+                {['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'].map((h, i) => (
+                  <li key={h}>
+                    <span className={i < 2 ? 'cd-tallycell is-held' : 'cd-tallycell'}>
+                      <span className="cd-tallycell__mark">
+                        {i < 2 ? <Icon name="check" size={11} strokeWidth={3} /> : null}
+                      </span>
+                      <span className="cd-tallycell__label">{h}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </Section>
+
+        {/* Session rail ------------------------------------------------- */}
+        <Section title="Session rail — the same rail, horizontal">
+          <Row label="running / paused / past the hour">
+            <span style={{ width: 220 }}>
+              <span className="cd-sessionrail is-running" style={{ '--progress': '38%' }}>
+                <span className="cd-sessionrail__fill" />
+                <span className="cd-sessionrail__bead cd-breathes" />
+              </span>
+            </span>
+            <span style={{ width: 220 }}>
+              <span className="cd-sessionrail" style={{ '--progress': '38%' }}>
+                <span className="cd-sessionrail__fill" />
+                <span className="cd-sessionrail__bead" />
+              </span>
+            </span>
+            <span style={{ width: 220 }}>
+              <span className="cd-sessionrail is-over" style={{ '--progress': '100%' }}>
+                <span className="cd-sessionrail__fill" />
+                <span className="cd-sessionrail__bead" />
+              </span>
+            </span>
+          </Row>
+        </Section>
 
         {/* PageHeading -------------------------------------------------- */}
         <Section title="PageHeading">
           <PageHeading
             eyebrow="Monday, 10 August"
             title="Good morning, Ibrahim."
-            accent="Protect the first three hours. Everything else can move."
+            lead="Protect the first three hours. Everything else can move."
             level={2}
             actions={<Button icon="sparkle">Generate</Button>}
           />
-          <PageHeading eyebrow="Loading" title="Resolving the brief" accentLoading level={2} />
+          <PageHeading eyebrow="Loading" title="Resolving the brief" leadLoading level={2} />
           <PageHeading
             eyebrow="Error"
             title="Brief unavailable"
-            accentError="Jarvis did not answer, so this is a standing reminder rather than a fresh one."
+            leadError="Jarvis did not answer, so this is a standing reminder rather than a fresh one."
             level={2}
           />
         </Section>
@@ -129,7 +299,7 @@ export function Gallery({ themeId, label }) {
               </CardBody>
             </Card>
             <Card interactive selected>
-              <CardHeader title="Selected" description="Accent tint, accent border." />
+              <CardHeader title="Selected" description="Sunken ground, ink border." />
               <CardBody>
                 <p className="text-sm text-ink-muted">Interactive cards lift on hover.</p>
               </CardBody>
@@ -139,7 +309,7 @@ export function Gallery({ themeId, label }) {
 
         {/* Button ------------------------------------------------------- */}
         <Section title="Button">
-          {['primary', 'secondary', 'tertiary', 'ghost', 'danger', 'danger-solid'].map((variant) => (
+          {['primary', 'go', 'secondary', 'tertiary', 'ghost', 'danger', 'danger-solid'].map((variant) => (
             <Row key={variant} label={variant}>
               <Button variant={variant}>Rest</Button>
               <Button variant={variant} icon="plus">
@@ -242,7 +412,7 @@ export function Gallery({ themeId, label }) {
             <Badge tone="neutral" icon={null}>
               Neutral
             </Badge>
-            <Badge tone="accent">Accent</Badge>
+            <Badge tone="signal">Now</Badge>
             <Badge tone="success">Held</Badge>
             <Badge tone="warning">Partly held</Badge>
             <Badge tone="danger">Missed</Badge>
@@ -459,15 +629,16 @@ export function Gallery({ themeId, label }) {
         {/* Type scale --------------------------------------------------- */}
         <Section title="Type scale">
           <p className="text-eyebrow text-ink-subtle">Eyebrow, uppercase, letterspaced</p>
-          <p className="font-display text-display">Display 48</p>
+          <p className="font-display-lg text-display">Display 52, high optical size</p>
           <p className="font-display text-4xl">Heading 38</p>
           <p className="font-display text-3xl">Heading 30</p>
           <p className="font-display text-2xl">Heading 24</p>
-          <p className="font-display italic text-lg text-accent">The italic accent line, 17</p>
+          <p className="font-display text-lg">Display 17, the small optical size</p>
           <p className="text-base text-ink">Body 15, the reading size, set with generous line height.</p>
           <p className="text-sm text-ink-muted">Small 13, descriptions and secondary copy.</p>
           <p className="text-caption text-ink-subtle">Caption 12, metadata and timestamps.</p>
-          <p className="font-mono text-base">0123456789 tabular 1,420.75</p>
+          <p className="font-mono text-base">0123456789 tabular, slashed zero</p>
+          <p className="font-mono text-2xl">18:00 &ndash; 19:00 &middot; 01:24:07</p>
         </Section>
 
         {/* Icons -------------------------------------------------------- */}

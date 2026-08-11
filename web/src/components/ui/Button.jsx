@@ -40,6 +40,9 @@ export function Spinner({ size = 'md', label = 'Loading', className }) {
 
 const VARIANTS = {
   primary: 'cd-btn--primary',
+  // The verb that starts something. The only button in the app that emits,
+  // and only because starting is the meaning the whole screen is built round.
+  go: 'cd-btn--go',
   secondary: 'cd-btn--secondary',
   tertiary: 'cd-btn--tertiary',
   ghost: 'cd-btn--ghost',

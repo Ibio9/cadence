@@ -1,28 +1,42 @@
 /* ==========================================================================
-   Primitive component classes.
+   Component classes.
 
    One control height, one radius language, one focus ring, one motion policy.
    Every rule resolves through tokens.css. No literal colour appears below.
+
+   THE LIGHT RULE, IN PRACTICE
+
+   --signal draws. --emission glows. Nothing in this file paints --emission on
+   a border, a fill or a text colour; it appears only through --glow-* and
+   --bloom, which are shadows and a radial gradient. Where a mark has to be
+   seen rather than felt, it is drawn in --signal, which is a different value
+   picked to clear 4.5:1 on its ground.
+
+   Light comes only from meaning: the block you are in, the now bead, a
+   running session, Jarvis thinking, a focused input. Nav, headers, dividers,
+   resting cards and every other piece of chrome are unlit, deliberately.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Card
-   Page sits on --bg, cards on --surface, overlays on --surface-raised.
-   Never more than two surface levels visible at once.
+
+   Cards are for things that genuinely float above the page: overlays, sheets,
+   toasts, and the few panels that are a distinct object. Today and Focus do
+   not use one. On a paper substrate, wrapping content in a shadowed rounded
+   box is a habit, not a decision.
    -------------------------------------------------------------------------- */
 
 .cd-card {
   background: var(--surface);
-  border: var(--hairline) solid var(--border);
+  border: var(--hairline) solid var(--rule);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-sm);
   transition: box-shadow var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
 .cd-card--raised { background: var(--surface-raised); box-shadow: var(--shadow-md); }
-.cd-card--flat { box-shadow: none; }
+.cd-card--flat { border-color: transparent; background: transparent; }
 .cd-card--interactive { cursor: pointer; }
-.cd-card--interactive:hover { box-shadow: var(--shadow-md); border-color: var(--border-strong); }
-.cd-card--selected { border-color: var(--accent); background: var(--accent-tint); }
+.cd-card--interactive:hover { border-color: var(--rule-strong); }
+.cd-card--selected { border-color: var(--signal); background: var(--cool); }
 
 .cd-card__header {
   padding: var(--shell-card-pad) var(--shell-card-pad) 0;
@@ -39,23 +53,19 @@
   justify-content: flex-end;
   gap: var(--space-2);
 }
-.cd-card__divider { height: var(--hairline); background: var(--border); border: 0; }
+.cd-card__divider { height: var(--hairline); background: var(--rule); border: 0; }
 
 /* --------------------------------------------------------------------------
-   PageHeading
-   Eyebrow, serif heading, one italic accent line. Once per screen.
+   PageHeading. Eyebrow, display heading, one supporting line.
    -------------------------------------------------------------------------- */
 
 .cd-heading { display: flex; flex-direction: column; gap: var(--space-3); }
-.cd-heading__row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
+.cd-heading__row { display: flex; flex-direction: column; gap: var(--space-4); }
 @media (min-width: 768px) {
   .cd-heading__row { flex-direction: row; align-items: flex-end; justify-content: space-between; }
 }
-.cd-heading__eyebrow {
+.cd-heading__eyebrow,
+.cd-eyebrow {
   font-size: var(--text-eyebrow);
   font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-eyebrow);
@@ -65,22 +75,19 @@
 }
 .cd-heading__title {
   font-family: var(--font-display);
-  font-weight: var(--weight-bold);
+  font-variation-settings: var(--display-opsz-lg);
+  font-weight: var(--weight-semibold);
   font-size: var(--text-3xl);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-tight);
   color: var(--ink);
-  margin-top: var(--space-3);
+  margin-top: var(--space-2);
   text-wrap: balance;
 }
 @media (min-width: 768px) { .cd-heading__title { font-size: var(--text-4xl); } }
 .cd-heading__accent {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-weight: var(--weight-normal);
-  font-size: var(--text-lg);
-  line-height: var(--leading-normal);
-  color: var(--accent);
+  font-size: var(--text-base);
+  color: var(--ink-muted);
   margin-top: var(--space-2);
   max-width: 62ch;
   text-wrap: pretty;
@@ -89,7 +96,6 @@
 
 /* --------------------------------------------------------------------------
    Button
-   Loading swaps the leading icon for a spinner and keeps the label and width.
    -------------------------------------------------------------------------- */
 
 .cd-btn {
@@ -100,7 +106,7 @@
   justify-content: center;
   gap: var(--space-2);
   min-height: var(--btn-h);
-  padding: 0 var(--space-6);
+  padding: 0 var(--space-5);
   border-radius: var(--radius-control);
   border: var(--hairline) solid transparent;
   font-family: var(--font-sans);
@@ -109,18 +115,19 @@
   line-height: 1;
   letter-spacing: var(--tracking-snug);
   white-space: nowrap;
+  text-decoration: none;
   cursor: pointer;
   transition: background-color var(--dur-fast) var(--ease),
               border-color var(--dur-fast) var(--ease),
               color var(--dur-fast) var(--ease),
               box-shadow var(--dur-fast) var(--ease);
 }
+.cd-btn:hover { text-decoration: none; }
 .cd-btn--sm { --btn-h: var(--touch-target); padding: 0 var(--space-4); font-size: var(--text-caption); }
-.cd-btn--lg { --btn-h: 52px; padding: 0 var(--space-8); font-size: var(--text-base); }
+.cd-btn--lg { --btn-h: 50px; padding: 0 var(--space-7); font-size: var(--text-base); }
 .cd-btn--block { display: flex; width: 100%; }
 
-/* A button whose label is a sentence rather than a verb. Wraps instead of
-   forcing the page wider, and reads left aligned like the text it is. */
+/* A button whose label is a sentence rather than a verb. */
 .cd-btn--wrap {
   white-space: normal;
   text-align: left;
@@ -135,44 +142,40 @@
 .cd-btn__label { display: inline-block; }
 
 .cd-btn:disabled,
-.cd-btn[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
+.cd-btn[aria-disabled='true'] { opacity: 0.42; cursor: not-allowed; }
 .cd-btn.is-loading { cursor: progress; }
 
-/* primary */
-.cd-btn--primary { background: var(--accent); color: var(--on-accent); }
-.cd-btn--primary:hover:not(:disabled) { background: var(--accent-deep); }
-.cd-btn--primary:active:not(:disabled) { background: var(--accent-deep); box-shadow: var(--press-inset); }
+/* primary: the one filled control on a screen */
+.cd-btn--primary { background: var(--ink); color: var(--paper); }
+.cd-btn--primary:hover:not(:disabled) { background: var(--ink); filter: contrast(0.88); }
+.cd-btn--primary:active:not(:disabled) { box-shadow: var(--press-inset); }
 
-/* secondary */
+/* go: the verb that starts something. The only button that emits, and only
+   because starting is the meaning the whole screen is built around. */
+.cd-btn--go { background: var(--signal); color: var(--on-signal); box-shadow: var(--glow-sm); }
+.cd-btn--go:hover:not(:disabled) { filter: brightness(1.06); box-shadow: var(--glow-md); }
+.cd-btn--go:active:not(:disabled) { box-shadow: var(--press-inset); }
+
 .cd-btn--secondary {
-  background: var(--surface-raised);
+  background: transparent;
   color: var(--ink);
-  border-color: var(--border-strong);
+  border-color: var(--rule-strong);
 }
-.cd-btn--secondary:hover:not(:disabled) { background: var(--surface); border-color: var(--ink-subtle); }
-.cd-btn--secondary:active:not(:disabled) { background: var(--surface-sunken); }
+.cd-btn--secondary:hover:not(:disabled) { background: var(--hover-tint); border-color: var(--ink-subtle); }
+.cd-btn--secondary:active:not(:disabled) { background: var(--active-tint); }
 
-/* tertiary */
-.cd-btn--tertiary { background: transparent; color: var(--accent); padding: 0 var(--space-3); }
-.cd-btn--tertiary:hover:not(:disabled) { color: var(--accent-deep); background: var(--hover-tint); }
-.cd-btn--tertiary:active:not(:disabled) { background: var(--active-tint); }
+.cd-btn--tertiary { background: transparent; color: var(--ink-muted); padding: 0 var(--space-3); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--rule-strong); }
+.cd-btn--tertiary:hover:not(:disabled) { color: var(--ink); text-decoration-color: currentColor; }
 
-/* ghost, for chrome level actions that must not read as a button */
 .cd-btn--ghost { background: transparent; color: var(--ink-muted); }
 .cd-btn--ghost:hover:not(:disabled) { background: var(--hover-tint); color: var(--ink); }
 .cd-btn--ghost:active:not(:disabled) { background: var(--active-tint); }
 
-/* destructive: secondary weight by default */
-.cd-btn--danger {
-  background: var(--surface-raised);
-  color: var(--danger);
-  border-color: var(--danger);
-}
-.cd-btn--danger:hover:not(:disabled) { background: var(--danger-tint); }
-.cd-btn--danger:active:not(:disabled) { background: var(--danger-tint); box-shadow: var(--press-inset); }
+.cd-btn--danger { background: transparent; color: var(--alarm); border-color: var(--alarm); }
+.cd-btn--danger:hover:not(:disabled) { background: var(--alarm-ground); }
+.cd-btn--danger:active:not(:disabled) { box-shadow: var(--press-inset); }
 
-/* destructive solid: only for irreversible actions */
-.cd-btn--danger-solid { background: var(--danger); color: var(--surface-raised); }
+.cd-btn--danger-solid { background: var(--alarm); color: var(--surface-raised); }
 .cd-btn--danger-solid:hover:not(:disabled) { filter: saturate(1.1) brightness(0.94); }
 .cd-btn--danger-solid:active:not(:disabled) { box-shadow: var(--press-inset); }
 
@@ -182,6 +185,7 @@
 
 .cd-iconbtn {
   --ib-size: var(--control-h);
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -194,22 +198,22 @@
   cursor: pointer;
   transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
-.cd-iconbtn { position: relative; }
-/* Compact means a smaller glyph and tighter type, never a smaller target: the
-   box stays 44px so nothing in the app is under the touch minimum. */
+/* Compact means a smaller glyph, never a smaller target: the box stays 44px
+   so nothing in the app is under the touch minimum. */
 .cd-iconbtn--sm { --ib-size: var(--touch-target); }
 .cd-iconbtn:hover:not(:disabled) { background: var(--hover-tint); color: var(--ink); }
 .cd-iconbtn:active:not(:disabled) { background: var(--active-tint); }
 .cd-iconbtn:disabled { opacity: 0.4; cursor: not-allowed; }
-.cd-iconbtn--primary { background: var(--accent); color: var(--on-accent); }
-.cd-iconbtn--primary:hover:not(:disabled) { background: var(--accent-deep); color: var(--on-accent); }
-.cd-iconbtn--secondary { background: var(--surface-raised); border-color: var(--border-strong); color: var(--ink); }
-.cd-iconbtn--secondary:hover:not(:disabled) { border-color: var(--ink-subtle); background: var(--surface); }
-.cd-iconbtn--danger { color: var(--danger); }
-.cd-iconbtn--danger:hover:not(:disabled) { background: var(--danger-tint); color: var(--danger); }
+.cd-iconbtn--primary { background: var(--ink); color: var(--paper); }
+.cd-iconbtn--primary:hover:not(:disabled) { filter: contrast(0.88); color: var(--paper); }
+.cd-iconbtn--secondary { border-color: var(--rule-strong); color: var(--ink); }
+.cd-iconbtn--secondary:hover:not(:disabled) { border-color: var(--ink-subtle); background: var(--hover-tint); }
+.cd-iconbtn--danger { color: var(--alarm); }
+.cd-iconbtn--danger:hover:not(:disabled) { background: var(--alarm-ground); color: var(--alarm); }
 
 /* --------------------------------------------------------------------------
-   Field: label above, control, helper below, inline validation with a message
+   Field. Label above, control, helper below, inline validation with a message.
+   A focused control is one of the five things allowed to emit.
    -------------------------------------------------------------------------- */
 
 .cd-field { display: flex; flex-direction: column; gap: var(--space-2); }
@@ -226,7 +230,7 @@
   align-items: flex-start;
   gap: var(--space-2);
   font-size: var(--text-caption);
-  color: var(--danger);
+  color: var(--alarm);
   line-height: var(--leading-normal);
 }
 .cd-field__error svg { margin-top: 1px; }
@@ -236,7 +240,7 @@
   min-height: var(--control-h);
   padding: 0 var(--space-4);
   background: var(--surface-raised);
-  border: var(--hairline) solid var(--border-strong);
+  border: var(--hairline) solid var(--rule-strong);
   border-radius: var(--radius-control);
   color: var(--ink);
   font-family: var(--font-sans);
@@ -246,18 +250,20 @@
 }
 .cd-control:hover:not(:disabled):not(:focus) { border-color: var(--ink-subtle); }
 .cd-control:focus-visible {
-  outline: var(--focus-ring-w) solid var(--accent);
+  outline: var(--focus-ring-w) solid var(--signal);
   outline-offset: var(--focus-ring-offset);
-  border-color: var(--accent);
+  border-color: var(--signal);
+  /* The glow is added to the ring, never instead of it. */
+  box-shadow: var(--glow-sm);
 }
 .cd-control:disabled {
   background: var(--surface-sunken);
   color: var(--ink-subtle);
   cursor: not-allowed;
 }
-.cd-control[aria-invalid='true'] { border-color: var(--danger); }
-.cd-control[aria-invalid='true']:focus-visible { outline-color: var(--danger); border-color: var(--danger); }
-.cd-control--mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.cd-control[aria-invalid='true'] { border-color: var(--alarm); }
+.cd-control[aria-invalid='true']:focus-visible { outline-color: var(--alarm); border-color: var(--alarm); box-shadow: none; }
+.cd-control--mono { font-family: var(--font-mono); letter-spacing: var(--tracking-mono); }
 
 .cd-control--textarea {
   min-height: calc(var(--control-h) * 2);
@@ -266,7 +272,6 @@
   resize: vertical;
 }
 
-/* input with a leading or trailing adornment */
 .cd-inputwrap { position: relative; display: flex; align-items: center; }
 .cd-inputwrap__affix {
   position: absolute;
@@ -280,7 +285,6 @@
 .cd-control--pad-start { padding-left: var(--space-10); }
 .cd-control--pad-end { padding-right: var(--space-10); }
 
-/* select: native control, custom chevron */
 .cd-selectwrap { position: relative; display: flex; }
 .cd-selectwrap__chevron {
   position: absolute;
@@ -318,18 +322,18 @@
 .cd-radio {
   position: relative;
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
   margin-top: 2px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: var(--surface-raised);
-  border: 1.5px solid var(--border-strong);
-  color: var(--on-accent);
+  border: 1.5px solid var(--rule-strong);
+  color: var(--paper);
   transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
-.cd-checkbox { border-radius: 6px; }
+.cd-checkbox { border-radius: 4px; }
 .cd-radio { border-radius: var(--radius-pill); }
 
 .cd-choice:hover .cd-checkbox,
@@ -337,16 +341,13 @@
 
 .cd-checkbox.is-checked,
 .cd-checkbox.is-indeterminate,
-.cd-radio.is-checked { background: var(--accent); border-color: var(--accent); }
+.cd-radio.is-checked { background: var(--ink); border-color: var(--ink); }
 
-.cd-choice:hover .cd-checkbox.is-checked,
-.cd-choice:hover .cd-radio.is-checked { background: var(--accent-deep); border-color: var(--accent-deep); }
-
-.cd-radio__dot { width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--on-accent); }
-.cd-checkbox__bar { width: 10px; height: 2px; border-radius: 1px; background: var(--on-accent); }
+.cd-radio__dot { width: 7px; height: 7px; border-radius: var(--radius-pill); background: var(--paper); }
+.cd-checkbox__bar { width: 9px; height: 2px; border-radius: 1px; background: var(--paper); }
 
 .cd-checkbox.is-invalid,
-.cd-radio.is-invalid { border-color: var(--danger); }
+.cd-radio.is-invalid { border-color: var(--alarm); }
 
 .cd-choice__input {
   position: absolute;
@@ -357,41 +358,37 @@
   cursor: inherit;
 }
 .cd-choice__input:focus-visible + .cd-checkbox,
-.cd-choice__input:focus-visible + .cd-radio {
-  outline: var(--focus-ring-w) solid var(--accent);
+.cd-choice__input:focus-visible + .cd-radio,
+.cd-choice__input:focus-visible + .cd-switch {
+  outline: var(--focus-ring-w) solid var(--signal);
   outline-offset: var(--focus-ring-offset);
 }
 .cd-choice__box { position: relative; display: inline-flex; flex-shrink: 0; }
 
-/* Switch */
 .cd-switch {
   position: relative;
   flex-shrink: 0;
-  width: 44px;
-  height: 26px;
+  width: 42px;
+  height: 25px;
   margin-top: 1px;
   border-radius: var(--radius-pill);
-  background: var(--border-strong);
+  background: var(--rule-strong);
   border: var(--hairline) solid transparent;
   transition: background-color var(--dur-fast) var(--ease);
 }
-.cd-switch.is-on { background: var(--accent); }
+.cd-switch.is-on { background: var(--ink); }
 .cd-switch__thumb {
   position: absolute;
   top: 3px;
   left: 3px;
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   border-radius: var(--radius-pill);
   background: var(--surface-raised);
   box-shadow: var(--shadow-sm);
   transition: transform var(--dur-fast) var(--ease);
 }
-.cd-switch.is-on .cd-switch__thumb { transform: translateX(18px); }
-.cd-choice__input:focus-visible + .cd-switch {
-  outline: var(--focus-ring-w) solid var(--accent);
-  outline-offset: var(--focus-ring-offset);
-}
+.cd-switch.is-on .cd-switch__thumb { transform: translateX(17px); }
 
 /* --------------------------------------------------------------------------
    Badge. Status always carries an icon or a word, never colour alone.
@@ -401,28 +398,28 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-pill);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
   border: var(--hairline) solid transparent;
   font-size: var(--text-caption);
   font-weight: var(--weight-medium);
-  line-height: 1.4;
+  line-height: 1.5;
   white-space: nowrap;
 }
-.cd-badge--neutral { background: var(--surface-sunken); color: var(--ink-muted); border-color: var(--border); }
-.cd-badge--accent { background: var(--accent-tint); color: var(--accent-deep); }
-.cd-badge--success { background: var(--success-tint); color: var(--success); }
-.cd-badge--warning { background: var(--warning-tint); color: var(--warning); }
-.cd-badge--danger { background: var(--danger-tint); color: var(--danger); }
-.cd-badge--outline { background: transparent; border-color: var(--border-strong); color: var(--ink-muted); }
-.cd-badge--mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.cd-badge--neutral { background: var(--surface-sunken); color: var(--ink-muted); }
+.cd-badge--signal { background: var(--cool); color: var(--signal); }
+.cd-badge--success { background: var(--held-ground); color: var(--held); }
+.cd-badge--warning { background: var(--warn-ground); color: var(--warn); }
+.cd-badge--danger { background: var(--alarm-ground); color: var(--alarm); }
+.cd-badge--outline { background: transparent; border-color: var(--rule-strong); color: var(--ink-muted); }
+.cd-badge--mono { font-family: var(--font-mono); letter-spacing: var(--tracking-mono); }
 
 /* --------------------------------------------------------------------------
    Tabs
    -------------------------------------------------------------------------- */
 
 .cd-tabs { display: flex; align-items: center; gap: var(--space-1); }
-.cd-tabs--underline { border-bottom: var(--hairline) solid var(--border); gap: var(--space-5); }
+.cd-tabs--underline { border-bottom: var(--hairline) solid var(--rule); gap: var(--space-5); }
 
 .cd-tab {
   position: relative;
@@ -451,17 +448,13 @@
 }
 .cd-tab:hover { color: var(--ink); }
 .cd-tab[aria-selected='true'] { color: var(--ink); }
-.cd-tabs--underline .cd-tab[aria-selected='true']::after { background: var(--accent); }
+.cd-tabs--underline .cd-tab[aria-selected='true']::after { background: var(--ink); }
 .cd-tab:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .cd-tabs--pill { gap: var(--space-1); }
-.cd-tabs--pill .cd-tab {
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-pill);
-  min-height: var(--touch-target);
-}
+.cd-tabs--pill .cd-tab { padding: 0 var(--space-3); border-radius: var(--radius-sm); min-height: var(--touch-target); }
 .cd-tabs--pill .cd-tab:hover { background: var(--hover-tint); }
-.cd-tabs--pill .cd-tab[aria-selected='true'] { background: var(--accent-tint); color: var(--ink); }
+.cd-tabs--pill .cd-tab[aria-selected='true'] { background: var(--surface-sunken); color: var(--ink); }
 
 /* --------------------------------------------------------------------------
    Table. Hairline dividers, no zebra, no vertical rules, mono numerics.
@@ -476,25 +469,24 @@
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
   color: var(--ink-subtle);
-  padding: var(--space-3) var(--space-4);
-  border-bottom: var(--hairline) solid var(--border);
+  padding: var(--space-3) var(--space-4) var(--space-3) 0;
+  border-bottom: var(--hairline) solid var(--rule);
   white-space: nowrap;
 }
 .cd-table td {
-  padding: var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-3) 0;
   color: var(--ink);
-  border-bottom: var(--hairline) solid var(--border);
+  border-bottom: var(--hairline) solid var(--rule);
   vertical-align: middle;
 }
 .cd-table tbody tr:last-child td { border-bottom: none; }
 .cd-table tbody tr { transition: background-color var(--dur-fast) var(--ease); }
 .cd-table tbody tr.is-interactive { cursor: pointer; }
 .cd-table tbody tr.is-interactive:hover { background: var(--hover-tint); }
-.cd-table tbody tr.is-selected { background: var(--accent-tint); }
+.cd-table tbody tr.is-selected { background: var(--surface-sunken); }
 .cd-table .cd-num {
   font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1;
+  letter-spacing: var(--tracking-mono);
   text-align: right;
   white-space: nowrap;
 }
@@ -525,43 +517,40 @@
 .cd-modal {
   position: relative;
   width: 100%;
-  max-width: 32rem;
+  max-width: 30rem;
   background: var(--surface-raised);
-  border: var(--hairline) solid var(--border);
+  border: var(--hairline) solid var(--rule);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-lg);
-  padding: var(--space-8);
+  padding: var(--space-7);
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
   animation: cd-modal-in var(--dur-slow) var(--ease);
 }
-.cd-modal--sm { max-width: 24rem; }
-.cd-modal--lg { max-width: 44rem; }
+.cd-modal--sm { max-width: 23rem; }
+.cd-modal--lg { max-width: 42rem; }
 .cd-modal__title {
   font-family: var(--font-display);
-  font-weight: var(--weight-bold);
+  font-variation-settings: var(--display-opsz-md);
+  font-weight: var(--weight-semibold);
   font-size: var(--text-2xl);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-tight);
   color: var(--ink);
 }
 .cd-modal__desc { font-size: var(--text-base); color: var(--ink-muted); line-height: var(--leading-body); }
-.cd-modal__actions {
-  display: flex;
-  flex-direction: column-reverse;
-  gap: var(--space-2);
-}
+.cd-modal__actions { display: flex; flex-direction: column-reverse; gap: var(--space-2); }
 @media (min-width: 640px) {
   .cd-modal__actions { flex-direction: row; justify-content: flex-end; }
 }
-.cd-modal__close { position: absolute; top: var(--space-4); right: var(--space-4); }
+.cd-modal__close { position: absolute; top: var(--space-3); right: var(--space-3); }
 
 .cd-sheet {
   position: fixed;
   z-index: var(--z-modal);
   background: var(--surface-raised);
-  border: var(--hairline) solid var(--border);
+  border: var(--hairline) solid var(--rule);
   box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
@@ -589,22 +578,22 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
-  padding: var(--space-6);
-  border-bottom: var(--hairline) solid var(--border);
+  padding: var(--space-5);
+  border-bottom: var(--hairline) solid var(--rule);
 }
-.cd-sheet__body { flex: 1; overflow-y: auto; padding: var(--space-6); }
+.cd-sheet__body { flex: 1; overflow-y: auto; padding: var(--space-5); }
 .cd-sheet__footer {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
-  padding: var(--space-6);
-  border-top: var(--hairline) solid var(--border);
+  padding: var(--space-5);
+  border-top: var(--hairline) solid var(--rule);
 }
 .cd-sheet__grip {
-  width: 36px;
+  width: 34px;
   height: 4px;
   border-radius: var(--radius-pill);
-  background: var(--border-strong);
+  background: var(--rule-strong);
   margin: var(--space-3) auto 0;
 }
 
@@ -634,7 +623,7 @@
   gap: var(--space-3);
   padding: var(--space-4) var(--space-4) var(--space-4) var(--space-5);
   background: var(--surface-raised);
-  border: var(--hairline) solid var(--border);
+  border: var(--hairline) solid var(--rule);
   border-radius: var(--radius-control);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
@@ -647,15 +636,15 @@
   top: 0;
   bottom: 0;
   width: 3px;
-  background: var(--accent);
+  background: var(--ink);
 }
-.cd-toast--success::before { background: var(--success); }
-.cd-toast--warning::before { background: var(--warning); }
-.cd-toast--danger::before { background: var(--danger); }
-.cd-toast__icon { flex-shrink: 0; margin-top: 1px; color: var(--accent); }
-.cd-toast--success .cd-toast__icon { color: var(--success); }
-.cd-toast--warning .cd-toast__icon { color: var(--warning); }
-.cd-toast--danger .cd-toast__icon { color: var(--danger); }
+.cd-toast--success::before { background: var(--held); }
+.cd-toast--warning::before { background: var(--warn); }
+.cd-toast--danger::before { background: var(--alarm); }
+.cd-toast__icon { flex-shrink: 0; margin-top: 1px; color: var(--ink-muted); }
+.cd-toast--success .cd-toast__icon { color: var(--held); }
+.cd-toast--warning .cd-toast__icon { color: var(--warn); }
+.cd-toast--danger .cd-toast__icon { color: var(--alarm); }
 .cd-toast__title { font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--ink); }
 .cd-toast__desc { font-size: var(--text-caption); color: var(--ink-muted); line-height: var(--leading-normal); margin-top: var(--space-1); }
 
@@ -671,13 +660,11 @@
   left: 50%;
   transform: translateX(-50%);
   padding: var(--space-2) var(--space-3);
-  background: var(--surface-raised);
-  border: var(--hairline) solid var(--border-strong);
+  background: var(--ink);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
   font-size: var(--text-caption);
   line-height: var(--leading-normal);
-  color: var(--ink);
+  color: var(--paper);
   white-space: nowrap;
   pointer-events: none;
   animation: cd-fade-in var(--dur-fast) var(--ease);
@@ -708,7 +695,7 @@
   width: 6px;
   height: 6px;
   border-radius: var(--radius-pill);
-  background: var(--accent);
+  background: var(--signal);
   animation: cd-dot 1.2s var(--ease) infinite;
 }
 
@@ -719,49 +706,45 @@
 .cd-state {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
+  align-items: flex-start;
+  text-align: left;
   gap: var(--space-3);
-  padding: var(--space-12) var(--space-6);
+  padding: var(--space-10) 0;
+  max-width: 46ch;
 }
 .cd-state__mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-pill);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-control);
   background: var(--surface-sunken);
   color: var(--ink-subtle);
   margin-bottom: var(--space-1);
 }
-.cd-state__mark--danger { background: var(--danger-tint); color: var(--danger); }
+.cd-state__mark--danger { background: var(--alarm-ground); color: var(--alarm); }
 .cd-state__title {
   font-family: var(--font-display);
+  font-variation-settings: var(--display-opsz-md);
   font-size: var(--text-xl);
-  font-weight: var(--weight-bold);
+  font-weight: var(--weight-semibold);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-tight);
   color: var(--ink);
 }
-.cd-state__body {
-  font-size: var(--text-base);
-  color: var(--ink-muted);
-  line-height: var(--leading-body);
-  max-width: 46ch;
-}
-.cd-state__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; justify-content: center; margin-top: var(--space-2); }
+.cd-state__body { font-size: var(--text-base); color: var(--ink-muted); line-height: var(--leading-body); }
+.cd-state__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
 
-/* Inline error, used inside a card that still has usable content */
 .cd-inline-error {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-4);
-  background: var(--danger-tint);
-  border: var(--hairline) solid var(--danger);
-  border-radius: var(--radius-control);
-  color: var(--danger);
+  padding: var(--space-3) var(--space-4);
+  background: var(--alarm-ground);
+  border-left: 3px solid var(--alarm);
+  border-radius: var(--radius-sm);
+  color: var(--alarm);
   font-size: var(--text-sm);
   line-height: var(--leading-normal);
 }
@@ -770,10 +753,10 @@
   align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  background: var(--warning-tint);
-  border: var(--hairline) solid var(--warning);
-  border-radius: var(--radius-control);
-  color: var(--warning);
+  background: var(--warn-ground);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--radius-sm);
+  color: var(--warn);
   font-size: var(--text-caption);
   line-height: var(--leading-normal);
 }
@@ -787,19 +770,18 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-pill);
-  background: var(--accent-tint);
-  color: var(--accent-deep);
-  font-size: var(--text-sm);
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
+  font-size: var(--text-caption);
   font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-snug);
   overflow: hidden;
-  border: var(--hairline) solid var(--border);
 }
-.cd-avatar--sm { width: 28px; height: 28px; font-size: var(--text-caption); }
-.cd-avatar--lg { width: 48px; height: 48px; font-size: var(--text-lg); }
+.cd-avatar--sm { width: 26px; height: 26px; font-size: 10px; }
+.cd-avatar--lg { width: 44px; height: 44px; font-size: var(--text-base); }
 .cd-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
 /* --------------------------------------------------------------------------
@@ -818,28 +800,31 @@
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: var(--text-caption);
-  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-mono);
   color: var(--ink-muted);
   transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 .cd-pagebtn:hover:not(:disabled) { background: var(--hover-tint); color: var(--ink); }
-.cd-pagebtn[aria-current='page'] { background: var(--accent-tint); color: var(--ink); font-weight: var(--weight-medium); }
+.cd-pagebtn[aria-current='page'] { background: var(--surface-sunken); color: var(--ink); font-weight: var(--weight-medium); }
 .cd-pagebtn:disabled { opacity: 0.35; cursor: not-allowed; }
 .cd-pagebtn--gap { color: var(--ink-subtle); pointer-events: none; }
 
 /* --------------------------------------------------------------------------
-   App shell. Gutters, max width and card rhythm are set once here.
+   App shell.
+
+   The nav is chrome, so it never emits. The active item is ink weight and a
+   short rule — no tint, no pill, no mint anywhere near it.
    -------------------------------------------------------------------------- */
 
-.cd-shell { display: flex; min-height: 100dvh; background: var(--bg); }
+.cd-shell { display: flex; min-height: 100dvh; background: var(--paper); }
 
 .cd-sidebar {
   display: none;
   width: var(--shell-sidebar-w);
   flex-shrink: 0;
-  background: var(--bg);
-  border-right: var(--hairline) solid var(--border);
-  padding: var(--space-6) var(--space-3) var(--space-5);
+  background: var(--paper);
+  border-right: var(--hairline) solid var(--rule);
+  padding: var(--space-6) var(--space-4) var(--space-5);
   flex-direction: column;
   position: sticky;
   top: 0;
@@ -849,33 +834,46 @@
 
 .cd-wordmark {
   font-family: var(--font-display);
-  font-size: var(--text-xl);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-tight);
+  font-variation-settings: var(--display-opsz-sm);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-snug);
   color: var(--ink);
-  padding: 0 var(--space-3);
   margin-bottom: var(--space-8);
 }
 
 .cd-navitem {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-height: var(--touch-target);
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-control);
+  min-height: 38px;
+  padding: 0 0 0 var(--space-3);
   font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-normal);
   color: var(--ink-muted);
   width: 100%;
   text-align: left;
-  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease);
 }
-.cd-navitem:hover { background: var(--hover-tint); color: var(--ink); }
-.cd-navitem[aria-current='page'] { background: var(--accent-tint); color: var(--ink); }
-.cd-navitem[aria-current='page'] .cd-navitem__icon { color: var(--accent); }
+.cd-navitem::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 0;
+  background: var(--ink);
+  transition: height var(--dur-fast) var(--ease);
+}
+.cd-navitem:hover { color: var(--ink); text-decoration: none; }
+.cd-navitem[aria-current='page'] { color: var(--ink); font-weight: var(--weight-medium); }
+.cd-navitem[aria-current='page']::before { height: 14px; }
 .cd-navitem__icon { color: var(--ink-subtle); transition: color var(--dur-fast) var(--ease); }
-.cd-navitem:hover .cd-navitem__icon { color: var(--ink-muted); }
+.cd-navitem:hover .cd-navitem__icon,
+.cd-navitem[aria-current='page'] .cd-navitem__icon { color: var(--ink-muted); }
 
 .cd-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
@@ -889,10 +887,9 @@
   gap: var(--shell-card-gap);
 }
 @media (min-width: 768px) {
-  .cd-page { padding: var(--space-10) var(--shell-gutter-lg) var(--space-16); }
+  .cd-page { padding: var(--space-12) var(--shell-gutter-lg) var(--space-16); }
 }
 
-/* Mobile bottom bar, same active state language as the sidebar */
 .cd-mobilenav {
   position: fixed;
   left: 0;
@@ -900,14 +897,15 @@
   bottom: 0;
   z-index: var(--z-sticky);
   height: var(--shell-mobile-nav-h);
-  background: var(--bg);
-  border-top: var(--hairline) solid var(--border);
+  background: var(--paper);
+  border-top: var(--hairline) solid var(--rule);
   display: flex;
   align-items: stretch;
   padding: var(--space-1) var(--space-1) calc(var(--space-1) + env(safe-area-inset-bottom, 0px));
 }
 @media (min-width: 768px) { .cd-mobilenav { display: none; } }
 .cd-mobilenav__item {
+  position: relative;
   flex: 1;
   min-width: 0;
   display: flex;
@@ -915,134 +913,259 @@
   align-items: center;
   justify-content: center;
   gap: 2px;
-  border-radius: var(--radius-control);
-  color: var(--ink-muted);
+  color: var(--ink-subtle);
   font-size: 10px;
   font-weight: var(--weight-medium);
   letter-spacing: var(--tracking-snug);
   padding: var(--space-1);
-  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease);
 }
 .cd-mobilenav__item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cd-mobilenav__item[aria-current='page'] { background: var(--accent-tint); color: var(--ink); }
-.cd-mobilenav__item[aria-current='page'] svg { color: var(--accent); }
-
-/* --------------------------------------------------------------------------
-   Screen level pieces built on the primitives
-   -------------------------------------------------------------------------- */
-
-/* --------------------------------------------------------------------------
-   Today: the day spine, then the habits strip.
-   -------------------------------------------------------------------------- */
-
-.cd-daybar {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-4);
+.cd-mobilenav__item[aria-current='page'] { color: var(--ink); }
+.cd-mobilenav__item[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 16px;
+  height: 2px;
+  background: var(--ink);
 }
-.cd-daybar__title {
-  font-family: var(--font-display);
-  font-weight: var(--weight-bold);
-  font-size: var(--text-3xl);
-  line-height: var(--leading-tight);
-  letter-spacing: var(--tracking-tight);
-  color: var(--ink);
-  margin-top: var(--space-2);
-}
-@media (min-width: 768px) { .cd-daybar__title { font-size: var(--text-4xl); } }
-.cd-daybar__count { display: flex; align-items: baseline; gap: var(--space-2); flex-shrink: 0; }
-.cd-daybar__held {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--text-2xl);
-  color: var(--ink);
-}
-.cd-daybar__of { font-size: var(--text-caption); color: var(--ink-muted); }
 
-/* The spine. Rows sit directly on the page ground rather than inside a card:
-   the day is the page, not a widget on it. */
-.cd-spine { display: flex; flex-direction: column; }
+/* ==========================================================================
+   THE RAIL — the signature.
 
-.cd-spinerow {
-  --block-colour: var(--border-strong);
+   One continuous hairline that is literal time, running the full height of
+   the day. Every block hangs off it. A single bead sits on it at the current
+   minute, and it is the only thing on the screen that emits. The entry the
+   bead touches is the only one drawn at full size; everything above it is
+   receding and everything below is a quiet ruled line.
+
+   On Focus the same rail turns horizontal and becomes the session's progress
+   track. It is the same object, zoomed in.
+   ========================================================================== */
+
+.cd-rail { position: relative; display: flex; flex-direction: column; }
+
+/* The line itself. Continuous, including across the gaps between blocks,
+   because the gaps are part of the day. */
+.cd-rail::before {
+  content: '';
+  position: absolute;
+  left: var(--rail-gutter);
+  top: 0.9rem;
+  bottom: 0.9rem;
+  width: var(--rail-w);
+  background: var(--rule-strong);
+}
+
+/* The time and the tick are absolute because they belong to the rail's fixed
+   x, not to the row's flow. Everything else is a normal flex row, so a title
+   that wraps pushes the row taller instead of running under the marks. */
+.cd-railrow {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: var(--space-4);
   width: 100%;
-  padding: var(--space-4) var(--space-3) var(--space-4) var(--space-4);
-  border-bottom: var(--hairline) solid var(--border);
-  border-left: 3px solid var(--block-colour);
+  padding: var(--space-4) var(--space-2) var(--space-4) calc(var(--rail-gutter) + var(--space-5));
   color: inherit;
   text-decoration: none;
-  transition: background-color var(--dur-fast) var(--ease);
+  transition: background-color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
 }
-.cd-spinerow:hover { background: var(--hover-tint); text-decoration: none; }
-.cd-spinerow:focus-visible { outline: var(--focus-ring-w) solid var(--accent); outline-offset: -2px; }
+.cd-railrow:hover { background: var(--hover-tint); text-decoration: none; }
+.cd-railrow:focus-visible { outline: var(--focus-ring-w) solid var(--signal); outline-offset: -2px; border-radius: var(--radius-sm); }
 
-/* Behind you: still readable, no longer asking for anything. */
-.cd-spinerow.is-past { opacity: 0.55; }
-/* The hour you are in. */
-.cd-spinerow.is-now { background: var(--accent-tint); }
-.cd-spinerow.is-now:hover { background: var(--accent-tint); }
-
-.cd-spinerow__time {
-  width: 3.6rem;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+/* The time, in the gutter to the left of the rail. */
+.cd-railrow__time {
+  position: absolute;
+  left: 0;
+  top: var(--space-4);
+  width: calc(var(--rail-gutter) - var(--space-4));
+  text-align: right;
   font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-mono);
+  color: var(--ink-muted);
+  line-height: 1.5;
 }
-.cd-spinerow__start { font-size: var(--text-sm); color: var(--ink); }
-.cd-spinerow.is-now .cd-spinerow__start { color: var(--accent); font-weight: var(--weight-medium); }
-.cd-spinerow__dur { font-size: var(--text-caption); color: var(--ink-subtle); }
+.cd-railrow__dur {
+  display: block;
+  font-size: var(--text-caption);
+  color: var(--ink-subtle);
+}
 
-.cd-spinerow__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
-.cd-spinerow__title {
+/* The tick where the entry meets the rail. A hollow ring in the project's own
+   colour: a legend on a chart, not decoration. It is never the only way the
+   project is named — the name is always written out underneath. */
+.cd-railrow__tick {
+  --tick-colour: var(--rule-strong);
+  position: absolute;
+  left: var(--rail-gutter);
+  top: calc(var(--space-4) + 0.72em);
+  width: var(--rail-tick);
+  height: var(--rail-tick);
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--tick-colour);
+  background: var(--paper);
+  transform: translate(-50%, -50%);
+}
+
+.cd-railrow__body { flex: 1; display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.cd-railrow__title {
   font-size: var(--text-base);
   font-weight: var(--weight-medium);
   color: var(--ink);
   overflow-wrap: anywhere;
 }
-.cd-spinerow.is-now .cd-spinerow__title,
-.cd-spinerow.is-next .cd-spinerow__title { font-size: var(--text-lg); }
-.cd-spinerow.is-past .cd-spinerow__title { font-weight: var(--weight-normal); }
-.cd-spinerow__meta {
+.cd-railrow__meta {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-2);
   min-width: 0;
   font-size: var(--text-caption);
   color: var(--ink-muted);
 }
-.cd-spinerow__project { flex-shrink: 0; font-weight: var(--weight-medium); }
-.cd-spinerow__marks { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
-.cd-spinerow__go { color: var(--ink-subtle); opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
-.cd-spinerow:hover .cd-spinerow__go,
-.cd-spinerow:focus-visible .cd-spinerow__go { opacity: 1; }
+.cd-railrow__project { flex-shrink: 0; }
+.cd-railrow__marks {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+.cd-railrow__go { color: var(--ink-subtle); opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
+.cd-railrow:hover .cd-railrow__go,
+.cd-railrow:focus-visible .cd-railrow__go { opacity: 1; }
+
+/* Behind you. Still readable, no longer asking for anything. */
+.cd-railrow.is-past { opacity: 0.5; }
+.cd-railrow.is-past .cd-railrow__title { font-weight: var(--weight-normal); }
+
+/* The hour you are in. The single emitter on this screen: a bloom anchored to
+   the rail so the light reads as coming off the line, a wide soft glow, and a
+   thicker signal segment where the rail passes through it. */
+.cd-railrow.is-now {
+  background-image: var(--bloom);
+  box-shadow: var(--glow-sm);
+  border-radius: var(--radius-sm);
+}
+.cd-railrow.is-now::after {
+  content: '';
+  position: absolute;
+  left: var(--rail-gutter);
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  transform: translateX(-50%);
+  background: var(--signal);
+  border-radius: var(--radius-pill);
+}
+.cd-railrow.is-now .cd-railrow__time { color: var(--signal); }
+.cd-railrow.is-now .cd-railrow__title { font-size: var(--text-lg); }
+.cd-railrow.is-now .cd-railrow__tick { display: none; }
+.cd-railrow.is-next .cd-railrow__title { font-size: var(--text-lg); }
+
+/* On a phone the gutter is dead width, so the rail moves in and the times
+   drop a size. The structure is identical; only the measure changes. */
+@media (max-width: 640px) {
+  .cd-rail { --rail-gutter: 3.1rem; }
+  .cd-railrow { padding-right: 0; padding-left: calc(var(--rail-gutter) + var(--space-4)); gap: var(--space-3); }
+  .cd-railrow__time { font-size: var(--text-caption); }
+  .cd-railrow.is-now .cd-railrow__title,
+  .cd-railrow.is-next .cd-railrow__title { font-size: var(--text-base); }
+}
+
+/* The bead: where you actually are, when you are not inside a block. Drawn in
+   --signal so it is legible, lit by --emission so it is the brightest thing
+   on the page. It breathes only while the day is genuinely running. */
+.cd-bead {
+  position: relative;
+  display: block;
+  height: var(--space-8);
+}
+.cd-bead__time {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: calc(var(--rail-gutter) - var(--space-4));
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-mono);
+  color: var(--signal);
+}
+.cd-bead__dot {
+  position: absolute;
+  left: var(--rail-gutter);
+  top: 50%;
+  width: var(--rail-bead);
+  height: var(--rail-bead);
+  border-radius: var(--radius-pill);
+  background: var(--signal);
+  transform: translate(-50%, -50%);
+  box-shadow: var(--glow-md);
+}
 
 /* A word, not a badge: these say when, and when needs no container. */
-.cd-tag {
+.cd-when {
   font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
   font-size: var(--text-caption);
+  letter-spacing: var(--tracking-mono);
   color: var(--ink-muted);
   white-space: nowrap;
 }
-.cd-tag--now { color: var(--accent); font-weight: var(--weight-medium); }
+.cd-when--now { color: var(--signal); font-weight: var(--weight-medium); }
 
-/* The strip. Every habit is one chip; five prayers are one line, not five rows. */
-.cd-strip {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  padding: var(--space-5) 0 0;
-  border-top: var(--hairline) solid var(--border);
+/* --------------------------------------------------------------------------
+   The day header
+   -------------------------------------------------------------------------- */
+
+.cd-daybar { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4); }
+.cd-daybar__title {
+  font-family: var(--font-display);
+  font-variation-settings: var(--display-opsz-lg);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-4xl);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  color: var(--ink);
+  margin-top: var(--space-2);
 }
-.cd-strip__group { display: flex; flex-direction: column; gap: var(--space-2); }
-.cd-strip__label {
+/* What is next, and when. The one fact worth putting in the corner of a day
+   header — never a count of what has been missed. */
+.cd-daybar__next { text-align: right; flex-shrink: 0; }
+.cd-daybar__nextlabel {
+  display: block;
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ink-subtle);
+}
+.cd-daybar__nexttime {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  letter-spacing: var(--tracking-mono);
+  color: var(--ink);
+  margin-top: var(--space-1);
+}
+.cd-daybar__nextin { font-size: var(--text-caption); color: var(--ink-muted); }
+
+/* --------------------------------------------------------------------------
+   The tally.
+
+   Habits are marked off, not tracked. Each is a cell on a baseline rule that
+   gets struck through when it is held — a training log, not a row of pills.
+   Held is past tense, so it never takes the signal colour: nothing on this
+   screen competes with what is happening now.
+   -------------------------------------------------------------------------- */
+
+.cd-tally { display: flex; flex-direction: column; gap: var(--space-6); padding-top: var(--space-6); border-top: var(--hairline) solid var(--rule); }
+.cd-tally__group { display: flex; flex-direction: column; gap: var(--space-1); }
+.cd-tally__label {
   display: flex;
   align-items: baseline;
   gap: var(--space-3);
@@ -1052,33 +1175,41 @@
   text-transform: uppercase;
   color: var(--ink-subtle);
 }
-.cd-strip__count {
+.cd-tally__count {
   font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: var(--tracking-normal);
+  letter-spacing: var(--tracking-mono);
   color: var(--ink-muted);
 }
-.cd-strip__list { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.cd-tally__list { display: flex; flex-wrap: wrap; gap: 0 var(--space-5); }
 
-.cd-chip {
+.cd-tallycell {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 34px;
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-pill);
-  border: var(--hairline) solid var(--border-strong);
-  background: transparent;
+  min-height: var(--touch-target);
+  padding: 0;
   color: var(--ink-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-medium);
-  white-space: nowrap;
-  transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  font-size: var(--text-sm);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
-.cd-chip svg { color: var(--ink-subtle); }
-.cd-chip:hover { border-color: var(--ink-subtle); color: var(--ink); }
-.cd-chip.is-on { background: var(--accent-tint); border-color: transparent; color: var(--ink); }
-.cd-chip.is-on svg { color: var(--accent); }
+.cd-tallycell:hover { color: var(--ink); border-bottom-color: var(--rule-strong); }
+.cd-tallycell__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--rule-strong);
+  border-radius: 3px;
+  color: var(--paper);
+}
+.cd-tallycell.is-held { color: var(--ink-subtle); }
+.cd-tallycell.is-held .cd-tallycell__label { text-decoration: line-through; text-decoration-color: var(--ink-subtle); }
+.cd-tallycell.is-held .cd-tallycell__mark { background: var(--ink-subtle); border-color: var(--ink-subtle); }
 
 /* Habit list in settings: a name, a rename, and a remove if you added it. */
 .cd-habitlines { display: flex; flex-direction: column; }
@@ -1088,87 +1219,28 @@
   gap: var(--space-2);
   min-height: var(--touch-target);
   padding: var(--space-1) 0;
-  border-bottom: var(--hairline) solid var(--border);
+  border-bottom: var(--hairline) solid var(--rule);
 }
 .cd-habitline:last-child { border-bottom: none; }
 
-/* Habit row: a real checkbox plus row level actions */
-.cd-habit {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  padding: 0 var(--space-2) 0 var(--space-4);
-  border: var(--hairline) solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
-}
-.cd-habit:hover { background: var(--hover-tint); }
-.cd-habit.is-done { background: var(--accent-tint); border-color: transparent; }
-.cd-habit__choice { flex: 1; min-width: 0; }
-.cd-habit__choice .cd-choice__text { min-width: 0; }
-.cd-habit__choice .cd-choice__label { overflow-wrap: anywhere; }
-.cd-habit.is-done .cd-choice__label {
-  color: var(--ink-muted);
-  text-decoration: line-through;
-  text-decoration-color: var(--ink-subtle);
-}
-.cd-habit__actions { display: flex; align-items: center; gap: var(--space-1); flex-shrink: 0; }
-
-/* Timetable: the day as blocks from the database.
-   --block-colour is per-project data, not a token, so it is set inline from
-   the record. It is never the only signal: the project name is always written
-   out, and the colour lands on a rule rather than on text, because a colour
-   chosen in the database cannot be guaranteed to clear 4.5:1 on this ground. */
-.cd-blocklist { display: flex; flex-direction: column; }
-
-.cd-blockrow {
-  --block-colour: var(--border-strong);
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--shell-card-pad);
-  border-bottom: var(--hairline) solid var(--border);
-  border-left: 3px solid var(--block-colour);
-}
-.cd-blockrow:last-child { border-bottom: none; }
-.cd-blockrow.is-now { background: var(--accent-tint); }
-
-/* A block row is a link into Focus. The whole row is the target, so it is the
-   <a> itself rather than a row containing one, and it keeps the same box as
-   the non-interactive version so nothing shifts. */
-a.cd-blockrow { text-decoration: none; color: inherit; width: 100%; }
-a.cd-blockrow:hover { background: var(--hover-tint); text-decoration: none; }
-a.cd-blockrow.is-now:hover { background: var(--accent-tint); }
-a.cd-blockrow:focus-visible { outline: var(--focus-ring-w) solid var(--accent); outline-offset: -2px; border-radius: var(--radius-sm); }
-.cd-blockrow__go { color: var(--ink-subtle); opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
-a.cd-blockrow:hover .cd-blockrow__go,
-a.cd-blockrow:focus-visible .cd-blockrow__go { opacity: 1; }
-
-/* --------------------------------------------------------------------------
-   Focus: one block, no shell.
-   -------------------------------------------------------------------------- */
+/* ==========================================================================
+   FOCUS — one block, no shell, no cards.
+   ========================================================================== */
 
 .cd-focus {
   min-height: 100dvh;
-  background: var(--bg);
+  background: var(--paper);
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
-  padding: var(--space-5) var(--shell-gutter) var(--space-16);
-  max-width: 1040px;
+  padding: var(--space-4) var(--shell-gutter) var(--space-16);
+  max-width: 960px;
   margin: 0 auto;
   width: 100%;
 }
-@media (min-width: 768px) { .cd-focus { padding: var(--space-6) var(--shell-gutter-lg) var(--space-20); } }
+@media (min-width: 768px) { .cd-focus { padding: var(--space-5) var(--shell-gutter-lg) var(--space-20); } }
 
-.cd-focus__bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
+.cd-focus__bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 .cd-focus__where { font-size: var(--text-caption); color: var(--ink-muted); text-align: right; }
 
 .cd-backlink {
@@ -1180,25 +1252,60 @@ a.cd-blockrow:focus-visible .cd-blockrow__go { opacity: 1; }
   margin-left: calc(var(--space-2) * -1);
   border-radius: var(--radius-control);
   font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
   color: var(--ink-muted);
   text-decoration: none;
   transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 .cd-backlink:hover { background: var(--hover-tint); color: var(--ink); text-decoration: none; }
 
+/* The rail again, horizontal: the session's own progress track. Unfilled it
+   is a hairline; the filled part is signal, and the head of the fill carries
+   the glow. It only emits while the clock is genuinely running. */
+.cd-sessionrail {
+  position: relative;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--rule-strong);
+}
+.cd-sessionrail__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--progress, 0%);
+  max-width: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--signal);
+  transition: width var(--dur-slow) linear;
+}
+.cd-sessionrail__bead {
+  position: absolute;
+  left: var(--progress, 0%);
+  top: 50%;
+  width: var(--rail-bead);
+  height: var(--rail-bead);
+  border-radius: var(--radius-pill);
+  background: var(--signal);
+  transform: translate(-50%, -50%);
+  transition: left var(--dur-slow) linear;
+}
+.cd-sessionrail.is-running .cd-sessionrail__bead { box-shadow: var(--glow-md); }
+.cd-sessionrail.is-over .cd-sessionrail__fill,
+.cd-sessionrail.is-over .cd-sessionrail__bead { background: var(--warn); }
+.cd-sessionrail.is-over .cd-sessionrail__bead { box-shadow: none; }
+
 .cd-focus__head { display: flex; flex-direction: column; gap: var(--space-3); }
 .cd-focus__when { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .cd-focus__window {
   font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
   font-size: var(--text-sm);
-  color: var(--ink);
+  letter-spacing: var(--tracking-mono);
+  color: var(--ink-muted);
 }
-.cd-focus__length { font-size: var(--text-caption); color: var(--ink-muted); }
 .cd-focus__title {
   font-family: var(--font-display);
-  font-weight: var(--weight-bold);
+  font-variation-settings: var(--display-opsz-lg);
+  font-weight: var(--weight-semibold);
   font-size: var(--text-3xl);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-tight);
@@ -1207,34 +1314,25 @@ a.cd-blockrow:focus-visible .cd-blockrow__go { opacity: 1; }
 }
 @media (min-width: 768px) { .cd-focus__title { font-size: var(--text-4xl); } }
 
-.cd-focus__grid { display: grid; grid-template-columns: 1fr; gap: var(--space-8); align-items: start; }
-@media (min-width: 900px) { .cd-focus__grid { grid-template-columns: minmax(0, 1fr) minmax(0, 22rem); gap: var(--space-10); } }
+.cd-focus__grid { display: grid; grid-template-columns: 1fr; gap: var(--space-10); align-items: start; }
+@media (min-width: 900px) { .cd-focus__grid { grid-template-columns: minmax(0, 1fr) minmax(0, 20rem); gap: var(--space-12); } }
 .cd-focus__col { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
-
-.cd-eyebrow {
-  font-size: var(--text-eyebrow);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-eyebrow);
-  text-transform: uppercase;
-  color: var(--ink-subtle);
-  line-height: 1.2;
-}
 
 .cd-objective { display: flex; flex-direction: column; gap: var(--space-3); }
 .cd-objective__line {
   font-family: var(--font-display);
+  font-variation-settings: var(--display-opsz-md);
   font-size: var(--text-2xl);
   line-height: var(--leading-snug);
   letter-spacing: var(--tracking-snug);
   color: var(--ink);
   text-wrap: pretty;
 }
-
 .cd-objective__ask { font-size: var(--text-base); color: var(--ink-muted); }
 
-/* Three objectives, already written. Each is one target the whole width of the
-   column, because the choice is between them and nothing else. */
-.cd-proposals { display: flex; flex-direction: column; gap: var(--space-2); }
+/* Three objectives, already written. Each is one target the whole width of
+   the column, because the choice is between them and nothing else. */
+.cd-proposals { display: flex; flex-direction: column; }
 .cd-proposal {
   display: flex;
   align-items: center;
@@ -1242,17 +1340,17 @@ a.cd-blockrow:focus-visible .cd-blockrow__go { opacity: 1; }
   gap: var(--space-4);
   width: 100%;
   min-height: var(--touch-target);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-2) var(--space-3) 0;
   text-align: left;
-  background: var(--surface);
-  border: var(--hairline) solid var(--border-strong);
-  border-radius: var(--radius-control);
+  background: none;
+  border: none;
+  border-bottom: var(--hairline) solid var(--rule);
   color: var(--ink);
   font-size: var(--text-base);
   line-height: var(--leading-normal);
-  transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  transition: background-color var(--dur-fast) var(--ease), padding-left var(--dur-fast) var(--ease);
 }
-.cd-proposal:hover:not(:disabled) { background: var(--surface-raised); border-color: var(--ink-subtle); }
+.cd-proposal:hover:not(:disabled) { background: var(--hover-tint); padding-left: var(--space-3); }
 .cd-proposal:disabled { opacity: 0.5; cursor: progress; }
 .cd-proposal__text { min-width: 0; }
 .cd-proposal svg { color: var(--ink-subtle); flex-shrink: 0; }
@@ -1263,9 +1361,12 @@ a.cd-blockrow:focus-visible .cd-blockrow__go { opacity: 1; }
   color: var(--ink-muted);
   text-decoration: underline;
   text-underline-offset: 3px;
+  text-decoration-color: var(--rule-strong);
   padding: var(--space-1) 0;
+  background: none;
+  border: none;
 }
-.cd-textlink:hover { color: var(--ink); }
+.cd-textlink:hover { color: var(--ink); text-decoration-color: currentColor; }
 
 .cd-plan { display: flex; flex-direction: column; gap: var(--space-3); }
 .cd-plan__list { display: flex; flex-direction: column; }
@@ -1274,156 +1375,120 @@ a.cd-blockrow:focus-visible .cd-blockrow__go { opacity: 1; }
   align-items: baseline;
   gap: var(--space-4);
   padding: var(--space-3) 0;
-  border-bottom: var(--hairline) solid var(--border);
+  border-bottom: var(--hairline) solid var(--rule);
 }
 .cd-plan__stage:last-child { border-bottom: none; }
 .cd-plan__time {
   font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
   font-size: var(--text-sm);
+  letter-spacing: var(--tracking-mono);
   color: var(--ink-muted);
-  width: 3.5rem;
+  width: 3.4rem;
   flex-shrink: 0;
 }
 .cd-plan__label { flex: 1; min-width: 0; font-size: var(--text-base); color: var(--ink); }
 .cd-plan__mins {
   font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
   font-size: var(--text-caption);
+  letter-spacing: var(--tracking-mono);
   color: var(--ink-subtle);
   flex-shrink: 0;
 }
 
-.cd-clock {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-6);
-  background: var(--surface);
-  border: var(--hairline) solid var(--border);
-  border-radius: var(--radius-card);
-}
+/* The clock. Set on the paper, not in a card: a big numeral, what it is
+   against, and the verbs. One filled control, the rest are words. */
+.cd-clock { display: flex; flex-direction: column; gap: var(--space-2); }
 .cd-clock__value {
   font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1;
   font-size: var(--text-display);
+  font-weight: var(--weight-normal);
   line-height: 1;
   letter-spacing: var(--tracking-tight);
   color: var(--ink);
   margin-top: var(--space-1);
 }
-.cd-clock__value.is-running { color: var(--accent); }
+.cd-clock__value.is-running { color: var(--signal); }
 .cd-clock__against { font-size: var(--text-caption); color: var(--ink-muted); }
 .cd-clock__actions { display: flex; gap: var(--space-2); margin-top: var(--space-4); flex-wrap: wrap; }
 
 .cd-pane { display: flex; flex-direction: column; gap: var(--space-3); }
 .cd-pane--grow { flex: 1; }
-.cd-savemark {
-  font-size: var(--text-caption);
-  color: var(--ink-subtle);
-  min-height: 1.2em;
-}
-.cd-savemark--error { display: flex; align-items: center; gap: var(--space-2); color: var(--danger); }
+.cd-savemark { font-size: var(--text-caption); color: var(--ink-subtle); min-height: 1.2em; }
+.cd-savemark--error { display: flex; align-items: center; gap: var(--space-2); color: var(--alarm); }
 
-.cd-blockrow__time {
-  width: 58px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-}
-.cd-blockrow__start { font-size: var(--text-sm); color: var(--ink); }
-.cd-blockrow__dur { font-size: var(--text-caption); color: var(--ink-subtle); }
+/* ==========================================================================
+   Remaining screen pieces
+   ========================================================================== */
 
-.cd-blockrow__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
-.cd-blockrow__title {
-  font-size: var(--text-base);
-  font-weight: var(--weight-medium);
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-.cd-blockrow__meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  font-size: var(--text-caption);
-  color: var(--ink-muted);
-}
-.cd-blockrow__project { flex-shrink: 0; font-weight: var(--weight-medium); }
-.cd-blockrow__marks { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
-
-.cd-nowmark { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--shell-card-pad); }
+/* Timetable rows. Same rail language, without the bead: another day has no
+   "now" on it. */
+.cd-nowmark { position: relative; display: block; height: var(--space-6); }
 .cd-nowmark__time {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: calc(var(--rail-gutter) - var(--space-4));
+  text-align: right;
   font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
   font-size: var(--text-caption);
-  font-weight: var(--weight-medium);
-  color: var(--accent);
+  letter-spacing: var(--tracking-mono);
+  color: var(--signal);
 }
-.cd-nowmark__rule { flex: 1; height: 2px; border-radius: var(--radius-pill); background: var(--accent); }
 
 /* Chat */
 .cd-bubble {
-  max-width: 46rem;
+  max-width: 44rem;
   padding: var(--space-3) var(--space-4);
   font-size: var(--text-base);
   line-height: var(--leading-body);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  border-radius: var(--radius-card);
 }
-.cd-bubble--user {
-  background: var(--accent);
-  color: var(--on-accent);
-  border-radius: var(--radius-card) var(--radius-card) var(--radius-sm) var(--radius-card);
-}
+.cd-bubble--user { background: var(--ink); color: var(--paper); border-bottom-right-radius: var(--radius-sm); }
 .cd-bubble--agent {
   background: var(--surface);
   color: var(--ink);
-  border: var(--hairline) solid var(--border);
-  box-shadow: var(--shadow-sm);
-  border-radius: var(--radius-card) var(--radius-card) var(--radius-card) var(--radius-sm);
+  border: var(--hairline) solid var(--rule);
+  border-bottom-left-radius: var(--radius-sm);
 }
 
-/* Status indicator, not decoration: a hairline ring with a dot that takes the
-   accent and pulses only while a request is in flight. The accent is never a
-   background wash, so the old filled blob is gone. */
+/* Jarvis thinking. One of the five things allowed to emit, and only while a
+   request is genuinely in flight. */
 .cd-orb {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 30px;
   border-radius: var(--radius-pill);
-  border: 2px solid var(--border-strong);
-  transition: border-color var(--dur-slow) var(--ease);
+  border: var(--hairline) solid var(--rule-strong);
+  transition: border-color var(--dur-slow) var(--ease), box-shadow var(--dur-slow) var(--ease);
 }
 .cd-orb::after {
   content: '';
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: var(--radius-pill);
   background: var(--ink-subtle);
   transition: background-color var(--dur-slow) var(--ease);
 }
-.cd-orb.is-active { border-color: var(--accent); }
-.cd-orb.is-active::after { background: var(--accent); animation: cd-orb 1.6s var(--ease) infinite; }
+.cd-orb.is-active { border-color: transparent; box-shadow: var(--glow-md); }
+.cd-orb.is-active::after { background: var(--signal); }
 
 .cd-composer {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-5);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
   background: var(--surface-raised);
-  border: var(--hairline) solid var(--border-strong);
-  border-radius: var(--radius-pill);
+  border: var(--hairline) solid var(--rule-strong);
+  border-radius: var(--radius-control);
   transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
-.cd-composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
+.cd-composer:focus-within { border-color: var(--signal); box-shadow: var(--glow-sm); }
 .cd-composer input { flex: 1; min-width: 0; min-height: var(--control-h); background: transparent; font-size: var(--text-base); }
 
 /* Note card */
@@ -1431,16 +1496,15 @@ a.cd-blockrow:focus-visible .cd-blockrow__go { opacity: 1; }
   break-inside: avoid;
   width: 100%;
   margin-bottom: var(--space-4);
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-4);
   background: var(--surface);
-  border: var(--hairline) solid var(--border);
-  border-radius: var(--radius-control);
-  box-shadow: var(--shadow-sm);
+  border: var(--hairline) solid var(--rule);
+  border-radius: var(--radius-card);
   text-align: left;
-  transition: box-shadow var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
 }
-.cd-note:hover { box-shadow: var(--shadow-md); border-color: var(--border-strong); }
-.cd-note.is-open { border-color: var(--accent); background: var(--accent-tint); }
+.cd-note:hover { border-color: var(--rule-strong); }
+.cd-note.is-open { border-color: var(--ink-subtle); background: var(--surface-raised); }
 .cd-notegrid { columns: 1; column-gap: var(--space-4); }
 @media (min-width: 768px) { .cd-notegrid { columns: 2; } }
 @media (min-width: 1280px) { .cd-notegrid--wide { columns: 3; } }
@@ -1450,34 +1514,63 @@ a.cd-blockrow:focus-visible .cd-blockrow__go { opacity: 1; }
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-4);
-  border: var(--hairline) solid var(--border-strong);
-  border-radius: var(--radius-control);
-  background: var(--surface);
+  padding: var(--space-3);
+  border: var(--hairline) solid var(--rule-strong);
+  border-radius: var(--radius-card);
+  background: transparent;
   text-align: left;
   cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+  transition: border-color var(--dur-fast) var(--ease);
 }
-.cd-themecard:hover { border-color: var(--ink-subtle); box-shadow: var(--shadow-md); }
-.cd-themecard[aria-pressed='true'] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
+.cd-themecard:hover { border-color: var(--ink-subtle); }
+.cd-themecard[aria-pressed='true'] { border-color: var(--ink); }
 .cd-themecard__preview {
   border-radius: var(--radius-sm);
-  border: var(--hairline) solid var(--border);
+  border: var(--hairline) solid var(--rule);
   padding: var(--space-3);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   overflow: hidden;
 }
-.cd-themecard__chip { height: 8px; border-radius: var(--radius-pill); }
+.cd-themecard__chip { height: 7px; border-radius: var(--radius-pill); }
 
 /* Progress ring track and fill */
-.cd-ring__track { stroke: var(--border-strong); }
-.cd-ring__fill { stroke: var(--accent); transition: stroke-dasharray var(--dur-slow) var(--ease); }
-.cd-ring__fill--done { stroke: var(--success); }
+.cd-ring__track { stroke: var(--rule-strong); }
+.cd-ring__fill { stroke: var(--ink); transition: stroke-dasharray var(--dur-slow) var(--ease); }
+.cd-ring__fill--done { stroke: var(--held); }
 
 /* Chart */
-.cd-chart__axis { stroke: var(--border-strong); }
-.cd-chart__grid { stroke: var(--border); }
-.cd-chart__series { fill: var(--accent); }
+.cd-chart__axis { stroke: var(--rule-strong); }
+.cd-chart__grid { stroke: var(--rule); }
+.cd-chart__series { fill: var(--ink-muted); }
 .cd-chart__label { fill: var(--ink-subtle); font-family: var(--font-mono); font-size: 10px; }
+
+/* ==========================================================================
+   THE MOTION MOMENT
+
+   Opening a block into Focus. The row's box becomes Focus's header rather
+   than a new screen fading in over the day, and the vertical rail unrolls
+   into the horizontal session rail. One orchestrated moment; everything else
+   in the app moves at 140ms or not at all.
+
+   Browsers without view transitions simply navigate, which is the correct
+   fallback: the feature is the polish, never the function.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(block-title),
+  ::view-transition-new(block-title) {
+    animation-duration: var(--dur-open);
+    animation-timing-function: var(--ease-open);
+  }
+  ::view-transition-group(block-title) {
+    animation-duration: var(--dur-open);
+    animation-timing-function: var(--ease-open);
+  }
+  ::view-transition-old(root) { animation: cd-fade-in var(--dur-base) var(--ease) reverse; }
+  ::view-transition-new(root) { animation: cd-fade-in var(--dur-base) var(--ease); }
+
+  .cd-sessionrail { transform-origin: left center; }
+  .cd-focus .cd-sessionrail { animation: cd-rail-unroll var(--dur-open) var(--ease-open); }
+}
