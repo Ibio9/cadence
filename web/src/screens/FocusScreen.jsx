@@ -21,9 +21,11 @@ import {
   ErrorState,
   Input,
   Skeleton,
+  Spinner,
   Textarea,
   useToast,
 } from '../components/ui';
+import { proposeObjectives } from '../lib/proposals';
 import { formatDayLabel } from '../lib/useDay';
 import { isRunning, sessionPlan, useAutosave, useBlock, useElapsed } from '../lib/session';
 
@@ -134,25 +136,56 @@ function Clock({ block, onAct, busy }) {
   );
 }
 
-/** The one concrete line this hour is for. */
-function Objective({ block, onSave }) {
+/**
+ * The one concrete line this hour is for.
+ *
+ * Three states, and the empty one is the interesting one: rather than an
+ * blank field, it offers three objectives already written from this block's
+ * own title and project. Picking one is a click; writing your own is still
+ * one click away. Deciding what the hour is for should not itself cost ten
+ * minutes of the hour.
+ */
+function Objective({ block, project, onSave }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(block.objective);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState('');
 
-  const commit = async () => {
-    const next = draft.trim();
+  const commit = async (value) => {
+    const next = (value ?? draft).trim();
     if (!next) return;
-    setSaving(true);
+    setSaving(next);
     try {
       await onSave(next);
       setEditing(false);
     } finally {
-      setSaving(false);
+      setSaving('');
     }
   };
 
-  if (!block.objective || editing) {
+  if (block.objective && !editing) {
+    return (
+      <section className="cd-objective" aria-labelledby="objective-heading">
+        <h2 id="objective-heading" className="cd-eyebrow">
+          Objective
+        </h2>
+        <p className="cd-objective__line">{block.objective}</p>
+        <button
+          type="button"
+          className="cd-textlink"
+          onClick={() => {
+            setDraft(block.objective);
+            setEditing(true);
+          }}
+        >
+          Change it
+        </button>
+      </section>
+    );
+  }
+
+  // Writing one out: either the field was asked for, or an objective already
+  // exists and is being changed.
+  if (editing) {
     return (
       <section className="cd-objective" aria-labelledby="objective-heading">
         <h2 id="objective-heading" className="cd-eyebrow">
@@ -161,8 +194,8 @@ function Objective({ block, onSave }) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <Input
             label="What this hour is for"
-            placeholder="Finish the 2019 paper, section B"
             autoFocus
+            placeholder="Finish the 2019 paper, section B"
             wrapperClassName="flex-1"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -174,29 +207,52 @@ function Objective({ block, onSave }) {
               }
             }}
           />
-          <Button loading={saving} disabled={!draft.trim()} onClick={commit}>
+          <Button loading={Boolean(saving)} disabled={!draft.trim()} onClick={() => commit()}>
             Set
           </Button>
         </div>
+        {block.objective ? (
+          <button type="button" className="cd-textlink" onClick={() => setEditing(false)}>
+            Keep the one I had
+          </button>
+        ) : null}
       </section>
     );
   }
+
+  const proposals = proposeObjectives(block, project);
 
   return (
     <section className="cd-objective" aria-labelledby="objective-heading">
       <h2 id="objective-heading" className="cd-eyebrow">
         Objective
       </h2>
-      <p className="cd-objective__line">{block.objective}</p>
+      <p className="cd-objective__ask">Pick what this hour is for.</p>
+      <ul className="cd-proposals list-none">
+        {proposals.map((text) => (
+          <li key={text}>
+            <button
+              type="button"
+              className="cd-proposal"
+              disabled={Boolean(saving)}
+              aria-busy={saving === text || undefined}
+              onClick={() => commit(text)}
+            >
+              <span className="cd-proposal__text">{text}</span>
+              {saving === text ? <Spinner size="sm" label="Setting" /> : <Icon name="arrowRight" size={16} />}
+            </button>
+          </li>
+        ))}
+      </ul>
       <button
         type="button"
         className="cd-textlink"
         onClick={() => {
-          setDraft(block.objective);
+          setDraft('');
           setEditing(true);
         }}
       >
-        Change it
+        Write my own
       </button>
     </section>
   );
@@ -311,7 +367,7 @@ export function FocusScreen({ id }) {
 
       <div className="cd-focus__grid">
         <div className="cd-focus__col">
-          <Objective block={block} onSave={(objective) => patch({ objective })} />
+          <Objective block={block} project={block.project} onSave={(objective) => patch({ objective })} />
           <Plan block={block} />
         </div>
 

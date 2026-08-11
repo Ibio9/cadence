@@ -1069,6 +1069,33 @@ a.cd-blockrow:focus-visible .cd-blockrow__go { opacity: 1; }
   text-wrap: pretty;
 }
 
+.cd-objective__ask { font-size: var(--text-base); color: var(--ink-muted); }
+
+/* Three objectives, already written. Each is one target the whole width of the
+   column, because the choice is between them and nothing else. */
+.cd-proposals { display: flex; flex-direction: column; gap: var(--space-2); }
+.cd-proposal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  background: var(--surface);
+  border: var(--hairline) solid var(--border-strong);
+  border-radius: var(--radius-control);
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.cd-proposal:hover:not(:disabled) { background: var(--surface-raised); border-color: var(--ink-subtle); }
+.cd-proposal:disabled { opacity: 0.5; cursor: progress; }
+.cd-proposal__text { min-width: 0; }
+.cd-proposal svg { color: var(--ink-subtle); flex-shrink: 0; }
+
 .cd-textlink {
   align-self: flex-start;
   font-size: var(--text-caption);
