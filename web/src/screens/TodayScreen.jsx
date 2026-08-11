@@ -83,12 +83,7 @@ function RailRow({ block, project, state, nowMin }) {
           <span className="cd-railrow__dur">{fmtDur(block.endMin - block.startMin)}</span>
         </span>
 
-        {/* The project's own colour, on the rail, as a hollow tick. It is never
-            the only signal: the project is written out below it. */}
-        <span
-          className="cd-railrow__tick"
-          style={project?.color ? { '--tick-colour': project.color } : undefined}
-        />
+        <span className="cd-railrow__tick" />
 
         <span className="cd-railrow__body">
           <span className="cd-railrow__title">{block.title}</span>
@@ -224,14 +219,16 @@ export function TodayScreen() {
           <h1 className="cd-daybar__title">Today</h1>
         </div>
 
-        {/* What is next, and when. Nothing about what has already been missed:
+        {/* When the next block is. Nothing about what has already been missed:
             at 21:00 a score of the day is the last thing that helps. When a
-            block is already running, the lit row says it and this stays out. */}
+            block is already running, the lit row says it and this stays out.
+
+            The countdown lives on the row rather than here, so the two say
+            different things: this is when it is, that is how long you have. */}
         {next ? (
           <p className="cd-daybar__next">
             <span className="cd-daybar__nextlabel">Next</span>
             <span className="cd-daybar__nexttime">{hhmm(next.startMin)}</span>
-            <span className="cd-daybar__nextin">{untilLabel(next.startMin - nowMin)}</span>
           </p>
         ) : null}
       </header>

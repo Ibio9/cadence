@@ -995,18 +995,23 @@
   color: var(--ink-subtle);
 }
 
-/* The tick where the entry meets the rail. A hollow ring in the project's own
-   colour: a legend on a chart, not decoration. It is never the only way the
-   project is named — the name is always written out underneath. */
+/* The tick where the entry meets the rail: structural, marking that this
+   entry is pinned at this minute.
+
+   It used to carry the project's colour as a hollow ring. That is gone. Seven
+   hues at 5px, forty pixels apart, never actually read as categories at a
+   glance — and every row already names its project in words directly
+   underneath. It was decoration wearing a data costume on a screen whose
+   whole argument is that one thing is lit. The rail is one line, one bead,
+   one lit row. */
 .cd-railrow__tick {
-  --tick-colour: var(--rule-strong);
   position: absolute;
   left: var(--rail-gutter);
   top: calc(var(--space-4) + 0.72em);
   width: var(--rail-tick);
   height: var(--rail-tick);
   border-radius: var(--radius-pill);
-  border: 1.5px solid var(--tick-colour);
+  border: 1.5px solid var(--rule-strong);
   background: var(--paper);
   transform: translate(-50%, -50%);
 }
@@ -1064,7 +1069,16 @@
 .cd-railrow.is-now .cd-railrow__time { color: var(--signal); }
 .cd-railrow.is-now .cd-railrow__title { font-size: var(--text-lg); }
 .cd-railrow.is-now .cd-railrow__tick { display: none; }
+/* The one ahead, when nothing is running. The secondary emitter, at about a
+   third of the strength: the glow without the bloom and without the signal
+   segment, and a filled tick instead of a hollow one. Only one of is-now and
+   is-next ever exists on a day, so this never doubles up. */
+.cd-railrow.is-next {
+  box-shadow: var(--glow-sm);
+  border-radius: var(--radius-sm);
+}
 .cd-railrow.is-next .cd-railrow__title { font-size: var(--text-lg); }
+.cd-railrow.is-next .cd-railrow__tick { background: var(--signal); border-color: var(--signal); }
 
 /* On a phone the gutter is dead width, so the rail moves in and the times
    drop a size. The structure is identical; only the measure changes. */

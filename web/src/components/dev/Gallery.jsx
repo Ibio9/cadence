@@ -70,26 +70,25 @@ const SWATCHES = [
   { token: '--alarm', does: 'The ink that means something needs you' },
 ];
 
-/* A day, on the rail: behind you, the hour you are in, and what is ahead.
-   Project colours are database values, so they are literals here too. */
+/* A day, on the rail: behind you, the hour you are in, and what is ahead. */
 const RAIL_ROWS = [
   {
-    time: '10:30', dur: '1h', state: 'past', colour: '#A83A32', mark: 'Held',
+    time: '10:30', dur: '1h', state: 'past', mark: 'Held',
     title: 'TARA — Section A under time', project: 'TARA',
     objective: 'Do one section under the clock and mark it.',
   },
   {
-    time: '14:00', dur: '1.5h', state: 'now', colour: '#B8842B', mark: 'Now',
+    time: '14:00', dur: '1.5h', state: 'now', mark: 'Now',
     title: 'Economics — Market failure essay', project: 'Economics',
     objective: 'Write one evaluation paragraph and stop.',
   },
   {
-    time: '16:00', dur: '1h', state: 'next', colour: '#9C5A46', mark: 'in 53m', bead: true,
+    time: '16:00', dur: '1h', state: 'next', mark: 'in 53m', bead: true,
     title: 'Philosophy — Uncommon Knowledge', project: 'Philosophy',
     objective: 'No objective yet',
   },
   {
-    time: '18:00', dur: '1h', state: 'later', colour: '#3E7D8C', mark: null,
+    time: '18:00', dur: '1h', state: 'later', mark: null,
     title: 'BJJ No-Gi', project: 'Training',
     objective: 'Go at the thing that beat you last session.',
   },
@@ -198,7 +197,7 @@ export function Gallery({ themeId, label }) {
                     {r.time}
                     <span className="cd-railrow__dur">{r.dur}</span>
                   </span>
-                  <span className="cd-railrow__tick" style={{ '--tick-colour': r.colour }} />
+                  <span className="cd-railrow__tick" />
                   <span className="cd-railrow__body">
                     <span className="cd-railrow__title">{r.title}</span>
                     <span className="cd-railrow__meta">

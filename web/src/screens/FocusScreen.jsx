@@ -15,7 +15,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fmtClock, fmtDur, hhmm } from '../../lib/api';
+import { fmtClock, fmtDur, fmtMins, hhmm } from '../../lib/api';
 import Icon from '../components/Icon';
 import {
   Badge,
@@ -301,7 +301,7 @@ function Plan({ block }) {
           <li key={stage.label} className="cd-plan__stage">
             <span className="cd-plan__time">{hhmm(stage.from)}</span>
             <span className="cd-plan__label">{stage.label}</span>
-            <span className="cd-plan__mins">{fmtDur(stage.mins)}</span>
+            <span className="cd-plan__mins">{fmtMins(stage.mins)}</span>
           </li>
         ))}
       </ol>

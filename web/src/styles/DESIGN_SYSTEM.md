@@ -160,10 +160,9 @@ rows, the only way to light the current block is to glow a box, which is
 chrome. And it carries: on Focus the same rail turns horizontal and becomes the
 session's own progress track. Same object, zoomed in.
 
-Project colour appears as a small **hollow ring on the rail** at the entry's
-tick — a legend on a chart, not decoration. It is never the only signal: the
-project name is always written out underneath, because a colour chosen in the
-database cannot be guaranteed to clear contrast on this ground.
+The tick where each entry meets the rail is structural: it marks that this
+entry is pinned at this minute. It carries no colour. See
+[the one taken away](#the-one-taken-away).
 
 ---
 
@@ -212,10 +211,18 @@ light touches a fill.
   strength. Everything else zero.
 - **Total glowing surface under ~10% of the viewport.** When in doubt, remove
   one.
-- Today: primary is the current row (bloom + `--glow-sm`) and its bead
-  (`--glow-md`). There is no secondary.
-- Focus: primary is the session rail bead while running; secondary is the
-  focused input (`--glow-sm`).
+- Today, mid-block: primary is the row you are in — bloom, `--glow-sm`, and a
+  3px `--signal` segment where the rail passes through it. No secondary.
+- Today, between blocks: primary is the bead on the rail (`--glow-md`);
+  secondary is the row that is next, at about a third of the strength —
+  `--glow-sm`, no bloom, no segment, and a filled tick rather than a hollow
+  one. Only one of *now* and *next* ever exists on a day, so these never
+  double up.
+- Focus: primary is the session rail bead while the clock runs; secondary is
+  the focused input (`--glow-sm`). Before the clock starts, neither of those is
+  lit and the Start button is the only emitter on the screen — which is the
+  correct handoff, because starting is the entire job of the screen at that
+  moment.
 
 ### It is enforced by absence
 
@@ -316,8 +323,7 @@ Written down because the reasons matter more than the result.
   Pomodoro app. The card is gone; the elapsed numeral sits on the paper with
   the rail above it as its track, one filled verb, the rest plain words.
 - **A 3px project-coloured left border on every row.** The Google Calendar
-  convention, and a second vertical line fights the rail. Now a hollow ring on
-  the rail itself.
+  convention, and a second vertical line fights the rail.
 - **Cards on Today and Focus.** On a paper substrate, wrapping everything in a
   shadowed rounded box is a reflex. Cards survive only where something
   genuinely floats: modals, sheets, toasts, and the panels on Settings.
@@ -328,3 +334,21 @@ Written down because the reasons matter more than the result.
 - **The italic display accent line.** A magazine device that had drifted onto
   every screen, saying something decorative in a place that should carry a
   fact. Supporting lines are body type now, or absent.
+
+### The one taken away
+
+Last, after everything else was built and looked right: **project colour on
+the rail.**
+
+It had survived the first critique by being demoted — a 3px coloured left
+border became a 5px hollow ring on the rail, which felt like a fix. It was the
+same idea in a smaller package. Seven hues at 5px, forty pixels apart, never
+actually read as categories at a glance, which was the only argument for
+having them. And every row already names its project in words, directly
+underneath the title.
+
+So it was decoration wearing a data costume, on a screen whose entire argument
+is that exactly one thing is lit. The rail is one line, one bead, one lit row.
+
+`Project.color` stays in the database. It is data, and a future view may want
+it; it is simply not on this screen.

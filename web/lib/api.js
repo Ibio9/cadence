@@ -25,7 +25,20 @@ export const api = {
 
 export const hhmm = (m) => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
 export const parseT = (s) => { const [h, m] = String(s || '0:0').split(':'); return (+h) * 60 + (+(m || 0)); };
-export const fmtDur = (m) => (m >= 60 ? (m / 60).toFixed(m % 60 ? 1 : 0).replace('.0', '') + 'h' : m + 'm');
+/**
+ * A length of time, written the way you would say it. Never a decimal hour:
+ * "1h 15m" is what 75 minutes is, and "1.3h" is only what a calculator says.
+ */
+export const fmtDur = (m) => {
+  const mins = Math.max(0, Math.round(m));
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const r = mins % 60;
+  return r ? `${h}h ${r}m` : `${h}h`;
+};
+
+/** Inside an hour, minutes are the unit. Used for the stages of a session. */
+export const fmtMins = (m) => `${Math.max(0, Math.round(m))}m`;
 
 /** Elapsed seconds as a clock. Under an hour it stays mm:ss so the seconds
  *  are the big number; past an hour it grows a place rather than rounding. */

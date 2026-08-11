@@ -60,10 +60,7 @@ function BlockRow({ block, project, isNow }) {
           <span className="cd-railrow__dur">{fmtDur(block.endMin - block.startMin)}</span>
         </span>
 
-        <span
-          className="cd-railrow__tick"
-          style={project?.color ? { '--tick-colour': project.color } : undefined}
-        />
+        <span className="cd-railrow__tick" />
 
         <span className="cd-railrow__body">
           <span className="cd-railrow__title">{block.title}</span>
