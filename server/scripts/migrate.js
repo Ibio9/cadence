@@ -49,6 +49,10 @@ const MIGRATIONS = join(ROOT, 'prisma', 'migrations');
 // The CLI is run as a script on this same node binary rather than through npx:
 // no shell, no PATH lookup, no npm download path, and it behaves the same on
 // the deploy host as it does on a laptop.
+//
+// This is also why `prisma` is a dependency rather than a devDependency. It is
+// needed at boot, not only at build, and a host that prunes dev dependencies
+// for production would otherwise leave the server unable to migrate.
 const PRISMA_CLI = createRequire(import.meta.url).resolve('prisma/build/index.js');
 
 const prisma = new PrismaClient();
