@@ -48,6 +48,9 @@ const PATHS = {
 
   // actions
   check: <path d="M4.5 12.5l5 5 10-11" />,
+  play: <path d="M7 4.8v14.4a1 1 0 0 0 1.53.85l11.2-7.2a1 1 0 0 0 0-1.7L8.53 3.95A1 1 0 0 0 7 4.8z" />,
+  pause: <path d="M9 4.5v15M15 4.5v15" />,
+  arrowLeft: <path d="M20 12H4M10 6l-6 6 6 6" />,
   plus: <path d="M12 5v14M5 12h14" />,
   minus: <path d="M5 12h14" />,
   close: <path d="M6 6l12 12M18 6L6 18" />,

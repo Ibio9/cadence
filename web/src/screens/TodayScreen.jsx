@@ -29,7 +29,8 @@ import {
   Skeleton,
   useToast,
 } from '../components/ui';
-import { formatDateLong, getGreeting, ls, parseJarvisReply } from '../lib/store';
+import { formatDateLong, getGreeting, parseJarvisReply } from '../lib/store';
+import { useChecklist } from '../lib/useChecklist';
 
 const BRIEF_PROMPT =
   "Give me one sharp, specific sentence about what Ibrahim should focus on most today. No preamble, just the sentence.";
@@ -134,16 +135,15 @@ function HabitRow({ habit, done, streak, onToggle, onRename, onRemove }) {
 /* Screen                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export function TodayScreen({ ready, checklistState, setChecklistState, todayKey }) {
+export function TodayScreen() {
   const { toast } = useToast();
+  const { ready, day: todayKey, habits, checked, streaks, toggle, rename, add, remove } = useChecklist();
   const [brief, setBrief] = useState('');
   const [briefStatus, setBriefStatus] = useState('loading'); // loading | ready | error
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newError, setNewError] = useState('');
   const addRef = useRef(null);
-
-  const { habits, checked } = checklistState;
 
   const loadBrief = useCallback(() => {
     if (!todayKey) return;
@@ -168,45 +168,11 @@ export function TodayScreen({ ready, checklistState, setChecklistState, todayKey
     if (adding) addRef.current?.focus();
   }, [adding]);
 
-  const saveState = useCallback(
-    (next) => {
-      setChecklistState(next);
-      ls.set('cadence_checklist_' + todayKey, next);
-    },
-    [todayKey, setChecklistState],
-  );
-
-  const toggle = useCallback(
-    (id) => {
-      const next = checked.includes(id) ? checked.filter((x) => x !== id) : [...checked, id];
-      const streaks = ls.get('cadence_streaks', {});
-      if (!checked.includes(id)) streaks[id] = (streaks[id] || 0) + 1;
-      else streaks[id] = Math.max(0, (streaks[id] || 1) - 1);
-      ls.set('cadence_streaks', streaks);
-      saveState({ ...checklistState, checked: next });
-    },
-    [checked, checklistState, saveState],
-  );
-
-  const rename = useCallback(
-    (id, label) => {
-      saveState({ ...checklistState, habits: habits.map((h) => (h.id === id ? { ...h, label } : h)) });
-    },
-    [checklistState, habits, saveState],
-  );
-
-  const remove = useCallback(
-    (id) => {
-      const habit = habits.find((h) => h.id === id);
-      saveState({
-        ...checklistState,
-        habits: habits.filter((h) => h.id !== id),
-        checked: checked.filter((c) => c !== id),
-      });
-      toast({ title: 'Habit removed', description: habit ? habit.label : undefined });
-    },
-    [checklistState, habits, checked, saveState, toast],
-  );
+  const removeHabit = (id) => {
+    const habit = habits.find((h) => h.id === id);
+    remove(id);
+    toast({ title: 'Habit removed', description: habit ? habit.label : undefined });
+  };
 
   const addHabit = () => {
     const label = newLabel.trim();
@@ -214,13 +180,12 @@ export function TodayScreen({ ready, checklistState, setChecklistState, todayKey
       setNewError('Give the habit a name so you can recognise it tomorrow.');
       return;
     }
-    saveState({ ...checklistState, habits: [...habits, { id: 'custom_' + Date.now(), label, prayer: false }] });
+    add(label);
     setNewLabel('');
     setNewError('');
     setAdding(false);
   };
 
-  const streaks = ls.get('cadence_streaks', {});
   const prayers = useMemo(() => habits.filter((h) => h.prayer), [habits]);
   const others = useMemo(() => habits.filter((h) => !h.prayer), [habits]);
   const prayersDone = prayers.filter((h) => checked.includes(h.id)).length;
@@ -238,7 +203,7 @@ export function TodayScreen({ ready, checklistState, setChecklistState, todayKey
           streak={streaks[h.id] || 0}
           onToggle={toggle}
           onRename={rename}
-          onRemove={remove}
+          onRemove={removeHabit}
         />
       ))}
     </ul>

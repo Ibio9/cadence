@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Block" ADD COLUMN     "elapsedSec" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "material" TEXT NOT NULL DEFAULT '',
+ADD COLUMN     "notes" TEXT NOT NULL DEFAULT '',
+ADD COLUMN     "startedAt" TIMESTAMP(3);

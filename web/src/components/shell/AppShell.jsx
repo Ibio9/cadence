@@ -3,49 +3,56 @@
 /**
  * The app shell, built once.
  *
- * Sidebar sits on --bg, not on a card. Active item is a soft --accent-tint
- * pill with --ink text. Inactive items are --ink-muted with line icons and a
- * warm neutral hover, never blue.
+ * Navigation is real routing now, not view state: every item is a link to a
+ * URL, so the back button, a bookmark and a pasted address all work. The
+ * active item is derived from the path rather than held anywhere.
  *
  * Page gutters, max content width and the vertical rhythm between cards live
  * here in .cd-page and are never overridden by a screen. Under 768px the
  * sidebar becomes a bottom bar carrying the same active state language.
  *
- * Navigation is the app's existing client side view state. No route changes.
+ * Focus is deliberately not in here. It is a route without a shell, because
+ * the whole point of it is that nothing else is on the screen.
  */
 
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { cn } from '../../lib/cn';
 import Icon from '../Icon';
 import { Avatar } from '../ui/Display';
 import { useTheme } from '../../context/ThemeContext';
 
 export const VIEWS = [
-  { id: 'today', label: 'Today', icon: 'today' },
-  { id: 'notes', label: 'Notes', icon: 'notes' },
-  { id: 'timetable', label: 'Timetable', icon: 'timetable' },
-  { id: 'jarvis', label: 'Jarvis', icon: 'jarvis' },
-  { id: 'settings', label: 'Settings', icon: 'settings' },
+  { href: '/', label: 'Today', icon: 'today' },
+  { href: '/timetable', label: 'Timetable', icon: 'timetable' },
+  { href: '/notes', label: 'Notes', icon: 'notes' },
+  { href: '/jarvis', label: 'Jarvis', icon: 'jarvis' },
+  { href: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
-function ThemeToggle({ compact = false }) {
-  const { theme, toggleTheme } = useTheme();
-  const goingDark = theme !== 'dark-blue';
-  const label = goingDark ? 'Switch to dark blue' : 'Switch to light blue';
+const isActive = (pathname, href) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
+
+function ThemeToggle() {
+  const { theme, toggleTheme, themes } = useTheme();
+  const next = themes.find((t) => t.id !== theme) || themes[0];
+  const goingDark = next.id.startsWith('dark');
 
   return (
     <button
       type="button"
       onClick={toggleTheme}
-      className={cn('cd-navitem', compact && 'justify-center')}
-      aria-label={label}
+      className="cd-navitem"
+      aria-label={`Switch to ${next.name.toLowerCase()}`}
     >
       <Icon name={goingDark ? 'moon' : 'sun'} size={18} className="cd-navitem__icon" />
-      {compact ? null : <span>{goingDark ? 'Dark blue' : 'Light blue'}</span>}
+      <span>{next.name}</span>
     </button>
   );
 }
 
-export function AppShell({ view, onViewChange, user = 'Ibrahim', children }) {
+export function AppShell({ user = 'Ibrahim', children }) {
+  const pathname = usePathname() || '/';
+
   return (
     <div className="cd-shell">
       <a className="skip-link" href="#main">
@@ -57,16 +64,15 @@ export function AppShell({ view, onViewChange, user = 'Ibrahim', children }) {
 
         <ul className="flex flex-col gap-1 flex-1 list-none">
           {VIEWS.map((item) => (
-            <li key={item.id}>
-              <button
-                type="button"
+            <li key={item.href}>
+              <Link
+                href={item.href}
                 className="cd-navitem"
-                aria-current={view === item.id ? 'page' : undefined}
-                onClick={() => onViewChange(item.id)}
+                aria-current={isActive(pathname, item.href) ? 'page' : undefined}
               >
                 <Icon name={item.icon} size={18} className="cd-navitem__icon" />
                 <span className="truncate">{item.label}</span>
-              </button>
+              </Link>
             </li>
           ))}
         </ul>
@@ -86,16 +92,15 @@ export function AppShell({ view, onViewChange, user = 'Ibrahim', children }) {
 
       <nav className="cd-mobilenav" aria-label="Primary">
         {VIEWS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
+          <Link
+            key={item.href}
+            href={item.href}
             className="cd-mobilenav__item"
-            aria-current={view === item.id ? 'page' : undefined}
-            onClick={() => onViewChange(item.id)}
+            aria-current={isActive(pathname, item.href) ? 'page' : undefined}
           >
             <Icon name={item.icon} size={20} />
             <span>{item.label}</span>
-          </button>
+          </Link>
         ))}
       </nav>
     </div>

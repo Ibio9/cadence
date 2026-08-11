@@ -22,6 +22,7 @@ import {
   useToast,
 } from '../components/ui';
 import { buildJarvisSystem, ls, parseJarvisReply } from '../lib/store';
+import { useChecklist } from '../lib/useChecklist';
 
 const STARTERS = [
   'What should I drop today to protect TARA prep?',
@@ -47,8 +48,9 @@ function JarvisSkeleton() {
   );
 }
 
-export function JarvisScreen({ ready, checklistState, todayKey }) {
+export function JarvisScreen() {
   const { toast } = useToast();
+  const { ready, day: todayKey, summary } = useChecklist();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -63,13 +65,6 @@ export function JarvisScreen({ ready, checklistState, todayKey }) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, loading]);
-
-  const checklistStatus = () => {
-    const { habits, checked } = checklistState;
-    const done = habits.filter((h) => checked.includes(h.id)).map((h) => h.label);
-    const todo = habits.filter((h) => !checked.includes(h.id)).map((h) => h.label);
-    return `Done: ${done.join(', ') || 'none'}. To do: ${todo.join(', ') || 'all done'}. Progress: ${checked.length}/${habits.length}`;
-  };
 
   const send = useCallback(
     async (rawText) => {
@@ -89,7 +84,7 @@ export function JarvisScreen({ ready, checklistState, todayKey }) {
         // The day itself is not sent from here. buildContext on the server
         // serialises today's real blocks into every request, and a second,
         // client-side copy of the timetable could only contradict it.
-        const system = buildJarvisSystem(checklistStatus());
+        const system = buildJarvisSystem(summary());
         const context = `[SYSTEM]\n${system}\n\n[HISTORY]\n${history
           .slice(-10)
           .map((m) => `${m.role === 'user' ? 'Ibrahim' : 'Jarvis'}: ${m.content}`)
@@ -106,9 +101,7 @@ export function JarvisScreen({ ready, checklistState, todayKey }) {
       }
       setLoading(false);
     },
-    // checklistStatus reads the latest props on every call
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [input, loading, messages, todayKey, checklistState],
+    [input, loading, messages, todayKey, summary],
   );
 
   const clearHistory = () => {

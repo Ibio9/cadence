@@ -41,8 +41,19 @@ model Block {
   objective String   @default("")
   /// Cached generated brief. Null until Focus generates one.
   brief     Json?
+  /// What you are working from this session: a chapter, a paper, a drill.
+  /// Free text you write, never a library reference.
+  material  String   @default("")
+  /// Session notes, written in Focus while the block is open.
+  notes     String   @default("")
   startMin  Int
   endMin    Int
+  /// Session clock. `elapsedSec` is time already banked; `startedAt` is set
+  /// while the clock is running and null while it is paused. Elapsed is always
+  /// elapsedSec + (now - startedAt), so a refresh cannot lose or invent time
+  /// and the browser clock is never the authority.
+  elapsedSec Int     @default(0)
+  startedAt DateTime?
   fixed     Boolean  @default(false)
   source    String   @default("me")   // me | template | jarvis
   status    String   @default("pending") // pending | done | missed

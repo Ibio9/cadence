@@ -18,11 +18,16 @@ import Icon from '../Icon';
 /* Field wrapper                                                              */
 /* -------------------------------------------------------------------------- */
 
-export function Field({ id, label, helper, error, optional = false, className, children }) {
+/**
+ * `hideLabel` keeps the label in the accessibility tree and takes it off the
+ * screen. It is for the case where a heading directly above the control
+ * already says the same thing, and printing it twice would be noise.
+ */
+export function Field({ id, label, hideLabel = false, helper, error, optional = false, className, children }) {
   return (
     <div className={cn('cd-field', className)}>
       {label ? (
-        <label className="cd-field__label" htmlFor={id}>
+        <label className={hideLabel ? 'sr-only' : 'cd-field__label'} htmlFor={id}>
           {label}
           {optional ? <span className="cd-field__optional"> (optional)</span> : null}
         </label>
@@ -53,13 +58,13 @@ function describedBy(id, helper, error) {
 /* -------------------------------------------------------------------------- */
 
 export const Input = forwardRef(function Input(
-  { id, label, helper, error, optional, iconStart, iconEnd, mono = false, className, wrapperClassName, ...rest },
+  { id, label, hideLabel, helper, error, optional, iconStart, iconEnd, mono = false, className, wrapperClassName, ...rest },
   ref,
 ) {
   const auto = useId();
   const fieldId = id || auto;
   return (
-    <Field id={fieldId} label={label} helper={helper} error={error} optional={optional} className={wrapperClassName}>
+    <Field id={fieldId} label={label} hideLabel={hideLabel} helper={helper} error={error} optional={optional} className={wrapperClassName}>
       <div className="cd-inputwrap">
         {iconStart ? (
           <span className="cd-inputwrap__affix cd-inputwrap__affix--start">
@@ -95,13 +100,13 @@ export const Input = forwardRef(function Input(
 /* -------------------------------------------------------------------------- */
 
 export const Textarea = forwardRef(function Textarea(
-  { id, label, helper, error, optional, rows = 3, className, wrapperClassName, ...rest },
+  { id, label, hideLabel, helper, error, optional, rows = 3, className, wrapperClassName, ...rest },
   ref,
 ) {
   const auto = useId();
   const fieldId = id || auto;
   return (
-    <Field id={fieldId} label={label} helper={helper} error={error} optional={optional} className={wrapperClassName}>
+    <Field id={fieldId} label={label} hideLabel={hideLabel} helper={helper} error={error} optional={optional} className={wrapperClassName}>
       <textarea
         ref={ref}
         id={fieldId}

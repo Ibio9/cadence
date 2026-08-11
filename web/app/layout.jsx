@@ -1,5 +1,6 @@
 import './globals.css';
 import { THEME_INIT_SCRIPT } from '../src/context/ThemeContext';
+import { Providers } from './providers';
 
 export const metadata = {
   title: 'Cadence',
@@ -29,7 +30,9 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

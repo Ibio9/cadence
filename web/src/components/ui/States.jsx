@@ -10,9 +10,37 @@
  * offers a retry. It never shows a bare status code as the whole message.
  */
 
+import Link from 'next/link';
 import { cn } from '../../lib/cn';
 import Icon from '../Icon';
 import { Button } from './Button';
+
+/**
+ * An action on a state is either something that happens here (`onClick`) or
+ * somewhere to go (`href`). A link is rendered as a link, so it opens in a new
+ * tab, copies its address and reads as navigation to a screen reader — all of
+ * which a button styled to look like one would break.
+ */
+function StateAction({ action, variant = 'primary' }) {
+  if (!action) return null;
+  if (action.href) {
+    return (
+      <Link href={action.href} className={cn('cd-btn', `cd-btn--${variant}`, 'no-underline')}>
+        {action.icon ? (
+          <span className="cd-btn__icon" aria-hidden="true">
+            <Icon name={action.icon} size={16} />
+          </span>
+        ) : null}
+        <span className="cd-btn__label">{action.label}</span>
+      </Link>
+    );
+  }
+  return (
+    <Button variant={variant} icon={action.icon} onClick={action.onClick} loading={action.loading}>
+      {action.label}
+    </Button>
+  );
+}
 
 export function EmptyState({ icon = 'sparkle', title, body, action, secondaryAction, className }) {
   return (
@@ -24,16 +52,8 @@ export function EmptyState({ icon = 'sparkle', title, body, action, secondaryAct
       {body ? <p className="cd-state__body">{body}</p> : null}
       {action || secondaryAction ? (
         <div className="cd-state__actions">
-          {secondaryAction ? (
-            <Button variant="secondary" icon={secondaryAction.icon} onClick={secondaryAction.onClick}>
-              {secondaryAction.label}
-            </Button>
-          ) : null}
-          {action ? (
-            <Button variant="primary" icon={action.icon} onClick={action.onClick} loading={action.loading}>
-              {action.label}
-            </Button>
-          ) : null}
+          <StateAction action={secondaryAction} variant="secondary" />
+          <StateAction action={action} variant="primary" />
         </div>
       ) : null}
     </div>
@@ -47,6 +67,7 @@ export function ErrorState({
   onRetry,
   retryLabel = 'Try again',
   retrying = false,
+  action,
   className,
 }) {
   return (
@@ -57,11 +78,14 @@ export function ErrorState({
       <h3 className="cd-state__title">{title}</h3>
       <p className="cd-state__body">{body}</p>
       {detail ? <p className="font-mono text-caption text-ink-subtle break-words max-w-prose">{detail}</p> : null}
-      {onRetry ? (
+      {onRetry || action ? (
         <div className="cd-state__actions">
-          <Button variant="secondary" icon="refresh" onClick={onRetry} loading={retrying}>
-            {retryLabel}
-          </Button>
+          {onRetry ? (
+            <Button variant="secondary" icon="refresh" onClick={onRetry} loading={retrying}>
+              {retryLabel}
+            </Button>
+          ) : null}
+          <StateAction action={action} variant="primary" />
         </div>
       ) : null}
     </div>
