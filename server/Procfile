@@ -1,1 +1,1 @@
-web: npx prisma db push --accept-data-loss && node src/index.js
+web: node scripts/migrate.js && node src/index.js
