@@ -5,12 +5,18 @@
    reference the semantic utility classes in utilities.css, which reference
    these variables. No component file contains a raw colour, shadow or size.
 
-   THE PALETTE IS SIX NAMED VALUES PER THEME.
+   ONE THEME. There is no light mode, no toggle and no [data-theme] selector.
+   The substrate is dense, near-black charcoal with a little blue in it, and
+   the only light in the building is blue. A second theme would have meant a
+   second set of decisions about where the light falls, and the light rule
+   below only survives being decided once.
 
-   Each is named for the job it does in the interface, not for what colour it
-   is, and everything else below is derived from those six:
+   THE PALETTE IS SIX NAMED VALUES.
 
-     --paper      the substrate the day is printed on
+   Each is named for the job it does, not for what colour it is, and
+   everything else below is derived from those six:
+
+     --paper      the substrate everything is printed on
      --ink        everything you read first
      --quiet      everything you read second
      --emission   the light that means "this is happening now"
@@ -19,53 +25,63 @@
 
    THE LIGHT RULE.
 
-   The surface is warm paper. Mint is light bleeding through it, never ink
-   printed on it. So --emission appears only in shadows and radial blooms, at
-   low opacity and wide blur, and never as a border, a fill or a text colour.
-   Where a word or a numeral genuinely has to carry the meaning, it uses
-   --signal, which is a different value chosen to clear 4.5:1 on its ground.
+   Blue radiates from meaning and never from chrome. It appears on the active
+   block, the now-marker, the recording indicator, Jarvis thinking, a focused
+   input, a topic falling out of retention, and the current question in a timed
+   drill. It never appears on a border, a resting card, a header, the nav, or
+   a divider.
 
-   Mint radiates from meaning only: the block you are in, the now marker, a
-   running clock, Jarvis thinking, a focused input. Never chrome — not
-   borders, not resting cards, not headers, not nav, not dividers.
+   So --emission lives only in shadows and radial blooms, at low opacity and
+   wide blur. Where a word or a numeral genuinely has to carry the meaning it
+   uses --signal, a lighter blue chosen to clear 4.5:1 on every ground it can
+   land on.
 
-   The dark theme inverts the substrate, not the logic. --emission is byte for
-   byte the same value in both themes.
+   Blue on black reads far harder than mint on cream did, so every opacity
+   below is lower than the value that felt right the first time. One primary
+   emitter per screen, one secondary at about a third of it, everything else
+   zero. Under about a tenth of the viewport is ever lit.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   1. Theme independent scales
+   1. Scales
    -------------------------------------------------------------------------- */
 
 :root {
+  color-scheme: dark;
+
   /* Type families ---------------------------------------------------------
-     Three faces, deliberately paired, each with a job:
+     Three faces, repaired for a dark substrate. Light spreads on black: thin
+     strokes bloom and fine serifs shimmer, so a high-contrast display face
+     that looked crisp on paper goes to pieces here. Each of these was chosen
+     against black rather than adapted to it.
 
-       display   Fraunces. A variable serif with a real optical size axis,
-                 drawn from old catalogue and almanac types. The person's
-                 voice: what I mean to do. Used for the day title, a block
-                 title in Focus, and the objective line. Nothing else.
+       display   Newsreader. A variable serif with a real optical size axis
+                 and moderate stroke contrast, so the thins survive against
+                 the substrate instead of dissolving into it. The person's
+                 voice: what I mean to do. The day title, a block title in
+                 Focus, the objective line, an interview prompt. Nothing else.
 
-       sans      Public Sans. Shorter ascenders and less geometry than the
-                 usual UI grotesque; reads like a form you have to fill in
-                 correctly. The connective tissue.
+       sans      IBM Plex Sans. The connective tissue, and the reason it is
+                 this one rather than the usual UI grotesque: it has genuine
+                 tabular lining figures and a slashed zero, drawn to the same
+                 skeleton as the mono below. The day spine and the drill
+                 timers are almost entirely numerals, and a numeral that
+                 changes width when a clock ticks is a defect, not a detail.
+                 Sans and mono are now metric siblings, so a duration in a
+                 sentence and the same duration in a table are the same digits.
 
-       mono      IBM Plex Mono. An instrument face, from engineering
-                 documentation rather than a code editor. The instrument's
-                 voice: what is measured. Every time, duration, count and
-                 score is set in it, always with tabular figures, because the
-                 day spine is almost entirely numerals and a ticking clock
-                 must never change width. */
-  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
-  --font-sans: 'Public Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+       mono      IBM Plex Mono. The instrument's voice: what is measured.
+                 Every time, duration, count and score. */
+  --font-display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-  /* Fraunces axes. Large display sizes take a high optical size, which pulls
-     the contrast up and the serifs fine. Small sizes take a low one, which
-     keeps them sturdy. */
-  --display-opsz-lg: 'opsz' 120;
-  --display-opsz-md: 'opsz' 48;
-  --display-opsz-sm: 'opsz' 14;
+  /* Newsreader's optical size axis runs 6 to 72. Large sizes take a high
+     value, which refines the serifs; small sizes take a low one, which keeps
+     them sturdy enough to hold on this ground. */
+  --display-opsz-lg: 'opsz' 60;
+  --display-opsz-md: 'opsz' 30;
+  --display-opsz-sm: 'opsz' 12;
 
   /* Numerals. Applied everywhere a figure appears, not just in tables. */
   --numeric: tabular-nums slashed-zero;
@@ -83,16 +99,16 @@
   --text-4xl: 2.375rem;       /* 38px */
   --text-display: 3.25rem;    /* 52px */
 
-  --leading-tight: 1.05;
-  --leading-snug: 1.3;
+  --leading-tight: 1.08;
+  --leading-snug: 1.32;
   --leading-normal: 1.45;
   --leading-body: 1.62;
   --leading-relaxed: 1.8;
 
   --tracking-eyebrow: 0.14em;
   --tracking-mono: 0.02em;   /* mono under 14px needs air */
-  --tracking-tight: -0.02em;
-  --tracking-snug: -0.01em;
+  --tracking-tight: -0.015em;
+  --tracking-snug: -0.005em;
   --tracking-normal: 0;
 
   --weight-normal: 400;
@@ -117,8 +133,7 @@
   --space-20: 5rem;
   --space-24: 6rem;
 
-  /* Radius. Paper does not have a 22px corner radius on everything, so the
-     card radius is much tighter than it was and most things have none. */
+  /* Radius. Most things have none. */
   --radius-card: 10px;
   --radius-control: 8px;
   --radius-sm: 5px;
@@ -130,15 +145,15 @@
   --rail-bead: 9px;
   --rail-tick: 7px;
 
-  /* Motion. Almost everything is instant or 160ms. The one orchestrated
+  /* Motion. Almost everything is instant or 140ms. The one orchestrated
      moment is a block opening into Focus, which gets --dur-open. */
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-open: cubic-bezier(0.32, 0.72, 0, 1);
   --dur-fast: 140ms;
   --dur-base: 180ms;
   --dur-slow: 240ms;
-  --dur-open: 420ms;
-  --dur-breathe: 5200ms;    /* long and low: a glow breathing, not pulsing */
+  --dur-open: 520ms;
+  --dur-breathe: 5600ms;    /* long and low: a glow breathing, not pulsing */
 
   /* Shell geometry -------------------------------------------------------- */
   --shell-sidebar-w: 208px;
@@ -165,183 +180,146 @@
 }
 
 /* --------------------------------------------------------------------------
-   2. light — warm paper. The default.
+   2. The substrate and the ink
 
    Contrast, measured against the ground each one actually lands on:
-     --ink    on --paper   14.8:1
-     --quiet  on --paper    5.7:1     on --surface 6.1:1
-     --signal on --paper    5.5:1     on --cool    5.3:1
-     --alarm  on --paper    5.7:1
-   -------------------------------------------------------------------------- */
-
-:root,
-[data-theme='light'] {
-  color-scheme: light;
-
-  /* ---- the six ---- */
-  --paper: #efeae1;
-  --ink: #191813;
-  --quiet: #5e5b51;
-  --emission: #43e3a9;
-  --signal: #0a6b4f;
-  --alarm: #9e3b2b;
-
-  /* ---- derived: substrate ---- */
-  /* A card is paper lifted toward white; a well is paper pushed away from it.
-     Two levels, never three. */
-  --surface: #f7f4ed;
-  --surface-raised: #fffdf8;
-  --surface-sunken: #e7e1d6;
-  /* The very slightly cooler ground that sits under and around a glow. This
-     is the only place mint touches a fill, and it is 4% of it. */
-  --cool: #e9eae2;
-
-  /* ---- derived: ink ---- */
-  --ink-muted: var(--quiet);
-  --ink-subtle: #83806f;    /* supplementary and large text only, 3.6:1 */
-  --ink-inverse: #f7f4ed;
-  --on-signal: #ffffff;     /* 5.9:1 on --signal */
-
-  /* ---- derived: structure ---- */
-  --rule: rgba(25, 24, 19, 0.11);
-  --rule-strong: rgba(25, 24, 19, 0.2);
-  --hover-tint: rgba(25, 24, 19, 0.04);
-  --active-tint: rgba(25, 24, 19, 0.07);
-
-  /* ---- derived: status. Never colour alone; always a word or a mark. ---- */
-  --held: var(--signal);
-  --held-ground: var(--cool);
-  --warn: #7c5312;
-  --warn-ground: #f0e8d8;
-  --alarm-ground: #f5e5e1;
-
-  /* ---- depth. Paper does not float much. ---- */
-  --shadow-sm: 0 1px 2px rgba(25, 24, 19, 0.05);
-  --shadow-md: 0 2px 6px rgba(25, 24, 19, 0.06), 0 10px 28px rgba(25, 24, 19, 0.07);
-  --shadow-lg: 0 4px 10px rgba(25, 24, 19, 0.07), 0 24px 64px rgba(25, 24, 19, 0.12);
-
-  --press-inset: inset 0 1px 3px rgba(25, 24, 19, 0.16);
-  --overlay-scrim: rgba(25, 24, 19, 0.38);
-  --scrollbar: rgba(25, 24, 19, 0.18);
-  --scrollbar-hover: rgba(25, 24, 19, 0.3);
-  --skeleton-base: rgba(25, 24, 19, 0.06);
-  --skeleton-sheen: rgba(25, 24, 19, 0.03);
-}
-
-/* --------------------------------------------------------------------------
-   3. dark — the substrate inverts, the light does not.
-
-   Contrast:
-     --ink    on --paper   15.4:1
-     --quiet  on --paper    7.0:1
-     --signal on --paper   11.3:1
-     --alarm  on --paper    8.1:1
-   -------------------------------------------------------------------------- */
-
-[data-theme='dark'] {
-  color-scheme: dark;
-
-  /* ---- the six. --emission is identical to the light theme's. ---- */
-  --paper: #14130e;
-  --ink: #efeae0;
-  --quiet: #a39d91;
-  --emission: #43e3a9;
-  --signal: #4fdca4;
-  --alarm: #e88c7b;
-
-  --surface: #1d1c16;
-  --surface-raised: #24231b;
-  --surface-sunken: #0e0d09;
-  --cool: #161a17;
-
-  --ink-muted: var(--quiet);
-  --ink-subtle: #7b7669;
-  --ink-inverse: #14130e;
-  --on-signal: #06231a;     /* 9.6:1 on --signal */
-
-  --rule: rgba(239, 234, 224, 0.12);
-  --rule-strong: rgba(239, 234, 224, 0.22);
-  --hover-tint: rgba(239, 234, 224, 0.055);
-  --active-tint: rgba(239, 234, 224, 0.095);
-
-  --held: var(--signal);
-  --held-ground: var(--cool);
-  --warn: #dfae6b;
-  --warn-ground: #2a2317;
-  --alarm-ground: #2f1c18;
-
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.42), 0 10px 28px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.46), 0 24px 64px rgba(0, 0, 0, 0.56);
-
-  --press-inset: inset 0 1px 3px rgba(0, 0, 0, 0.4);
-  --overlay-scrim: rgba(4, 4, 3, 0.68);
-  --scrollbar: rgba(239, 234, 224, 0.18);
-  --scrollbar-hover: rgba(239, 234, 224, 0.3);
-  --skeleton-base: rgba(239, 234, 224, 0.075);
-  --skeleton-sheen: rgba(239, 234, 224, 0.035);
-}
-
-/* --------------------------------------------------------------------------
-   4. Emission
-
-   Soft radial falloff, never a hard ring. Each glow is two low opacity mint
-   shadows at wide blur, so the edge is never findable. The largest emitter
-   also gets --bloom, a radial gradient, because a shadow alone cannot make
-   light appear to come from inside the surface.
-
-   Budget, enforced by hand in the screens: one primary emitter per screen,
-   one secondary at roughly a third of the strength, everything else zero.
-   Total glowing surface stays under about a tenth of the viewport.
-
-   These sit outside the theme blocks because the light does not change
-   between themes — only what it falls on does.
+     --ink     on --paper   16.4:1
+     --quiet   on --paper    7.6:1     on --surface 7.0:1
+     --signal  on --paper    9.1:1     on --surface 8.3:1
+     --alarm   on --paper    8.8:1
+     --warn    on --paper   10.1:1
+     --ink-subtle on --paper 5.2:1     — a real text colour, not a loophole
    -------------------------------------------------------------------------- */
 
 :root {
-  --emission-rgb: 67, 227, 169;
+  /* ---- the six ---- */
+  --paper: #0b0d12;
+  --ink: #e8ecf3;
+  --quiet: #9aa4b4;
+  --emission: #3d8bff;
+  --signal: #7db4ff;
+  --alarm: #ff8f7a;
+
+  /* ---- derived: substrate ----
+     A card is the substrate lifted a little; a well is it pushed down.
+     Two levels above the ground, never three. On black the steps have to be
+     small or a card stops reading as the same material. */
+  --surface: #12151d;
+  --surface-raised: #191d27;
+  --surface-sunken: #07080c;
+  /* The slightly blued ground that sits under and around a glow. This is the
+     only place the light touches a fill, and it is a few percent of it. */
+  --cool: #0e1119;
+
+  /* ---- derived: ink ---- */
+  --ink-muted: var(--quiet);
+  --ink-subtle: #7b8496;
+  --ink-inverse: #0b0d12;
+  --on-signal: #05101c;     /* 9.0:1 on --signal */
+
+  /* The one filled control.
+     On paper, "primary" meant an ink slab: maximum contrast, and restrained,
+     because a dark rectangle on a light page is quiet. Inverted, the same rule
+     produces a near-white rectangle on near-black — and that is brighter than
+     any glow in the system. The screenshot pass made it obvious: the eye went
+     to the Save button, never to the lit block. So the primary fill is
+     re-derived rather than inverted. It is a lifted charcoal, clearly the one
+     solid control on a screen, and nowhere near the light. Ink on it reads
+     12.3:1. */
+  --fill: #232936;
+  --fill-hover: #2c3343;
+
+  /* ---- derived: structure ----
+     Rules are ink at low alpha, never a lightened grey, so a hairline on a
+     card and a hairline on the substrate are the same line. */
+  --rule: rgba(232, 236, 243, 0.09);
+  --rule-strong: rgba(232, 236, 243, 0.18);
+  --hover-tint: rgba(232, 236, 243, 0.045);
+  --active-tint: rgba(232, 236, 243, 0.08);
+
+  /* ---- derived: status ----
+     Never colour alone; always a word or a mark beside it.
+
+     There is deliberately no green. Blue is the light, and the light means
+     "now" — so a colour for "you got this right" would either compete with
+     it or add a fourth hue to a palette whose whole argument is restraint.
+     Held is past tense and takes a bright neutral: it is a fact, not an
+     event. */
+  --held: #b6c0d0;
+  --held-ground: rgba(232, 236, 243, 0.05);
+  --warn: #e5b35c;
+  --warn-ground: #211a0d;
+  --alarm-ground: #291513;
+
+  /* ---- depth ----
+     A shadow on near-black is nearly invisible, so these are for separation
+     at the edges of floating things only. Elevation on this substrate is
+     carried by the surface step, not by the shadow. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.55), 0 12px 32px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.6), 0 28px 72px rgba(0, 0, 0, 0.66);
+
+  --press-inset: inset 0 1px 3px rgba(0, 0, 0, 0.45);
+  --overlay-scrim: rgba(3, 4, 6, 0.74);
+  --scrollbar: rgba(232, 236, 243, 0.16);
+  --scrollbar-hover: rgba(232, 236, 243, 0.28);
+  --skeleton-base: rgba(232, 236, 243, 0.06);
+  --skeleton-sheen: rgba(232, 236, 243, 0.03);
+}
+
+/* --------------------------------------------------------------------------
+   3. Emission
+
+   Soft radial falloff, never a hard ring. Each glow is two low-opacity blue
+   shadows at wide blur with the spread pulled negative, so the edge is never
+   findable. The one largest emitter on a screen also gets --bloom, a radial
+   gradient, because a shadow alone cannot make light appear to come from
+   inside a surface.
+
+   These opacities are roughly half what the mint equivalents were. Blue at
+   full saturation against near-black is the highest-energy pairing in the
+   whole system: the same geometry that read as a soft halo on cream reads as
+   a lamp here. Every time this looked right it was too much.
+   -------------------------------------------------------------------------- */
+
+:root {
+  --emission-rgb: 61, 139, 255;
+
+  /* The secondary emitter, at about a third of --glow-md. It exists because
+     "everything else at a third" needs a value rather than a good intention:
+     without it, every second emitter quietly became --glow-sm and the screen
+     ended up with two light sources of the same brightness. */
+  --glow-xs:
+    0 1px 10px -5px rgba(var(--emission-rgb), 0.09),
+    0 0 26px -12px rgba(var(--emission-rgb), 0.06);
 
   --glow-sm:
-    0 2px 14px -4px rgba(var(--emission-rgb), 0.24),
-    0 0 34px -12px rgba(var(--emission-rgb), 0.16);
+    0 2px 16px -6px rgba(var(--emission-rgb), 0.16),
+    0 0 38px -14px rgba(var(--emission-rgb), 0.11);
 
   --glow-md:
-    0 4px 26px -6px rgba(var(--emission-rgb), 0.3),
-    0 0 68px -16px rgba(var(--emission-rgb), 0.2);
+    0 4px 30px -8px rgba(var(--emission-rgb), 0.2),
+    0 0 76px -18px rgba(var(--emission-rgb), 0.14);
 
   --glow-lg:
-    0 6px 42px -8px rgba(var(--emission-rgb), 0.36),
-    0 0 120px -24px rgba(var(--emission-rgb), 0.24);
+    0 6px 48px -10px rgba(var(--emission-rgb), 0.24),
+    0 0 130px -26px rgba(var(--emission-rgb), 0.16);
 
   /* The bloom for the single largest emitter. Anchored left so the light
      reads as coming off the rail rather than out of the middle of a box. */
   --bloom: radial-gradient(
     140% 180% at 0% 50%,
-    rgba(var(--emission-rgb), 0.15),
-    rgba(var(--emission-rgb), 0.05) 38%,
+    rgba(var(--emission-rgb), 0.1),
+    rgba(var(--emission-rgb), 0.035) 38%,
     transparent 72%
   );
-}
 
-/* The dark substrate takes light more readily, so the same geometry needs
-   less opacity to read as equally bright. */
-[data-theme='dark'] {
-  --glow-sm:
-    0 2px 14px -4px rgba(var(--emission-rgb), 0.2),
-    0 0 34px -12px rgba(var(--emission-rgb), 0.14);
-
-  --glow-md:
-    0 4px 26px -6px rgba(var(--emission-rgb), 0.26),
-    0 0 68px -16px rgba(var(--emission-rgb), 0.18);
-
-  --glow-lg:
-    0 6px 42px -8px rgba(var(--emission-rgb), 0.3),
-    0 0 120px -24px rgba(var(--emission-rgb), 0.2);
-
-  --bloom: radial-gradient(
-    140% 180% at 0% 50%,
-    rgba(var(--emission-rgb), 0.13),
-    rgba(var(--emission-rgb), 0.045) 38%,
-    transparent 72%
+  /* A bloom that comes from the centre. For the one round emitter — the
+     recording dot, the orb — where "off the rail" would be a lie. */
+  --bloom-centre: radial-gradient(
+    circle at 50% 50%,
+    rgba(var(--emission-rgb), 0.14),
+    rgba(var(--emission-rgb), 0.04) 42%,
+    transparent 70%
   );
 }

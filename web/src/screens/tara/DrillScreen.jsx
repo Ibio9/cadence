@@ -62,7 +62,7 @@ function ReferenceSheet({ open, onClose }) {
           ))}
         </div>
       ) : status === 'error' ? (
-        <p className="text-sm text-alarm">The reference could not be loaded. It is also at /tara/reference.</p>
+        <p className="text-sm text-alarm">The reference did not load. It is also at /tara/reference.</p>
       ) : (
         <div className="cd-refsheet">
           <section>
@@ -336,7 +336,7 @@ export function DrillScreen() {
       // this says what happened rather than throwing the work away.
       toast({
         tone: 'danger',
-        title: 'The answers were not recorded',
+        title: 'Your answers did not save',
         description: `${e.message} Your review below is still correct, but this set will not count towards progress.`,
       });
     }
@@ -404,8 +404,8 @@ export function DrillScreen() {
     return (
       <Page>
         <ErrorState
-          title="The set could not be built"
-          body="Your bank is safe on the server. This is a connection problem, not lost work."
+          title="The set did not build"
+          body="The server did not answer. Your bank is untouched. Check your connection and try again."
           detail={error}
           onRetry={() => router.refresh()}
           action={{ label: 'Back to the module', href: `/tara/${module}` }}
@@ -422,8 +422,8 @@ export function DrillScreen() {
           title={mode === 'review' ? 'Nothing to review yet' : 'No questions are ready'}
           body={
             mode === 'review'
-              ? 'A review set is built from questions you have already answered. Drill some first and they will appear here.'
-              : 'Everything in this type has either been answered correctly twice or is not in the bank yet. Generate more from the module screen.'
+              ? 'A review set is built from questions you have already answered. Drill a normal set first and they will appear here.'
+              : 'You have answered everything in this type correctly twice. More are being written in the background — come back shortly, or drill another type.'
           }
           action={{ label: 'Back to the module', href: `/tara/${module}`, icon: 'arrowLeft' }}
         />
@@ -544,7 +544,7 @@ export function DrillScreen() {
         open={confirmSubmit}
         onClose={() => setConfirmSubmit(false)}
         title="Some are still blank"
-        description="There is no negative marking on this test. A blank scores zero; a guess has a one-in-five chance. Fill them in."
+        description="Nothing is deducted for a wrong answer. A blank scores nothing; a guess scores one in five. Fill them in."
         actions={
           <>
             <Button

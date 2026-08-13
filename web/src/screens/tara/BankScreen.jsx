@@ -73,7 +73,7 @@ function AddReal({ modules, onClose, onAdded }) {
       toast({ tone: 'success', title: 'Added to the bank', description: row.source || 'Past-paper question' });
       onAdded();
     } catch (e) {
-      toast({ tone: 'danger', title: 'Could not add it', description: e.message });
+      toast({ tone: 'danger', title: 'That question did not save', description: e.message });
     }
     setSaving(false);
   };
@@ -86,7 +86,7 @@ function AddReal({ modules, onClose, onAdded }) {
       onClose={onClose}
       size="lg"
       title="Add a past-paper question"
-      description="Typed exactly as it appears. These are the volume source — generated questions only fill the gaps."
+      description="Type it exactly as it appears. Past papers are the volume; generated questions fill the gaps."
       actions={
         <>
           <Button variant="tertiary" onClick={onClose}>
@@ -171,7 +171,7 @@ function AddReal({ modules, onClose, onAdded }) {
         <Textarea
           label="Why that is the answer"
           rows={3}
-          helper="Optional, but the explanation is what makes it worth re-drilling."
+          helper="Optional — but the explanation is what makes it worth drilling twice."
           value={form.why}
           onChange={(e) => set('why', e.target.value)}
         />
@@ -212,7 +212,7 @@ export function BankScreen() {
       reload();
       setOpen(null);
     } catch (e) {
-      toast({ tone: 'danger', title: 'Could not change it', description: e.message });
+      toast({ tone: 'danger', title: 'That change did not save', description: e.message });
     }
   };
 
@@ -277,8 +277,8 @@ export function BankScreen() {
         </div>
       ) : status === 'error' ? (
         <ErrorState
-          title="The bank could not be loaded"
-          body="Your questions are safe on the server. This is a connection problem, not lost work."
+          title="The bank did not load"
+          body="The server did not answer. Your questions are on it, so nothing is lost. Check your connection and try again."
           detail={error}
           onRetry={reload}
         />
@@ -288,10 +288,10 @@ export function BankScreen() {
           title={filters.retired === 'true' ? 'Nothing retired' : 'Nothing matches'}
           body={
             filters.retired === 'true'
-              ? 'You have not retired any questions. A question you find fault with goes here rather than being deleted.'
-              : 'Widen the filters, or add a past-paper question by hand.'
+              ? 'Nothing retired. A question you find fault with comes here rather than being deleted, so the attempts against it keep their meaning.'
+              : 'Widen the filters, or type in a past-paper question of your own.'
           }
-          action={{ label: 'Add a real one', onClick: () => setAdding(true), icon: 'plus' }}
+          action={{ label: 'Add a past-paper question', onClick: () => setAdding(true), icon: 'plus' }}
         />
       ) : (
         <>

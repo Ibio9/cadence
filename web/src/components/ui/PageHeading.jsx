@@ -4,7 +4,7 @@
  * PageHeading.
  *
  * The one heading pattern in the app: a small uppercase letterspaced eyebrow,
- * a large Fraunces heading, then one supporting line in body type. Once per
+ * a large display heading, then one supporting line in body type. Once per
  * screen, never twice. Built as a component so it cannot drift.
  *
  * `lead` is the supporting line. `leadLoading` renders a skeleton in its place

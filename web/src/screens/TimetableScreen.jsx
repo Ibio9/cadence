@@ -73,7 +73,7 @@ function BlockRow({ block, project, isNow }) {
             {block.objective ? (
               <span className="truncate">{block.objective}</span>
             ) : block.status === 'pending' ? (
-              <span className="cd-railrow__unset">No objective yet</span>
+              <span className="cd-railrow__unset">Not decided yet</span>
             ) : null}
           </span>
         </span>
@@ -142,8 +142,8 @@ export function TimetableScreen({ date, onDateChange }) {
 
       {status === 'error' ? (
         <ErrorState
-          title="The day could not be loaded"
-          body="Your blocks are safe on the server. This is a connection problem, not lost work."
+          title="That day did not load"
+          body="The server did not answer. Your blocks are on it, so nothing is lost. Check your connection and try again."
           detail={error}
           onRetry={reload}
           retrying={status === 'loading'}
@@ -151,10 +151,10 @@ export function TimetableScreen({ date, onDateChange }) {
       ) : blocks.length === 0 ? (
         <EmptyState
           icon="calendarPlus"
-          title="This day is empty"
-          body="No rhythms land on this date. Ask Jarvis to put something here, or move a block onto it from another day."
+          title="Nothing lands on this day"
+          body="No rhythm covers this date. Tell Jarvis what you want on it and it will build the day."
           action={{ label: 'Ask Jarvis', icon: 'jarvis', href: '/jarvis' }}
-          secondaryAction={{ label: 'Reload', icon: 'refresh', onClick: reload }}
+          secondaryAction={{ label: 'Try again', icon: 'refresh', onClick: reload }}
         />
       ) : (
         <ol className="cd-rail list-none" aria-label={`Blocks on ${formatDayLabel(date)}`}>

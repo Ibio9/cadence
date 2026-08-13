@@ -39,8 +39,8 @@ export function EssayScreen({ id }) {
     return (
       <Page>
         <ErrorState
-          title="That essay could not be loaded"
-          body="It may have been deleted, or this is a connection problem."
+          title="That essay did not load"
+          body="It was deleted, or the server did not answer. Open the writing task and pick it from the list."
           detail={error}
           onRetry={reload}
           action={{ label: 'Back to the writing task', href: '/tara/writing' }}
@@ -54,8 +54,8 @@ export function EssayScreen({ id }) {
     return (
       <Page>
         <ErrorState
-          title="This essay has not been marked"
-          body="It was saved as a draft but never submitted."
+          title="This one was never submitted"
+          body="It is saved as a draft. Open the writing task, start a fresh sitting on the same prompt, and finish it."
           action={{ label: 'Back to the writing task', href: '/tara/writing' }}
         />
       </Page>

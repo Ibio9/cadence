@@ -1,5 +1,4 @@
 import './globals.css';
-import { THEME_INIT_SCRIPT } from '../src/context/ThemeContext';
 import { Providers } from './providers';
 
 export const metadata = {
@@ -8,25 +7,20 @@ export const metadata = {
 };
 
 // The browser chrome colour is the one place a literal is unavoidable: a meta
-// tag cannot read a CSS variable. These two mirror --paper in each theme and
-// are the only literals outside src/styles/tokens.css.
+// tag cannot read a CSS variable. This mirrors --paper and is the only literal
+// outside src/styles/tokens.css. One value, because there is one theme.
 export const viewport = {
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#efeae1' },
-    { media: '(prefers-color-scheme: dark)', color: '#14130e' },
-  ],
+  themeColor: '#0b0d12',
+  colorScheme: 'dark',
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    // One theme, so the substrate is a fact about the document rather than
+    // something read from storage before first paint. There is no theme init
+    // script here any more, and so no flash to prevent.
+    <html lang="en">
       <head>
-        {/*
-          Sets data-theme before first paint so the stored theme is already in
-          place when the page renders. The App Router has no index.html, so this
-          inline script in head is the equivalent hook.
-        */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>

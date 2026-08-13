@@ -7,7 +7,7 @@
  * A note filed under To Do is handed to Jarvis to be placed on today's
  * timetable, and the result is reported in a toast either way.
  *
- * Categories carry no colour of their own. Mint means "happening now" and
+ * Categories carry no colour of their own. Blue means "happening now" and
  * nothing else, so a category is told apart by its name in a plain badge.
  */
 
@@ -101,8 +101,8 @@ export function NotesScreen({ ready, todayKey }) {
           setScheduleFailed(taskText);
           toast({
             tone: 'warning',
-            title: 'Saved, but not scheduled',
-            description: 'Jarvis did not place it. Add it to the timetable yourself.',
+            title: 'Saved, not scheduled',
+            description: 'Jarvis found no gap for it. Put it on the timetable yourself.',
             action: { label: 'Try again', onClick: () => scheduleAsTask(taskText) },
           });
         }
@@ -110,8 +110,8 @@ export function NotesScreen({ ready, todayKey }) {
         setScheduleFailed(taskText);
         toast({
           tone: 'danger',
-          title: 'Saved, but not scheduled',
-          description: 'Jarvis is not reachable. Your note is safe.',
+          title: 'Saved, not scheduled',
+          description: 'Jarvis did not answer. The note is saved — schedule it yourself.',
           action: { label: 'Try again', onClick: () => scheduleAsTask(taskText) },
         });
       }
@@ -123,7 +123,7 @@ export function NotesScreen({ ready, todayKey }) {
   const addNote = async () => {
     const text = capturing.trim();
     if (!text) {
-      setCaptureError('Write something first, even a fragment.');
+      setCaptureError('Write something first. A fragment counts.');
       return;
     }
     setCaptureError('');
@@ -201,7 +201,7 @@ export function NotesScreen({ ready, todayKey }) {
             rows={4}
             value={capturing}
             error={captureError}
-            helper="Ctrl or Cmd plus Enter saves."
+            helper="Ctrl or Cmd plus Enter saves it."
             onChange={(e) => {
               setCapturing(e.target.value);
               if (captureError) setCaptureError('');
@@ -243,7 +243,7 @@ export function NotesScreen({ ready, todayKey }) {
           <Input
             label="Search notes"
             iconStart="search"
-            placeholder="Search the text of every note"
+            placeholder="Search every note"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -283,14 +283,14 @@ export function NotesScreen({ ready, todayKey }) {
           {notes.length === 0 ? (
             <EmptyState
               icon="inbox"
-              title="Nothing captured yet"
-              body="Notes work best when they cost nothing to write. Put the first thought in the box above and file it later."
+              title="Start with one thought"
+              body="Notes work best when they cost nothing to write. Put it in the box above and file it later."
             />
           ) : (
             <EmptyState
               icon="search"
-              title="No notes match that"
-              body="Try a shorter search, or clear the category filter to see everything again."
+              title="Nothing matches that"
+              body="Shorten the search, or clear the category filter to see everything again."
               action={{
                 label: 'Clear filters',
                 icon: 'refresh',

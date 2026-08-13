@@ -3,9 +3,12 @@
 /**
  * /dev/ui
  *
- * Every primitive in every state in both themes on one page. Gated behind
+ * Every primitive in every state on one page. Gated behind
  * NEXT_PUBLIC_ENABLE_DEV_UI so it never ships enabled by accident. Set
  * NEXT_PUBLIC_ENABLE_DEV_UI=true in web/.env.local to view it.
+ *
+ * One pass, not two: there is one substrate now, so a gallery that rendered
+ * the same components twice was showing the same thing twice.
  */
 
 import Gallery from '../../../src/components/dev/Gallery';
@@ -20,8 +23,7 @@ export default function DevUiPage() {
         <div className="cd-state">
           <h1 className="cd-state__title">The gallery is switched off</h1>
           <p className="cd-state__body">
-            Set NEXT_PUBLIC_ENABLE_DEV_UI to true in web/.env.local and restart the dev server to see every primitive
-            in both themes.
+            Set NEXT_PUBLIC_ENABLE_DEV_UI to true in web/.env.local, then restart the dev server.
           </p>
         </div>
       </main>
@@ -32,8 +34,7 @@ export default function DevUiPage() {
     <ToastProvider>
       <main>
         <h1 className="sr-only">Cadence primitive gallery</h1>
-        <Gallery themeId="light" label="Light — warm paper. The default." />
-        <Gallery themeId="dark" label="Dark — the substrate inverts, the light does not." />
+        <Gallery label="Every primitive, every state, one substrate." />
       </main>
     </ToastProvider>
   );

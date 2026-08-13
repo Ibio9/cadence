@@ -189,8 +189,8 @@ function Sitting({ prompt, essayId, onMarked }) {
       <Modal
         open={confirm}
         onClose={() => setConfirm(false)}
-        title="Abandon this sitting?"
-        description="The draft is saved, but the clock does not restart. You can start a fresh sitting on the same prompt."
+        title="Leave this sitting?"
+        description="Your draft is saved. The clock does not restart — start a fresh sitting on the same prompt when you want the full forty minutes."
         actions={
           <>
             <Button variant="secondary" onClick={() => setConfirm(false)}>
@@ -263,7 +263,7 @@ export function WritingScreen({ module, state, onChange }) {
       <PageHeading
         eyebrow={<>TARA Drill · {module.minutes} minutes · {module.wordLimit} words</>}
         title={module.name}
-        lead="Three prompts, pick one, write it under the clock, then have it marked hard against the official criteria."
+        lead="Pick one of three, write it under the clock, then have it marked hard against the official criteria."
         actions={
           <Button variant="secondary" icon="sparkle" loading={generating} onClick={fresh}>
             Three new prompts
@@ -274,8 +274,8 @@ export function WritingScreen({ module, state, onChange }) {
       {shown.length === 0 ? (
         <EmptyState
           icon="notes"
-          title="No prompts yet"
-          body="Generate three in the official shape — a statement, then explain it, argue against it, and say how far you agree."
+          title="Write your first prompt set"
+          body="Three prompts in the official shape: a statement, then explain it, argue against it, and say how far you agree."
           action={{ label: 'Write three prompts', onClick: fresh, icon: 'sparkle', loading: generating }}
         />
       ) : (

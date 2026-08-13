@@ -11,8 +11,8 @@
  * This file is the mapping from those semantic names to the CSS variables in
  * src/styles/tokens.css. Installing tailwindcss and pointing PostCSS at this
  * config is a drop in: the class names in the components already match, so no
- * component needs to change. Every value resolves through a variable, so both
- * themes keep working without a dark: variant anywhere.
+ * component needs to change. Every value resolves through a variable, and there is one
+ * theme, so there is no dark: variant anywhere and nothing to switch.
  */
 
 /** @type {import('tailwindcss').Config} */
@@ -26,28 +26,30 @@ module.exports = {
       current: 'currentColor',
       inherit: 'inherit',
 
-      bg: 'var(--bg)',
+      // Note: --emission is deliberately absent. There is no colour key for the
+      // light, because a colour key is a way to paint it on a border or a fill,
+      // and the light rule forbids both. It is reachable only through the glow
+      // and bloom utilities in src/styles/utilities.css.
+      paper: 'var(--paper)',
       surface: {
         DEFAULT: 'var(--surface)',
         raised: 'var(--surface-raised)',
         sunken: 'var(--surface-sunken)',
       },
+      cool: 'var(--cool)',
+      fill: { DEFAULT: 'var(--fill)', hover: 'var(--fill-hover)' },
       ink: {
         DEFAULT: 'var(--ink)',
         muted: 'var(--ink-muted)',
         subtle: 'var(--ink-subtle)',
         inverse: 'var(--ink-inverse)',
       },
-      accent: {
-        DEFAULT: 'var(--accent)',
-        deep: 'var(--accent-deep)',
-        soft: 'var(--accent-soft)',
-        tint: 'var(--accent-tint)',
-      },
-      'on-accent': 'var(--on-accent)',
-      success: { DEFAULT: 'var(--success)', tint: 'var(--success-tint)' },
-      warning: { DEFAULT: 'var(--warning)', tint: 'var(--warning-tint)' },
-      danger: { DEFAULT: 'var(--danger)', tint: 'var(--danger-tint)' },
+      signal: 'var(--signal)',
+      'on-signal': 'var(--on-signal)',
+      held: { DEFAULT: 'var(--held)', ground: 'var(--held-ground)' },
+      warn: { DEFAULT: 'var(--warn)', ground: 'var(--warn-ground)' },
+      alarm: { DEFAULT: 'var(--alarm)', ground: 'var(--alarm-ground)' },
+      rule: { DEFAULT: 'var(--rule)', strong: 'var(--rule-strong)' },
       hover: 'var(--hover-tint)',
       active: 'var(--active-tint)',
       scrim: 'var(--overlay-scrim)',
@@ -55,13 +57,13 @@ module.exports = {
     },
 
     borderColor: {
-      DEFAULT: 'var(--border)',
-      hairline: 'var(--border)',
-      strong: 'var(--border-strong)',
-      accent: 'var(--accent)',
-      success: 'var(--success)',
-      warning: 'var(--warning)',
-      danger: 'var(--danger)',
+      DEFAULT: 'var(--rule)',
+      hairline: 'var(--rule)',
+      strong: 'var(--rule-strong)',
+      signal: 'var(--signal)',
+      held: 'var(--held)',
+      warn: 'var(--warn)',
+      alarm: 'var(--alarm)',
       transparent: 'transparent',
       current: 'currentColor',
     },
@@ -133,6 +135,10 @@ module.exports = {
       full: '9999px',
     },
 
+    // Depth and light are separate scales on purpose. A shadow separates a
+    // floating thing from the page; a glow means something is happening. They
+    // are never interchangeable, and no component uses one where it wants the
+    // other.
     boxShadow: {
       none: 'none',
       card: 'var(--shadow-sm)',
@@ -141,6 +147,10 @@ module.exports = {
       sm: 'var(--shadow-sm)',
       md: 'var(--shadow-md)',
       lg: 'var(--shadow-lg)',
+      'glow-xs': 'var(--glow-xs)',
+      'glow-sm': 'var(--glow-sm)',
+      'glow-md': 'var(--glow-md)',
+      'glow-lg': 'var(--glow-lg)',
     },
 
     transitionTimingFunction: { DEFAULT: 'var(--ease)', ease: 'var(--ease)' },
@@ -170,7 +180,9 @@ module.exports = {
         toast: 'var(--z-toast)',
         tooltip: 'var(--z-tooltip)',
       },
-      ringColor: { DEFAULT: 'var(--accent)', accent: 'var(--accent)' },
+      // The focus ring is --signal, not --emission: a ring has to be seen
+      // rather than felt, and it has to clear contrast on any ground.
+      ringColor: { DEFAULT: 'var(--signal)', signal: 'var(--signal)' },
       ringWidth: { DEFAULT: 'var(--focus-ring-w)' },
       ringOffsetWidth: { DEFAULT: 'var(--focus-ring-offset)' },
     },

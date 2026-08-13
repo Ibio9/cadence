@@ -1,368 +1,256 @@
-# Cadence — the design system
+# Cadence design system
 
-Everything here answers one brief.
+One substrate, one light. Everything below follows from that.
 
-> One person, 17, sitting down at 21:00 after training, nine weeks from an
-> Oxford admissions test. Tired, slightly wired, needs to start rather than
-> browse. The single job of Today: make the next hour unambiguous.
-
-Every decision below was held against one test: **from the doorway, squinting,
-can you tell what to do next?** Not "is this pretty" — "is the next hour
-unambiguous."
-
-The visual world is an exam hall, a training log, a lab notebook. It is not a
-SaaS dashboard, and where it started drifting toward one, that is written down
-in [What was cut](#what-was-cut) rather than quietly fixed.
+The reference is an X-ray plate or a long exposure: dense black, structure
+emerging in cold light, most of the frame empty. If a screen looks busy, the
+fix is subtraction, not rebalancing.
 
 ---
 
-## 1. Palette
+## 1. There is one theme
 
-Six named values per theme. Each is named for the **job it does in the
-interface**, never for what colour it is. Everything else in the system —
-surfaces, rules, hovers, status grounds, glows — is derived from these six in
-`tokens.css`, and no component ever sees a seventh.
+No light mode, no toggle, no `[data-theme]` selector, no theme provider, no
+pre-paint script. `tokens.css` declares the palette on bare `:root` and nothing
+at runtime can change it.
 
-| Token | Light | Dark | What it does |
-|---|---|---|---|
-| `--paper` | `#EFEAE1` | `#14130E` | The substrate the day is printed on |
-| `--ink` | `#191813` | `#EFEAE0` | Everything you read first |
-| `--quiet` | `#5E5B51` | `#A39D91` | Everything you read second |
-| `--emission` | `#43E3A9` | `#43E3A9` | The light that means *this is happening now* |
-| `--signal` | `#0A6B4F` | `#4FDCA4` | The ink that says "now" where a word or numeral carries it |
-| `--alarm` | `#9E3B2B` | `#E88C7B` | The ink that means something needs you |
+This is a decision, not an omission. The light rule below is the whole design,
+and it only survives being decided once — a second substrate would have meant a
+second set of judgements about where the light falls, made in a hurry, against
+a ground nobody was actually looking at.
 
-### Why these
+---
 
-**`--paper` is a warm grey-cream, not a yellow cream.** Yellow cream reads
-cosy — a journalling app, a recipe site. This needs to read like exam stock:
-warm enough not to be clinical, desaturated enough to be serious. It also sits
-a few percent off white on purpose, because light cannot bleed *through* a
-surface that is already the brightest thing on screen.
+## 2. The palette is six named values
 
-**`--emission` is identical in both themes.** That is the whole point of "the
-dark theme inverts the substrate, not the logic". What changes between themes
-is what the light falls on, never the light.
+Everything else is derived. Each is named for the job it does, never for what
+colour it is.
 
-**`--signal` and `--emission` are two different values doing two different
-jobs**, and keeping them apart is what makes the light rule enforceable:
-
-> **`--signal` draws. `--emission` glows.**
-
-`--emission` is high-chroma mint that would fail contrast as text and is never
-used as text. `--signal` is a deep mint chosen to clear 4.5:1 on its ground, and
-it is what a numeral, a word or a 3px rail segment is actually painted in.
-
-**Held is deliberately not a colour.** An early version tinted every completed
-block mint-green. Three green badges on a day pull the eye as hard as the one
-lit row, and completion is past tense. Held is now written quietly in
-`--ink-muted` and takes no ground at all.
-
-### Measured contrast
-
-Against the ground each one actually lands on:
-
-| | on `--paper` (light) | on `--paper` (dark) |
+| Token | Value | Job |
 |---|---|---|
-| `--ink` | 14.8:1 | 15.4:1 |
-| `--quiet` | 5.7:1 | 7.0:1 |
-| `--signal` | 5.5:1 | 11.3:1 |
-| `--alarm` | 5.7:1 | 8.1:1 |
-| `--ink-subtle` | 3.6:1 — large and supplementary text only | 3.9:1 |
-| `--on-signal` on `--signal` | 5.9:1 | 9.6:1 |
+| `--paper` | `#0b0d12` | The substrate everything is printed on |
+| `--ink` | `#e8ecf3` | Everything you read first |
+| `--quiet` | `#9aa4b4` | Everything you read second |
+| `--emission` | `#3d8bff` | The light that means "this is happening now" |
+| `--signal` | `#7db4ff` | The ink that says "now" where a word or numeral carries it |
+| `--alarm` | `#ff8f7a` | The ink that means something needs you |
 
-Text over a glowed surface holds 4.5:1. **Glow loses to contrast, always** — a
-glow is a shadow behind the surface, so it never sits between ink and its
-ground, and the `--cool` wash under the primary emitter is 4% mint, which moves
-the ground's luminance by less than a percent.
+**`--paper` is a blued charcoal, not black.** Pure `#000` has no material — it
+is the absence of a screen, and everything on it floats. A near-black with a
+little blue in it is a surface, and blue light falling on a faintly blue ground
+belongs there rather than sitting on top of it.
 
----
+**`--emission` and `--signal` are two values, not one.** `--emission` is
+saturated and would fail as text; it never appears as text. `--signal` is
+lighter and clears 4.5:1 on every ground in the system, so it can be read.
 
-## 2. Type
+Measured contrast, against the ground each one actually lands on:
 
-Three faces, deliberately paired. The pairing carries an argument rather than
-just filling three slots.
-
-| Role | Face | Why |
+| | on `--paper` | on `--surface` |
 |---|---|---|
-| Display | **Fraunces** | A variable serif with a real optical-size axis, drawn from old catalogue and almanac types. Warm, printed, slightly odd — nothing like a system serif or a fashion serif. |
-| Body | **Public Sans** | Shorter ascenders and less geometry than the usual UI grotesque. Reads like a form you have to fill in correctly, which is the right register. |
-| Utility | **IBM Plex Mono** | An *instrument* face, from engineering documentation rather than a code editor. Slab-ish terminals give numerals a printed, mechanical quality. |
+| `--ink` | 16.4:1 | 15.2:1 |
+| `--quiet` | 7.6:1 | 7.0:1 |
+| `--signal` | 9.1:1 | 8.3:1 |
+| `--alarm` | 8.8:1 | 8.1:1 |
+| `--ink-subtle` | 5.2:1 | 4.8:1 |
 
-**The pairing means something.** Fraunces is the person's voice: what I mean to
-do. Plex Mono is the instrument's voice: what is measured. Public Sans is the
-connective tissue between them. That is why the objective line is set in
-Fraunces and the elapsed clock is set in Plex Mono, and never the reverse.
+`--ink-subtle` clears 4.5:1 deliberately. On the old paper substrate it sat at
+3.6:1 and was documented as "large text only", which in practice meant it got
+used for small text anyway. Making it legal removed the loophole.
 
-Not Inter and a generic serif, by explicit instruction and by preference.
+### There is no green
 
-### Numerals
-
-The day spine is almost entirely numerals, so this is not a detail.
-
-```css
-body {
-  font-variant-numeric: tabular-nums slashed-zero;
-  font-feature-settings: 'kern' 1, 'tnum' 1, 'zero' 1;
-}
-```
-
-Tabular figures are set on `body`, not opted into per component. A ticking
-clock must never change width, and a column of start times must align down the
-gutter without anyone remembering to ask for it. Mono under 14px also carries
-`letter-spacing: 0.02em` (`--tracking-mono`), because Plex Mono sets tight at
-caption size.
-
-### Fraunces optical size
-
-The axis is used, not decorative:
-
-| Token | Value | Where |
-|---|---|---|
-| `--display-opsz-lg` | `opsz 120` | The day title, a block title in Focus. High contrast, fine serifs. |
-| `--display-opsz-md` | `opsz 48` | Objective line, state titles, modal titles. |
-| `--display-opsz-sm` | `opsz 14` | The wordmark. Sturdy at small size. |
-
-Display type is used for exactly three things: the day title, a block's title
-in Focus, and the objective line. Everything else is Public Sans or Plex Mono.
+Blue is the light, and the light means *now*. A colour for "you got this right"
+would either compete with it or add a fourth hue to a palette whose whole
+argument is restraint. So a correct answer, a held block and a met criterion all
+take `--held` — a bright neutral — plus a word or a mark. Held is a fact about
+the past. It is not an event, and it does not glow.
 
 ---
 
-## 3. The rail — the signature
+## 3. The light rule
 
-One continuous hairline runs the full height of the day. It is literal time,
-unbroken, **including across the gaps between blocks**, because the gaps are
-part of the day. Every block hangs off it.
+**Blue radiates from meaning. It never comes from chrome.**
 
-```
-        │
-  08:00 ├─ Further Maths — Complex numbers        held
-        │  Finish one exercise and mark it
-  10:30 ├─ TARA — Section A under time             held
-        │
-        ●  ← the bead, at 15:07. The only lit thing on the screen.
-  14:00 ┝━ ECONOMICS — MARKET FAILURE ESSAY         Now
-        ┃  Write one evaluation paragraph and stop
-        │
-  16:00 ├─ Philosophy — Uncommon Knowledge      in 53m
-  18:00 ├─ BJJ No-Gi
-        ╵
-```
+It is allowed on: the active block, the now-marker, the recording indicator,
+Jarvis thinking, a focused input, a topic falling out of retention, and the
+current question in a timed drill.
 
-A single bead sits on the rail at the current minute. The entry the bead
-touches is the only one drawn at full size and the only one lit; everything
-above it recedes to 50% opacity, everything below is a quiet ruled line.
+It is banned on: borders, resting cards, headers, nav, dividers, and anything
+whose only claim is that it is interactive.
 
-**Why a rail rather than a list of rows.** A ledger is a table of things; the
-rail is time itself. Seeing 11:30–14:00 as empty rail is information rows
-cannot give. It also gives emission somewhere to live that is not a card — with
-rows, the only way to light the current block is to glow a box, which is
-chrome. And it carries: on Focus the same rail turns horizontal and becomes the
-session's own progress track. Same object, zoomed in.
+Enforced by the absence of a class. There is no utility that puts `--emission`
+on a border, a fill or a text colour. The only routes to it are `.glow-xs`,
+`.glow-sm`, `.glow-md`, `.glow-lg`, `.bloom` and `.bloom-centre` — four shadows
+and two radial gradients.
 
-The tick where each entry meets the rail is structural: it marks that this
-entry is pinned at this minute. It carries no colour. See
-[the one taken away](#the-one-taken-away).
+### Soft falloff, never a ring
 
----
+Every glow is two low-opacity blue shadows at wide blur with negative spread, so
+the edge is never findable. The single largest emitter on a screen also gets a
+bloom, because a shadow alone cannot make light appear to come from *inside* a
+surface — it only paints it behind one.
 
-## 4. Emission — the light rule
+`.cd-bead__dot` is the reference implementation: a 9px `--signal` dot, a
+`--glow-md` shadow, and a `::after` at nine times the diameter carrying
+`--bloom-centre`. Without the third layer it read as a dot with a smudge.
 
-The surface is warm paper. **Mint is light bleeding through it, never ink
-printed on it.**
+### Pull the opacities down, not up
 
-### Where light is allowed
-
-Light radiates from meaning only. There are exactly five emitters in the app:
-
-1. the block you are in (Today, Timetable)
-2. the now bead
-3. a running session clock and its rail (Focus)
-4. Jarvis thinking
-5. a focused input
-
-Never chrome: not borders, not resting cards, not headers, not nav, not
-dividers. The nav's active item is ink weight and a 2px ink rule — there is no
-tint on it and no mint anywhere near it.
-
-### How it is built
-
-Every glow is two low-opacity mint shadows at wide blur, so the edge is never
-findable. There is no hard ring anywhere.
-
-```css
---glow-sm: 0 2px 14px -4px rgba(67,227,169,0.24), 0 0 34px -12px rgba(67,227,169,0.16);
---glow-md: 0 4px 26px -6px rgba(67,227,169,0.30), 0 0 68px -16px rgba(67,227,169,0.20);
---glow-lg: 0 6px 42px -8px rgba(67,227,169,0.36), 0 0 120px -24px rgba(67,227,169,0.24);
-```
-
-The single largest emitter also gets `--bloom`, a radial gradient anchored to
-the left so the light reads as coming off the rail rather than out of the
-middle of a box. A shadow alone cannot make light appear to come from *inside*
-a surface.
-
-The surface around a glow reads very slightly cooler: `--cool` is `--paper`
-mixed 4% toward the emission, and it is the only place in the system where the
-light touches a fill.
+Blue at full saturation against near-black is the highest-energy pairing in the
+system. The same geometry that read as a soft halo on cream reads as a lamp
+here. Every glow opacity is roughly half its mint predecessor, and every time
+one of them looked right it was too much.
 
 ### The budget
 
-- **One primary emitter per screen.** Secondary at about a third of the
-  strength. Everything else zero.
-- **Total glowing surface under ~10% of the viewport.** When in doubt, remove
-  one.
-- Today, mid-block: primary is the row you are in — bloom, `--glow-sm`, and a
-  3px `--signal` segment where the rail passes through it. No secondary.
-- Today, between blocks: primary is the bead on the rail (`--glow-md`);
-  secondary is the row that is next, at about a third of the strength —
-  `--glow-sm`, no bloom, no segment, and a tick filled with **ink** rather
-  than a hollow one. Only one of *now* and *next* ever exists on a day, so
-  those two never double up — but *next* and the bead always co-exist, since
-  *next* is only drawn when nothing is running, which is exactly when there is
-  a bead. That is why the filled tick is ink and not mint: two mint dots on
-  one rail, the same size a few rows apart, and "you are here" stops being
-  obvious. Filled against hollow already does the job without the light.
-- Focus: primary is the session rail bead while the clock runs; secondary is
-  the focused input (`--glow-sm`). Before the clock starts, neither of those is
-  lit and the Start button is the only emitter on the screen — which is the
-  correct handoff, because starting is the entire job of the screen at that
-  moment.
+One primary emitter per screen at `--glow-md` or above. One secondary at
+`--glow-xs`, which is about a third. Everything else is zero. Under about a
+tenth of the viewport is ever lit.
 
-### It is enforced by absence
+`--glow-xs` exists because "everything else at a third" needs a value rather
+than a good intention: without it, every second emitter quietly became
+`--glow-sm` and each screen ended up with two lights of equal weight, at which
+point neither reads as a source.
 
-There is deliberately **no utility class** that puts `--emission` on a border,
-a fill or a text colour. The only routes to the light are `.glow-sm/md/lg` and
-`.bloom`, which are shadows and a gradient. If a component wants a mint border,
-the system has no way to give it one.
+Where two emitters could collide, one is written so it cannot:
+
+- `.cd-railrow.is-now` and `.cd-bead` never co-exist — the bead only appears
+  when nothing is running.
+- `.cd-btn--go` and a running `.cd-sessionrail` never co-exist — the button
+  becomes Pause the moment the clock starts.
+
+### Contrast beats light, always
+
+Text over any glowed surface holds 4.5:1. If a glow ever costs a reading, the
+glow loses. This is why `--signal` exists as a separate value from
+`--emission`, and why the focus ring is drawn in `--signal` rather than felt
+through a glow — a focus ring has to be *seen*.
 
 ### Breathing
 
-Glows breathe long and low — `--dur-breathe: 5200ms`, opacity 0.78 → 1 — and
-**only while something is genuinely active**. A paused clock is lit and still.
+`.cd-breathes` runs a 5.6s opacity cycle between 0.78 and 1. Long and low: alive,
+not flashing. It is applied only while something is genuinely running.
 
-`prefers-reduced-motion` drops to a static glow at full strength via
-`.cd-breathes { animation: none; opacity: 1 }`. The emphasis is the
-information, so it is stilled, never removed.
-
----
-
-## 5. Motion
-
-**One orchestrated moment, and it is a block opening into Focus.**
-
-Focus is a route, so by default the day would disappear and something else
-would be there — which reads as a modal over the day. Instead the row measures
-itself on the way out (`openBlock`) and hands its rectangle forward; Focus picks
-it up on mount and plays the block into place from exactly where it was
-standing, with the session rail unrolling underneath (`playOpen`). A
-first-last-invert on the Web Animations API, so it works in every browser
-rather than only where view transitions have shipped.
-
-Everything else moves at `--dur-fast` (140ms) or not at all. `prefers-reduced-motion`
-skips the opening entirely and navigates.
+Under `prefers-reduced-motion: reduce` a breathing glow drops to a static glow
+at full strength. The emphasis is information, so it is stilled, never removed.
 
 ---
 
-## 6. Copy
+## 4. Brightness is not importance
 
-- Active voice, sentence case, plain verbs. **"Start", not "Begin Session".**
-- **An action keeps its name through the whole flow.** Start → Pause → Done,
-  and "The day" is what the way back is called on every screen.
-- **Empty states are invitations.** An empty day says what to do about it and
-  links to where to do it: *"Nothing is on today. Your rhythms put training on
-  the days you train. Everything else you put here yourself."*
-- **Errors say what happened and how to fix it**, never vague, never
-  apologising: *"Today could not be loaded. Your blocks are safe on the server.
-  This is a connection problem, not lost work."*
-- **Named by what you control, not how it was built:** "Working from", not
-  "material". "The hour", not "session plan". "Held", not "completed".
+The correction that came out of the first screenshot pass, and the one rule most
+easily lost when inverting a design.
 
----
+On paper, "the one filled control" and "the darkest rectangle" happened to be the
+same thing, so `background: var(--ink)` was both correct and quiet. Inverted, it
+produces a near-white slab on near-black — brighter than every glow in the
+building. In the first screenshots the eye went to *Save note* on every screen
+and never to the lit block.
 
-## 7. The quality floor
+So `--fill` (`#232936`) is derived for this substrate rather than flipped into
+it: a lifted charcoal, unmistakably the one solid control, nowhere near the
+light. `--ink` on it reads 12.3:1.
 
-Assumed, not announced:
-
-- Responsive to 390px. The rail's gutter narrows and the times drop a size; the
-  structure does not change.
-- Visible keyboard focus on every interactive element — 2px `--signal` with
-  2px offset, never removed without a replacement. On inputs the glow is added
-  *to* the ring, never instead of it.
-- `prefers-reduced-motion` respected throughout.
-- Real loading and empty states on every screen, and skeletons in the real
-  shape so nothing shifts when content arrives.
-- Every control is at least 44px in its smallest dimension. "Compact" changes
-  the glyph and the type, never the target.
-- Status is never carried by colour alone: every status has a word or a mark.
+Everything that was a large ink fill now uses it: the primary button, the
+primary icon button, the user's chat bubble, a checked radio. The only things
+left at full brightness are text and the light.
 
 ---
 
-## 8. Files
+## 5. Type
 
-```
-tokens.css       Every value the interface may use. The only file with literals.
-base.css         Reset, element defaults, focus, keyframes, motion policy.
-components.css   Component classes. Resolves entirely through tokens.
-utilities.css    Semantic utilities, named to match tailwind.config.js.
+| Role | Face | Why this one |
+|---|---|---|
+| Display | **Newsreader** | A variable serif with a real optical size axis and *moderate* stroke contrast. On black, light spreads: fine serifs bloom and high-contrast thins dissolve. A face drawn for paper does not survive the inversion, so this was chosen against black rather than adapted to it. |
+| Body | **IBM Plex Sans** | Genuine tabular lining figures and a slashed zero, drawn to the same skeleton as the mono. |
+| Instrument | **IBM Plex Mono** | Every time, duration, count and score. |
+
+**The utility face was chosen for its numerals.** The day spine and the drill
+timers are almost entirely figures, and a numeral that changes width when a
+clock ticks is a defect. Plex Sans and Plex Mono are metric siblings, so a
+duration inside a sentence and the same duration in a table are the same digits
+at the same width — which the previous pairing, drawn by different hands for
+different purposes, could not promise.
+
+Tabular figures are set on `body`, not opted into per component:
+
+```css
+font-variant-numeric: tabular-nums slashed-zero;
+font-feature-settings: 'kern' 1, 'tnum' 1, 'zero' 1;
 ```
 
-No component file contains a raw colour, shadow, radius or duration.
-`/dev/ui` renders every primitive in both themes on one page and is kept in the
-repo so it keeps doing that job.
+### Optical size
+
+Newsreader's `opsz` axis runs 6–72 and is driven by three tokens: `lg` (60) for
+the day title and Focus's block title, `md` (30) for section headings and modal
+titles, `sm` (12) for the wordmark. Large sizes take a high value, which refines
+the serifs; small sizes take a low one, which keeps them sturdy enough to hold
+on this ground.
+
+### The pairing means something
+
+Newsreader is the person's voice: what I mean to do. Plex Mono is the
+instrument's voice: what is measured. Plex Sans is the connective tissue. A
+block title is set in Newsreader and the elapsed clock in Plex Mono, and never
+the reverse.
 
 ---
 
-## What was cut
+## 6. Motion
 
-Written down because the reasons matter more than the result.
+The entire budget is spent on one moment: **a block opening into Focus.**
+Everything else is 140ms or does not move.
 
-- **"3 of 8 held" in the day header.** The most generic move in the category,
-  and at 21:00 it reads *you failed at five things* — the opposite of "start
-  now". The corner now shows what is next and when, or nothing at all when a
-  block is already running, because then the lit row has already said it.
-- **Habits as rounded pills with a `+`.** Every habit tracker ever shipped. Now
-  a tally: cells on a baseline rule, struck through when held. A log, not a
-  tracker.
-- **The Focus clock as a rounded card with a button cluster.** That is a
-  Pomodoro app. The card is gone; the elapsed numeral sits on the paper with
-  the rail above it as its track, one filled verb, the rest plain words.
-- **A 3px project-coloured left border on every row.** The Google Calendar
-  convention, and a second vertical line fights the rail.
-- **Cards on Today and Focus.** On a paper substrate, wrapping everything in a
-  shadowed rounded box is a reflex. Cards survive only where something
-  genuinely floats: modals, sheets, toasts, and the panels on Settings.
-- **The nav's tinted active pill.** A straight violation of the light rule,
-  which bans mint on chrome.
-- **The Jarvis brief on Today.** A network call on load, in front of the day,
-  that said something general. Jarvis has its own screen.
-- **The italic display accent line.** A magazine device that had drifted onto
-  every screen, saying something decorative in a place that should carry a
-  fact. Supporting lines are body type now, or absent.
-- **The block's title inside its own objective proposals.** The proposals wrote
-  the title into each sentence, which read as mail merge the moment a title was
-  a phrase rather than a bare noun: *"Write one paragraph of the Market failure
-  essay essay and stop."* Fixing the grammar was the obvious repair and the
-  wrong one — on Focus the objective sits directly under the title, set large,
-  so naming the topic again was repeating in small type the words immediately
-  above. The proposals now say only what you will do with the hour.
-- **"No objective yet" on a block that is already behind you.** True, and
-  useless: it is a note about a decision nobody can make any more, printed at
-  the weight of a real objective. It appears only on blocks still ahead.
+The row is a rectangle on the day spine. Focus is a bigger rectangle. So the
+moment is that rectangle *growing* — measured, not approximated:
 
-### The one taken away
+1. `openBlock()` captures the row's box and its title's box on the way out.
+2. `playOpen()` draws `.cd-openghost` at exactly the row's bounds and animates
+   width, height and position to exactly the header's, carrying the substrate
+   wash and the glow so what grows is the lit block itself.
+3. The title travels from where it was standing to where it lands, scaled by
+   the ratio of the two measured heights, so there are never two titles at two
+   sizes.
+4. The session rail unrolls from the left, 80ms behind — the vertical rail the
+   row was hanging off, turning horizontal.
+5. Everything else arrives last and barely moves.
 
-Last, after everything else was built and looked right: **project colour on
-the rail.**
+The ghost is `pointer-events: none`, `aria-hidden`, and removed on `finish`,
+`cancel`, or a timeout — a backgrounded tab never fires `finish`.
 
-It had survived the first critique by being demoted — a 3px coloured left
-border became a 5px hollow ring on the rail, which felt like a fix. It was the
-same idea in a smaller package. Seven hues at 5px, forty pixels apart, never
-actually read as categories at a glance, which was the only argument for
-having them. And every row already names its project in words, directly
-underneath the title.
+A browser that cannot measure it simply navigates. This is the polish, never the
+function.
 
-So it was decoration wearing a data costume, on a screen whose entire argument
-is that exactly one thing is lit. The rail is one line, one bead, one lit row.
+---
 
-`Project.color` stays in the database. It is data, and a future view may want
-it; it is simply not on this screen.
+## 7. Copy
+
+- **Active voice.** "The day did not load", never "The day could not be loaded".
+- **Sentence case.** "Start", not "Begin Session".
+- **Plain verbs.** Write, open, drill, hold, pick.
+- **Empty states are invitations.** They name the first move. They never
+  describe the void, and they no longer carry a decorative icon tile above the
+  heading — it repeated the title and, on this substrate, put a grey box in the
+  middle of a frame whose argument is emptiness.
+- **Errors say what happened and the one thing to do.** No apologies, no
+  "something went wrong", no "please", never a bare status code as the whole
+  message.
+
+Every error in the app follows the same three-beat shape: what failed, where
+your work actually is, what to do.
+
+> **The day did not load.** The server did not answer. Your blocks are on it, not
+> in this tab, so nothing is lost. Check your connection and try again.
+
+---
+
+## 8. Rules a component must not break
+
+1. No literal colour, shadow, radius or duration outside `tokens.css`.
+2. No `--emission` on a border, a fill or a text colour.
+3. No second primary emitter on a screen.
+4. Nothing under 44px of hit area.
+5. No status carried by colour alone — always a word or a mark beside it.
+6. No text under 4.5:1 on the ground it actually lands on.
+7. Nothing large filled with `--ink`. That is what `--fill` is for.

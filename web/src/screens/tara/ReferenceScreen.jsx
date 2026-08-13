@@ -101,8 +101,8 @@ export function ReferenceScreen() {
     return (
       <Page>
         <ErrorState
-          title="The reference could not be loaded"
-          body="This is a connection problem — nothing here is stored on this device."
+          title="The reference did not load"
+          body="The server did not answer. Nothing here is kept in this browser, so it has to come from there. Try again."
           detail={error}
           onRetry={reload}
         />

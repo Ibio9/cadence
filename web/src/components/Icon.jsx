@@ -169,6 +169,46 @@ const PATHS = {
       <path d="M7.5 12h.01M9.8 8.3h.01M14.2 7.5h.01" />
     </>
   ),
+
+  // the interview drill
+  mic: (
+    <>
+      <rect x="9" y="2.5" width="6" height="11" rx="3" />
+      <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" />
+    </>
+  ),
+  camera: (
+    <>
+      <path d="M15 8.5V7a1.5 1.5 0 0 0-1.5-1.5h-9A1.5 1.5 0 0 0 3 7v10a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 15 17v-1.5z" />
+      <path d="M15 10.5l5-3v9l-5-3z" />
+    </>
+  ),
+  /* A filled dot inside a ring: the one shape that is universally "recording"
+     without a word. The fill is drawn by the component, not the path. */
+  record: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="4.5" fill="currentColor" stroke="none" />
+    </>
+  ),
+  stop: <rect x="6.5" y="6.5" width="11" height="11" rx="2" />,
+  quote: <path d="M9.5 6.5C7 7.8 5.5 10 5.5 12.8V17.5h5v-5h-2.6c.2-1.6 1-2.9 2.4-3.8zM19 6.5c-2.5 1.3-4 3.5-4 6.3v4.7h5v-5h-2.6c.2-1.6 1-2.9 2.4-3.8z" />,
+
+  // retention
+  /* A decay curve: high on the left, falling away and flattening. Drawn as the
+     real shape the model produces, not a generic downward arrow. */
+  curve: (
+    <>
+      <path d="M3.5 20.5V4M3.5 20.5H21" />
+      <path d="M4.5 6c4.5 0 5.5 5.2 7.5 8s4.5 3.4 8 3.4" />
+    </>
+  ),
+  book: (
+    <>
+      <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H19v15H5.5A1.5 1.5 0 0 0 4 19.5z" />
+      <path d="M4 19.5A1.5 1.5 0 0 1 5.5 21H19" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 20, strokeWidth = 1.5, className = '', title, ...rest }) {

@@ -264,8 +264,8 @@ export function ProgressScreen() {
     return (
       <Page>
         <ErrorState
-          title="Progress could not be loaded"
-          body="Your attempts are safe on the server. This is a connection problem, not lost work."
+          title="Progress did not load"
+          body="The server did not answer. Every answer you have given is on it. Check your connection and try again."
           detail={error}
           onRetry={reload}
         />
@@ -280,7 +280,7 @@ export function ProgressScreen() {
       <PageHeading
         eyebrow="TARA Drill"
         title="Progress"
-        lead="Nothing here is rounded up. A weak type is shown as a weak type."
+        lead="Nothing here is rounded up. A weak type reads as a weak type."
         actions={
           <ButtonLink variant="secondary" icon="arrowLeft" href="/tara">
             TARA Drill
@@ -291,8 +291,8 @@ export function ProgressScreen() {
       {answered === 0 ? (
         <EmptyState
           icon="target"
-          title="Nothing answered yet"
-          body="Drill a set and this fills in: accuracy per type, where the minutes go, which flaws you keep missing, and how far you are from 20 out of 22."
+          title="Answer a set and this fills in"
+          body="Accuracy per type, where the minutes go, the flaws you keep missing, and how far you are from 20 out of 22. Drill ten questions and come back."
           action={{ label: 'Open Critical Thinking', href: '/tara/ct', icon: 'arrowRight' }}
         />
       ) : (

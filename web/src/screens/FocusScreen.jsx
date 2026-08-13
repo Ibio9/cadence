@@ -85,7 +85,7 @@ function SaveMark({ state }) {
     return (
       <span className="cd-savemark cd-savemark--error" role="alert">
         <Icon name="alertCircle" size={13} />
-        Not saved. Check your connection, then type again.
+        Not saved. Check your connection, then type anything to try again.
       </span>
     );
   }
@@ -212,7 +212,7 @@ function Objective({ block, project, onSave }) {
             setEditing(true);
           }}
         >
-          Change it
+          Change
         </button>
       </section>
     );
@@ -246,7 +246,7 @@ function Objective({ block, project, onSave }) {
         </div>
         {block.objective ? (
           <button type="button" className="cd-textlink" onClick={() => setEditing(false)}>
-            Keep the one I had
+            Keep the old one
           </button>
         ) : null}
       </section>
@@ -339,12 +339,12 @@ export function FocusScreen({ id }) {
     setBusy(action);
     try {
       await act(action);
-      if (action === 'done') toast({ tone: 'success', title: 'Held', description: 'The block is closed.' });
+      if (action === 'done') toast({ tone: 'success', title: 'Held', description: 'Nothing more is owed to this hour.' });
     } catch {
       toast({
         tone: 'danger',
-        title: 'The clock did not change',
-        description: 'The server did not answer. Your time so far is still saved on it.',
+        title: 'The clock did not move',
+        description: 'The server did not answer. Every minute you have banked is still on it. Press it again.',
       });
     }
     setBusy('');
@@ -356,8 +356,8 @@ export function FocusScreen({ id }) {
     return (
       <FocusShell>
         <ErrorState
-          title="This block is not on any day"
-          body="It was deleted, or the link points at something that has moved. Open the day and pick a block from there."
+          title="That block is gone"
+          body="It was deleted, or this link points somewhere that has moved. Open the day and pick a block from there."
           action={{ label: 'Open the day', href: '/' }}
         />
       </FocusShell>
@@ -368,8 +368,8 @@ export function FocusScreen({ id }) {
     return (
       <FocusShell>
         <ErrorState
-          title="The block could not be loaded"
-          body="Your work is safe on the server. This is a connection problem, not lost time."
+          title="This block did not load"
+          body="The server did not answer. Your notes and your time are on it, so nothing is lost. Check your connection and try again."
           detail={error}
           onRetry={reload}
           retrying={status === 'loading'}
@@ -439,7 +439,7 @@ export function FocusScreen({ id }) {
               label="Notes"
               hideLabel
               rows={9}
-              placeholder="What you worked out, what you got stuck on, where to pick up."
+              placeholder="What you worked out, where you got stuck, where to pick up."
               value={notes.value}
               onChange={(e) => notes.change(e.target.value)}
               onBlur={notes.flush}

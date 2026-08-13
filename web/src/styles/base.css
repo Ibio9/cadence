@@ -88,8 +88,11 @@ hr {
 
 table { border-collapse: collapse; width: 100%; }
 
+/* Selection is the one place the light is allowed on a fill, because a
+   selection genuinely is "this, now" — and on this substrate a neutral
+   highlight is invisible. */
 ::selection {
-  background: var(--cool);
+  background: rgba(var(--emission-rgb), 0.3);
   color: var(--ink);
 }
 
@@ -188,12 +191,6 @@ table { border-collapse: collapse; width: 100%; }
 @keyframes cd-breathe {
   0%, 100% { opacity: 0.78; }
   50% { opacity: 1; }
-}
-
-/* The rail unrolling when a block opens into Focus. */
-@keyframes cd-rail-unroll {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
 }
 
 /* --------------------------------------------------------------------------

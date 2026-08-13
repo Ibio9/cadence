@@ -12,9 +12,16 @@
    seen rather than felt, it is drawn in --signal, which is a different value
    picked to clear 4.5:1 on its ground.
 
-   Light comes only from meaning: the block you are in, the now bead, a
-   running session, Jarvis thinking, a focused input. Nav, headers, dividers,
+   Light comes only from meaning: the block you are in, the now bead, a running
+   session, Jarvis thinking, a focused input, a recording indicator, a topic
+   falling out of retention, the question you are on. Nav, headers, dividers,
    resting cards and every other piece of chrome are unlit, deliberately.
+
+   The budget is enforced by hand, per screen: one primary emitter at --glow-md
+   or above, one secondary at --glow-xs, and nothing else. Where two emitters
+   could appear together, one of them is written so it cannot — the now-row and
+   the bead are mutually exclusive, and so are the go button and the running
+   rail. If two things glow equally, neither reads as a light source.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -146,8 +153,8 @@
 .cd-btn.is-loading { cursor: progress; }
 
 /* primary: the one filled control on a screen */
-.cd-btn--primary { background: var(--ink); color: var(--paper); }
-.cd-btn--primary:hover:not(:disabled) { background: var(--ink); filter: contrast(0.88); }
+.cd-btn--primary { background: var(--fill); color: var(--ink); }
+.cd-btn--primary:hover:not(:disabled) { background: var(--fill-hover); }
 .cd-btn--primary:active:not(:disabled) { box-shadow: var(--press-inset); }
 
 /* go: the verb that starts something. The only button that emits, and only
@@ -175,7 +182,7 @@
 .cd-btn--danger:hover:not(:disabled) { background: var(--alarm-ground); }
 .cd-btn--danger:active:not(:disabled) { box-shadow: var(--press-inset); }
 
-.cd-btn--danger-solid { background: var(--alarm); color: var(--surface-raised); }
+.cd-btn--danger-solid { background: var(--alarm); color: var(--paper); }
 .cd-btn--danger-solid:hover:not(:disabled) { filter: saturate(1.1) brightness(0.94); }
 .cd-btn--danger-solid:active:not(:disabled) { box-shadow: var(--press-inset); }
 
@@ -204,8 +211,8 @@
 .cd-iconbtn:hover:not(:disabled) { background: var(--hover-tint); color: var(--ink); }
 .cd-iconbtn:active:not(:disabled) { background: var(--active-tint); }
 .cd-iconbtn:disabled { opacity: 0.4; cursor: not-allowed; }
-.cd-iconbtn--primary { background: var(--ink); color: var(--paper); }
-.cd-iconbtn--primary:hover:not(:disabled) { filter: contrast(0.88); color: var(--paper); }
+.cd-iconbtn--primary { background: var(--fill); color: var(--ink); }
+.cd-iconbtn--primary:hover:not(:disabled) { background: var(--fill-hover); color: var(--ink); }
 .cd-iconbtn--secondary { border-color: var(--rule-strong); color: var(--ink); }
 .cd-iconbtn--secondary:hover:not(:disabled) { border-color: var(--ink-subtle); background: var(--hover-tint); }
 .cd-iconbtn--danger { color: var(--alarm); }
@@ -330,7 +337,7 @@
   justify-content: center;
   background: var(--surface-raised);
   border: 1.5px solid var(--rule-strong);
-  color: var(--paper);
+  color: var(--ink);
   transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
 .cd-checkbox { border-radius: 4px; }
@@ -341,10 +348,10 @@
 
 .cd-checkbox.is-checked,
 .cd-checkbox.is-indeterminate,
-.cd-radio.is-checked { background: var(--ink); border-color: var(--ink); }
+.cd-radio.is-checked { background: var(--fill); border-color: var(--held); }
 
-.cd-radio__dot { width: 7px; height: 7px; border-radius: var(--radius-pill); background: var(--paper); }
-.cd-checkbox__bar { width: 9px; height: 2px; border-radius: 1px; background: var(--paper); }
+.cd-radio__dot { width: 7px; height: 7px; border-radius: var(--radius-pill); background: var(--ink); }
+.cd-checkbox__bar { width: 9px; height: 2px; border-radius: 1px; background: var(--ink); }
 
 .cd-checkbox.is-invalid,
 .cd-radio.is-invalid { border-color: var(--alarm); }
@@ -376,7 +383,7 @@
   border: var(--hairline) solid transparent;
   transition: background-color var(--dur-fast) var(--ease);
 }
-.cd-switch.is-on { background: var(--ink); }
+.cd-switch.is-on { background: var(--held); }
 .cd-switch__thumb {
   position: absolute;
   top: 3px;
@@ -406,8 +413,8 @@
   line-height: 1.5;
   white-space: nowrap;
 }
-.cd-badge--neutral { background: var(--surface-sunken); color: var(--ink-muted); }
-.cd-badge--signal { background: var(--cool); color: var(--signal); }
+.cd-badge--neutral { background: var(--surface-raised); color: var(--ink-muted); }
+.cd-badge--signal { background: var(--fill); color: var(--signal); }
 .cd-badge--success { background: var(--held-ground); color: var(--held); }
 .cd-badge--warning { background: var(--warn-ground); color: var(--warn); }
 .cd-badge--danger { background: var(--alarm-ground); color: var(--alarm); }
@@ -660,11 +667,12 @@
   left: 50%;
   transform: translateX(-50%);
   padding: var(--space-2) var(--space-3);
-  background: var(--ink);
+  background: var(--surface-raised);
+  border: var(--hairline) solid var(--rule-strong);
   border-radius: var(--radius-sm);
   font-size: var(--text-caption);
   line-height: var(--leading-normal);
-  color: var(--paper);
+  color: var(--ink);
   white-space: nowrap;
   pointer-events: none;
   animation: cd-fade-in var(--dur-fast) var(--ease);
@@ -712,18 +720,6 @@
   padding: var(--space-10) 0;
   max-width: 46ch;
 }
-.cd-state__mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-control);
-  background: var(--surface-sunken);
-  color: var(--ink-subtle);
-  margin-bottom: var(--space-1);
-}
-.cd-state__mark--danger { background: var(--alarm-ground); color: var(--alarm); }
 .cd-state__title {
   font-family: var(--font-display);
   font-variation-settings: var(--display-opsz-md);
@@ -813,7 +809,7 @@
    App shell.
 
    The nav is chrome, so it never emits. The active item is ink weight and a
-   short rule — no tint, no pill, no mint anywhere near it.
+   short rule — no tint, no pill, no light anywhere near it.
    -------------------------------------------------------------------------- */
 
 .cd-shell { display: flex; min-height: 100dvh; background: var(--paper); }
@@ -1077,15 +1073,15 @@
    third of the strength: the glow without the bloom and without the signal
    segment, and a filled tick instead of a hollow one.
 
-   The tick fills with ink rather than mint on purpose. is-now and is-next
+   The tick fills with ink rather than signal on purpose. is-now and is-next
    never co-exist, but is-next and the bead always do — is-next only appears
-   when nothing is running, which is exactly when the bead is drawn. A mint
-   tick here put a second mint dot on the rail a few rows from the bead, the
+   when nothing is running, which is exactly when the bead is drawn. A blue
+   tick here put a second blue dot on the rail a few rows from the bead, the
    same size and the same colour, and the one that means "you are here"
    stopped being obvious. Filled against hollow already separates this row
    from the ones after it, so it does not need the light as well. */
 .cd-railrow.is-next {
-  box-shadow: var(--glow-sm);
+  box-shadow: var(--glow-xs);
   border-radius: var(--radius-sm);
 }
 .cd-railrow.is-next .cd-railrow__title { font-size: var(--text-lg); }
@@ -1131,6 +1127,20 @@
   background: var(--signal);
   transform: translate(-50%, -50%);
   box-shadow: var(--glow-md);
+}
+/* The falloff. Nine times the dot, entirely soft, so the bead reads as the
+   thing emitting rather than the thing lit. */
+.cd-bead__dot::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--rail-bead) * 9);
+  height: calc(var(--rail-bead) * 9);
+  transform: translate(-50%, -50%);
+  border-radius: var(--radius-pill);
+  background: var(--bloom-centre);
+  pointer-events: none;
 }
 
 /* A word, not a badge: these say when, and when needs no container. */
@@ -1471,7 +1481,7 @@
   overflow-wrap: anywhere;
   border-radius: var(--radius-card);
 }
-.cd-bubble--user { background: var(--ink); color: var(--paper); border-bottom-right-radius: var(--radius-sm); }
+.cd-bubble--user { background: var(--fill); color: var(--ink); border-bottom-right-radius: var(--radius-sm); }
 .cd-bubble--agent {
   background: var(--surface);
   color: var(--ink);
@@ -1534,32 +1544,6 @@
 @media (min-width: 768px) { .cd-notegrid { columns: 2; } }
 @media (min-width: 1280px) { .cd-notegrid--wide { columns: 3; } }
 
-/* Theme preview card */
-.cd-themecard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: var(--hairline) solid var(--rule-strong);
-  border-radius: var(--radius-card);
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease);
-}
-.cd-themecard:hover { border-color: var(--ink-subtle); }
-.cd-themecard[aria-pressed='true'] { border-color: var(--ink); }
-.cd-themecard__preview {
-  border-radius: var(--radius-sm);
-  border: var(--hairline) solid var(--rule);
-  padding: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  overflow: hidden;
-}
-.cd-themecard__chip { height: 7px; border-radius: var(--radius-pill); }
-
 /* Progress ring track and fill */
 .cd-ring__track { stroke: var(--rule-strong); }
 .cd-ring__fill { stroke: var(--ink); transition: stroke-dasharray var(--dur-slow) var(--ease); }
@@ -1574,30 +1558,59 @@
 /* ==========================================================================
    THE MOTION MOMENT
 
-   Opening a block into Focus. The row's box becomes Focus's header rather
-   than a new screen fading in over the day, and the vertical rail unrolls
-   into the horizontal session rail. One orchestrated moment; everything else
-   in the app moves at 140ms or not at all.
+   Opening a block into Focus, and nothing else. The whole motion budget for
+   the app is spent here: everything else moves at 140ms, or does not move.
 
-   Browsers without view transitions simply navigate, which is the correct
-   fallback: the feature is the polish, never the function.
+   The row is a rectangle on the day spine. Focus is a bigger rectangle. So
+   the row's measured box grows into the working surface — its own width and
+   height, not a scale on a proxy — while its title travels from where it was
+   standing to where it lands, and the vertical rail it was hanging off
+   unrolls into the horizontal session rail. It reads as the block opening,
+   not as a modal arriving over the day.
+
+   A browser that cannot measure it simply navigates, which is the correct
+   fallback: this is the polish, never the function.
    ========================================================================== */
 
-@media (prefers-reduced-motion: no-preference) {
-  ::view-transition-old(block-title),
-  ::view-transition-new(block-title) {
-    animation-duration: var(--dur-open);
-    animation-timing-function: var(--ease-open);
-  }
-  ::view-transition-group(block-title) {
-    animation-duration: var(--dur-open);
-    animation-timing-function: var(--ease-open);
-  }
-  ::view-transition-old(root) { animation: cd-fade-in var(--dur-base) var(--ease) reverse; }
-  ::view-transition-new(root) { animation: cd-fade-in var(--dur-base) var(--ease); }
+/* The expanding surface.
+ *
+ * A block on the day spine is a rectangle. Focus is a bigger rectangle. The
+ * moment is that rectangle growing — so this element is drawn at the row's
+ * exact measured bounds and animated to the header's, carrying the substrate
+ * and the light with it. It is painted, not faded in over the page: the
+ * content underneath is already in place and this passes over it and leaves.
+ *
+ * It is inert to the pointer and removed from the DOM when the animation
+ * finishes, so it can never intercept a click or be found by a screen reader.
+ */
+.cd-openghost {
+  position: fixed;
+  z-index: var(--z-overlay);
+  pointer-events: none;
+  border-radius: var(--radius-sm);
+  background: var(--cool);
+  background-image: var(--bloom);
+  box-shadow: var(--glow-md);
+  will-change: transform, opacity;
+}
 
-  .cd-sessionrail { transform-origin: left center; }
-  .cd-focus .cd-sessionrail { animation: cd-rail-unroll var(--dur-open) var(--ease-open); }
+/* The rail segment the row was hanging off, riding along inside the ghost so
+   the line is continuous through the whole move. */
+.cd-openghost__rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--signal);
+}
+
+.cd-sessionrail { transform-origin: left center; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* No expansion, no unroll — but Focus still arrives fully drawn, because
+     the destination was never the animation. */
+  .cd-openghost { display: none; }
 }
 
 /* ==========================================================================
@@ -1721,8 +1734,8 @@
 .cd-option__mark { flex-shrink: 0; }
 .cd-option.is-chosen { border-color: var(--ink); background: var(--surface-raised); }
 .cd-option.is-chosen .cd-option__label { color: var(--ink); }
-.cd-option.is-key { border-color: var(--signal); background: var(--held-ground); }
-.cd-option.is-key .cd-option__mark, .cd-option.is-key .cd-option__label { color: var(--signal); }
+.cd-option.is-key { border-color: var(--held); background: var(--held-ground); }
+.cd-option.is-key .cd-option__mark, .cd-option.is-key .cd-option__label { color: var(--held); }
 .cd-option.is-miss { border-color: var(--alarm); background: var(--alarm-ground); }
 .cd-option.is-miss .cd-option__mark, .cd-option.is-miss .cd-option__label { color: var(--alarm); }
 
@@ -1780,7 +1793,7 @@
 
 .cd-forms { display: flex; flex-direction: column; gap: var(--space-3); }
 .cd-form { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-4); border-radius: var(--radius-card); border: var(--hairline) solid var(--rule); background: var(--surface); border-left-width: 3px; }
-.cd-form.is-valid { border-left-color: var(--signal); }
+.cd-form.is-valid { border-left-color: var(--held); }
 .cd-form.is-invalid { border-left-color: var(--alarm); }
 .cd-form__head { display: flex; align-items: center; gap: var(--space-2); }
 .cd-form__name { font-size: var(--text-base); color: var(--ink); font-weight: var(--weight-medium); }
@@ -1805,7 +1818,7 @@
 /* ---- progress ---- */
 .cd-readycards { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
 .cd-readycard { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-5); border-radius: var(--radius-card); border: var(--hairline) solid var(--rule); background: var(--surface); }
-.cd-readycard.is-ready { border-color: var(--signal); background: var(--held-ground); }
+.cd-readycard.is-ready { border-color: var(--held); background: var(--held-ground); }
 .cd-readycard__name { font-size: var(--text-sm); color: var(--ink-muted); }
 .cd-readycard__none { font-size: var(--text-sm); color: var(--ink-subtle); font-style: italic; }
 .cd-readycard__score { font-family: var(--font-mono); font-size: var(--text-4xl); line-height: var(--leading-tight); color: var(--ink); }
@@ -1827,7 +1840,7 @@
 .cd-bar__name { font-size: var(--text-sm); color: var(--ink); min-width: 0; }
 .cd-bar__track { height: 6px; border-radius: var(--radius-pill); background: var(--surface-sunken); overflow: hidden; }
 .cd-bar__fill { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--ink-subtle); }
-.cd-bar__fill.is-success { background: var(--signal); }
+.cd-bar__fill.is-success { background: var(--held); }
 .cd-bar__fill.is-warning { background: var(--warn); }
 .cd-bar__fill.is-danger { background: var(--alarm); }
 .cd-bar__value { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--ink); }
@@ -1846,7 +1859,7 @@
 .cd-trend__row { display: flex; gap: var(--space-2); align-items: flex-end; height: 6rem; }
 .cd-trend__col { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: var(--space-1); flex: 1; height: 100%; }
 .cd-trend__bar { display: block; width: 100%; border-radius: var(--radius-sm) var(--radius-sm) 0 0; background: var(--ink-subtle); }
-.cd-trend__bar.is-success { background: var(--signal); }
+.cd-trend__bar.is-success { background: var(--held); }
 .cd-trend__bar.is-warning { background: var(--warn); }
 .cd-trend__bar.is-danger { background: var(--alarm); }
 .cd-trend__tick { font-family: var(--font-mono); font-size: var(--text-eyebrow); color: var(--ink-subtle); }
@@ -1887,7 +1900,7 @@
 .cd-structural svg { color: var(--alarm); flex-shrink: 0; margin-top: 2px; }
 .cd-criteria { display: flex; flex-direction: column; gap: var(--space-3); }
 .cd-criterion { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); border-radius: var(--radius-card); border: var(--hairline) solid var(--rule); background: var(--surface); border-left-width: 3px; }
-.cd-criterion.is-met { border-left-color: var(--signal); }
+.cd-criterion.is-met { border-left-color: var(--held); }
 .cd-criterion.is-partial { border-left-color: var(--warn); }
 .cd-criterion.is-failed { border-left-color: var(--alarm); }
 .cd-criterion__head { display: flex; align-items: center; gap: var(--space-3); }

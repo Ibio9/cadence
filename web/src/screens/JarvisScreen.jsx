@@ -97,7 +97,7 @@ export function JarvisScreen() {
         ls.set('cadence_jarvis_history', finalMsgs.slice(-60));
         setLastAttempt('');
       } catch {
-        setError('Jarvis did not answer. The server may be down or the request timed out.');
+        setError('Jarvis did not answer — the request timed out. Your message is still here. Send it again.');
       }
       setLoading(false);
     },
@@ -118,7 +118,7 @@ export function JarvisScreen() {
       <PageHeading
         eyebrow="Assistant"
         title="Jarvis"
-        lead="Primed with today's checklist and today's hours."
+        lead="It can see today's blocks, your open tasks and what you have held this week."
         actions={
           messages.length > 0 ? (
             <Button variant="secondary" icon="trash" onClick={clearHistory}>
@@ -133,7 +133,7 @@ export function JarvisScreen() {
           <div className="flex items-center gap-4">
             <span className={loading ? 'cd-orb is-active' : 'cd-orb'} aria-hidden="true" />
             <p className="text-sm text-ink-muted" role="status">
-              {loading ? 'Jarvis is thinking.' : 'Ready when you are.'}
+              {loading ? 'Thinking.' : 'Ready.'}
             </p>
           </div>
 
@@ -141,8 +141,7 @@ export function JarvisScreen() {
             <div className="flex flex-col gap-4 py-4">
               <p className="font-display text-xl text-ink">Ask the thing you are avoiding.</p>
               <p className="text-base text-ink-muted max-w-prose">
-                Jarvis can see what you have held today and what is on your timetable. Start with one of these, or
-                write your own.
+                Start with one of these, or write your own.
               </p>
               <div className="flex flex-col gap-2 items-start">
                 {STARTERS.map((s) => (

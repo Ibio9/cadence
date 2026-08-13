@@ -109,8 +109,8 @@ export function TaraHomeScreen() {
     return (
       <Page>
         <ErrorState
-          title="TARA Drill could not be loaded"
-          body="Your bank is safe on the server. This is a connection problem, not lost work."
+          title="TARA did not load"
+          body="The server did not answer. Your bank is on it, so nothing is lost. Check your connection and try again."
           detail={error}
           onRetry={reload}
         />
@@ -125,7 +125,7 @@ export function TaraHomeScreen() {
       <PageHeading
         eyebrow="Exam prep"
         title="TARA Drill"
-        lead="Three modules. Pick a type, drill it, and let the tree tell you where you are weak."
+        lead="Three modules. Pick a type, drill it, and read where you are weak off the tree."
         actions={
           <div className="flex items-center gap-1">
             <ButtonLink variant="secondary" icon="target" href="/tara/progress">

@@ -5,11 +5,15 @@
  * always override a component class without a specificity fight, which is the
  * same layering Tailwind uses.
  *
- * Three faces, one request. Fraunces comes as a variable font so the optical
- * size axis is real rather than faked with a second weight.
+ * Three faces, one request. Newsreader is variable on an optical size axis, so
+ * a display line and a small heading are genuinely different drawings of the
+ * same face rather than the same drawing at two sizes — which matters more on
+ * black, where fine serifs bloom. IBM Plex Sans and IBM Plex Mono are metric
+ * siblings, so a numeral in a sentence and the same numeral in a table are the
+ * same shape at the same width.
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400..700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,300..700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 @import '../src/styles/tokens.css';
 @import '../src/styles/base.css';

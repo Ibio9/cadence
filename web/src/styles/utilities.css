@@ -277,7 +277,7 @@
 .bg-surface { background-color: var(--surface); }
 .bg-surface-raised { background-color: var(--surface-raised); }
 .bg-surface-sunken { background-color: var(--surface-sunken); }
-/* The cooled ground that sits under a glow. Four percent mint, and the only
+/* The blued ground that sits under a glow. A few percent of the light, and the only
    place in the system where the light touches a fill. */
 .bg-cool { background-color: var(--cool); }
 .bg-signal { background-color: var(--signal); }
@@ -319,15 +319,19 @@
 .shadow-card-lg { box-shadow: var(--shadow-lg); }
 
 /* --- emission ------------------------------------------------------------
-   The only way to reach the light. All three are shadows with a wide blur and
-   no hard edge, so a glow never has a findable boundary. .bloom adds the
-   radial falloff and belongs to the single largest emitter on a screen.
-   .cd-breathes makes a glow breathe, long and low, and is only applied while
-   something is genuinely running. */
+   The only way to reach the light. All four are shadows with a wide blur and
+   a negative spread, so a glow never has a findable boundary. .bloom adds the
+   radial falloff and belongs to the single largest emitter on a screen;
+   .bloom-centre is its round sibling, for an emitter that is genuinely a
+   point. .glow-xs is the secondary, at about a third. .cd-breathes makes a
+   glow breathe, long and low, and is only applied while something is
+   genuinely running. */
+.glow-xs { box-shadow: var(--glow-xs); }
 .glow-sm { box-shadow: var(--glow-sm); }
 .glow-md { box-shadow: var(--glow-md); }
 .glow-lg { box-shadow: var(--glow-lg); }
 .bloom { background-image: var(--bloom); }
+.bloom-centre { background-image: var(--bloom-centre); }
 .cd-breathes { animation: cd-breathe var(--dur-breathe) var(--ease) infinite; }
 
 /* --- misc --------------------------------------------------------------- */

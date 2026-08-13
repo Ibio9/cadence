@@ -3,20 +3,18 @@
 /**
  * Settings.
  *
- * Theme control as live preview cards, not a dropdown. Each card renders its
- * own theme by scoping data-theme to the preview, so both options show their
- * real substrate, ink and emission whichever theme is currently active.
+ * There is no appearance section. Cadence has one substrate and one light, and
+ * a toggle would only have offered a way to make it worse.
  *
  * Habits are edited here rather than on Today, because Today's job is the next
- * hour and a screen full of rename and delete controls is not that. Ticking
- * still happens on Today; naming happens here.
+ * hour and a screen full of rename and delete controls is not that. Tick them
+ * on Today; name them here.
  */
 
 import { useEffect, useRef, useState } from 'react';
 import { Page } from '../components/shell/AppShell';
 import Icon from '../components/Icon';
 import {
-  Badge,
   Button,
   Card,
   CardBody,
@@ -24,16 +22,12 @@ import {
   IconButton,
   Input,
   PageHeading,
-  PartialNotice,
-  Skeleton,
   Table,
   useToast,
 } from '../components/ui';
-import { useTheme } from '../context/ThemeContext';
 import { useChecklist } from '../lib/useChecklist';
 
 const STORAGE_KEYS = [
-  { key: 'cadence_theme', holds: 'Theme preference' },
   { key: 'cadence_checklist_<date>', holds: "One day's habits and ticks" },
   { key: 'cadence_streaks', holds: 'Run length per habit' },
   { key: 'cadence_notes', holds: 'Every note' },
@@ -41,39 +35,7 @@ const STORAGE_KEYS = [
   { key: 'cadence_jarvis_history', holds: 'Last 60 messages' },
 ];
 
-function ThemePreview({ themeId }) {
-  return (
-    /* The preview shows what the theme actually is: the substrate, a line of
-       ink on it, and one lit bead. */
-    <div data-theme={themeId} className="cd-themecard__preview bg-paper">
-      <p className="font-display text-base text-ink leading-tight">Economics</p>
-      <p className="text-caption text-ink-muted">Write one paragraph and stop.</p>
-      <div className="flex items-center gap-3 pt-2">
-        <span className="cd-themecard__chip bg-signal glow-sm" style={{ width: 9, height: 9 }} />
-        <span className="cd-themecard__chip bg-rule" style={{ flex: 1 }} />
-      </div>
-    </div>
-  );
-}
-
-function SettingsSkeleton() {
-  return (
-    <Page>
-      <div className="flex flex-col gap-3">
-        <Skeleton width="6rem" height="0.7rem" rounded="pill" />
-        <Skeleton width="min(16rem, 70%)" height="2.4rem" rounded="pill" />
-      </div>
-      <Card>
-        <CardBody className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Skeleton height="12rem" rounded="card" />
-          <Skeleton height="12rem" rounded="card" />
-        </CardBody>
-      </Card>
-    </Page>
-  );
-}
-
-/** One habit, renameable in place. Custom habits can also be removed. */
+/** One habit, renameable in place. Habits you added can also be removed. */
 function HabitLine({ habit, onRename, onRemove }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(habit.label);
@@ -129,7 +91,6 @@ function HabitLine({ habit, onRename, onRemove }) {
 }
 
 export function SettingsScreen() {
-  const { theme, setTheme, themes, ready, persistError } = useTheme();
   const { toast } = useToast();
   const { habits, rename, add, remove } = useChecklist();
   const [newLabel, setNewLabel] = useState('');
@@ -138,7 +99,7 @@ export function SettingsScreen() {
   const addHabit = () => {
     const label = newLabel.trim();
     if (!label) {
-      setNewError('Give the habit a name so you can recognise it tomorrow.');
+      setNewError('Type a name first — you need to recognise it tomorrow.');
       return;
     }
     add(label);
@@ -149,7 +110,7 @@ export function SettingsScreen() {
   const removeHabit = (id) => {
     const habit = habits.find((h) => h.id === id);
     remove(id);
-    toast({ title: 'Habit removed', description: habit?.label });
+    toast({ title: 'Removed', description: habit?.label });
   };
 
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -160,63 +121,15 @@ export function SettingsScreen() {
     setApiBase(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080');
   }, []);
 
-  if (!ready) return <SettingsSkeleton />;
-
   return (
     <Page>
-      <PageHeading
-        eyebrow="Preferences"
-        title="Settings"
-        lead="Set it once and the whole app follows."
-      />
+      <PageHeading eyebrow="Preferences" title="Settings" lead="Set it once. The whole app follows." />
 
-      {persistError ? (
-        <PartialNotice>
-          The theme is applied for this session but could not be saved. Private browsing or a full storage quota will
-          do that. It will open on light next time.
-        </PartialNotice>
-      ) : null}
-
-      {/* Theme */}
-      <Card as="section" aria-label="Theme">
-        <CardHeader
-          eyebrow="Appearance"
-          title="Theme"
-          description="Both themes are built to the same contrast rules. Pick the one that suits the room."
-        />
-        <CardBody>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4" role="group" aria-label="Choose a theme">
-            {themes.map((t) => {
-              const active = t.id === theme;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  className="cd-themecard"
-                  aria-pressed={active}
-                  onClick={() => setTheme(t.id)}
-                >
-                  <ThemePreview themeId={t.id} />
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-base font-medium text-ink">{t.name}</p>
-                      <p className="text-caption text-ink-muted">{t.description}</p>
-                    </div>
-                    {active ? <Badge tone="signal" icon="checkCircle">In use</Badge> : null}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </CardBody>
-      </Card>
-
-      {/* Habits */}
       <Card as="section" aria-label="Habits">
         <CardHeader
           eyebrow="Habits"
           title="What you hold every day"
-          description="These become the strip under today's blocks. Tick them there; name them here."
+          description="These become the strip under today's blocks. Tick them there. Name them here."
         />
         <CardBody className="flex flex-col gap-5">
           {habits.length ? (
@@ -227,7 +140,7 @@ export function SettingsScreen() {
             </ul>
           ) : (
             <p className="text-base text-ink-muted max-w-prose">
-              Nothing yet. One habit you can actually hold beats ten you cannot.
+              Nothing yet. Add one you can actually hold — it beats ten you cannot.
             </p>
           )}
 
@@ -251,7 +164,6 @@ export function SettingsScreen() {
         </CardBody>
       </Card>
 
-      {/* Motion and access */}
       <Card as="section" aria-label="Motion">
         <CardHeader
           eyebrow="Motion"
@@ -262,21 +174,21 @@ export function SettingsScreen() {
           <p className="flex items-center gap-3 text-sm text-ink-muted">
             <Icon name={reducedMotion ? 'checkCircle' : 'info'} size={16} />
             {reducedMotion
-              ? 'Reduced motion is on in your system settings, so transitions are switched off.'
-              : 'Reduced motion is off in your system settings, so transitions are on.'}
+              ? 'Your system asks for reduced motion, so transitions are off.'
+              : 'Your system allows motion, so transitions are on.'}
           </p>
           <p className="text-caption text-ink-subtle max-w-prose">
-            Loading indicators keep a slow pulse either way, so it is always clear when something is still working.
+            Either way, anything that glows keeps glowing — it just stops breathing. The light carries meaning, so
+            reduced motion stills it rather than removing it.
           </p>
         </CardBody>
       </Card>
 
-      {/* Data */}
       <Card as="section" aria-label="Stored data">
         <CardHeader
           eyebrow="Data"
-          title="What is stored on this device"
-          description="Cadence keeps your day in this browser. Nothing on this screen changes it."
+          title="What this browser keeps"
+          description="Your day, your blocks and the question bank live on the server. These five keys are local."
         />
         <CardBody className="flex flex-col gap-4">
           <Table
@@ -294,7 +206,6 @@ export function SettingsScreen() {
         </CardBody>
       </Card>
 
-      {/* Keyboard */}
       <Card as="section" aria-label="Keyboard shortcuts">
         <CardHeader eyebrow="Keyboard" title="Shortcuts" description="Everything here also works with the mouse." />
         <CardBody>
@@ -307,7 +218,7 @@ export function SettingsScreen() {
             rows={[
               { keys: 'Tab', does: 'Move through every control in reading order' },
               { keys: 'Enter', does: 'Open the block under the cursor, or send to Jarvis' },
-              { keys: 'Space', does: 'Mark a habit off' },
+              { keys: 'Space', does: 'Tick a habit' },
               { keys: 'Ctrl or Cmd + Enter', does: 'Save a note from the capture box' },
               { keys: 'Escape', does: 'Close a dialog or panel' },
             ]}

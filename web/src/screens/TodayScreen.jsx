@@ -99,7 +99,7 @@ function RailRow({ block, project, state, nowMin }) {
             {block.objective ? (
               <span className="truncate">{block.objective}</span>
             ) : unset ? (
-              <span className="cd-railrow__unset">No objective yet</span>
+              <span className="cd-railrow__unset">Not decided yet</span>
             ) : null}
           </span>
         </span>
@@ -246,8 +246,8 @@ export function TodayScreen() {
 
       {status === 'error' ? (
         <ErrorState
-          title="Today could not be loaded"
-          body="Your blocks are safe on the server. This is a connection problem, not lost work."
+          title="The day did not load"
+          body="The server did not answer. Your blocks are on it, not in this tab, so nothing is lost. Check your connection and try again."
           detail={error}
           onRetry={reload}
           retrying={status === 'loading'}
@@ -255,8 +255,8 @@ export function TodayScreen() {
       ) : blocks.length === 0 ? (
         <EmptyState
           icon="calendarPlus"
-          title="Nothing is on today"
-          body="Your rhythms put training on the days you train. Everything else you put here yourself. Open the timetable and give the first hour a name."
+          title="Today is empty"
+          body="Your rhythms fill the days you train. The rest you fill yourself. Open the timetable and name the first hour."
           action={{ label: 'Open the timetable', icon: 'timetable', href: '/timetable' }}
         />
       ) : (
@@ -295,7 +295,7 @@ export function TodayScreen() {
           <Tally label="Discipline" habits={others} checked={checked} onToggle={toggle} />
           {habits.length === 0 ? (
             <p className="text-caption text-ink-muted">
-              No habits yet. <Link href="/settings">Add them in settings.</Link>
+              Nothing to hold yet. <Link href="/settings">Add one in settings.</Link>
             </p>
           ) : null}
         </section>

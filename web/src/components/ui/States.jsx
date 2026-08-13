@@ -3,11 +3,12 @@
 /**
  * EmptyState and ErrorState.
  *
- * Empty is written as an invitation to start: one short Playfair line, one
- * sentence of guidance, one primary action.
+ * Empty is an invitation to start: one short display line, one sentence that
+ * names the first move, one primary action. It never describes the void.
  *
- * Error says in plain language what happened and what to do next, and always
- * offers a retry. It never shows a bare status code as the whole message.
+ * Error says what happened and the one thing to do about it, and always offers
+ * a retry. It never apologises, never says "something went wrong", and never
+ * shows a bare status code as the whole message.
  */
 
 import Link from 'next/link';
@@ -42,12 +43,15 @@ function StateAction({ action, variant = 'primary' }) {
   );
 }
 
-export function EmptyState({ icon = 'sparkle', title, body, action, secondaryAction, className }) {
+/**
+ * `icon` is accepted and ignored. The tile that used to sit above the heading
+ * is gone — it repeated what the title already said and, on this substrate, put
+ * a grey box in the middle of a frame whose whole argument is emptiness. The
+ * prop stays so the twelve call sites do not all have to change to say nothing.
+ */
+export function EmptyState({ title, body, action, secondaryAction, className }) {
   return (
     <div className={cn('cd-state', className)}>
-      <span className="cd-state__mark">
-        <Icon name={icon} size={22} />
-      </span>
       <h3 className="cd-state__title">{title}</h3>
       {body ? <p className="cd-state__body">{body}</p> : null}
       {action || secondaryAction ? (
@@ -62,7 +66,7 @@ export function EmptyState({ icon = 'sparkle', title, body, action, secondaryAct
 
 export function ErrorState({
   title = 'That did not load',
-  body = 'The request did not come back. Check your connection and try again.',
+  body = 'The server did not answer. Check your connection and try again.',
   detail,
   onRetry,
   retryLabel = 'Try again',
@@ -72,9 +76,6 @@ export function ErrorState({
 }) {
   return (
     <div className={cn('cd-state', className)} role="alert">
-      <span className="cd-state__mark cd-state__mark--danger">
-        <Icon name="cloudOff" size={22} />
-      </span>
       <h3 className="cd-state__title">{title}</h3>
       <p className="cd-state__body">{body}</p>
       {detail ? <p className="font-mono text-caption text-ink-subtle break-words max-w-prose">{detail}</p> : null}

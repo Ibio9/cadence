@@ -71,11 +71,11 @@ function Launcher({ module, sub, onClose, onGenerated }) {
         title: res.added ? `${res.added} added` : 'Nothing usable came back',
         description: dropped
           ? `${dropped} were thrown away for being malformed. They are not in the bank.`
-          : 'Written from this type’s own rules and checked before saving.',
+          : 'Written from this type’s own rules and checked before it went in.',
       });
       onGenerated?.();
     } catch (e) {
-      toast({ tone: 'danger', title: 'Could not generate', description: e.message });
+      toast({ tone: 'danger', title: 'Nothing was written', description: e.message });
     }
     setBusy(false);
   };
@@ -104,13 +104,13 @@ function Launcher({ module, sub, onClose, onGenerated }) {
           value={mode}
           onChange={setMode}
           options={[
-            { value: 'practice', label: 'Untimed', helper: 'Answer, then see the explanation straight away.' },
+            { value: 'practice', label: 'Untimed', helper: 'Answer, then read the explanation straight away.' },
             {
               value: 'timed',
               label: 'Timed',
               helper: `${secs(module.secondsPerQuestion)} a question, the real budget. Explanations at the end.`,
             },
-            { value: 'review', label: 'Review', helper: 'Only questions you have answered before, including ones you have mastered.' },
+            { value: 'review', label: 'Review', helper: 'Only questions you have seen before, including the ones you have mastered.' },
           ]}
         />
 
@@ -136,11 +136,11 @@ function Launcher({ module, sub, onClose, onGenerated }) {
           </p>
           {available < wanted ? (
             <p className="cd-launcher__short">
-              That is fewer than {wanted}. You will get {available} — generate more to fill the set.
+              Fewer than {wanted}. You will get {available}. Write more to fill the set.
             </p>
           ) : null}
           <Button variant="secondary" icon="sparkle" size="sm" loading={busy} onClick={generate}>
-            Generate five more
+            Write five more
           </Button>
         </div>
       </div>
@@ -216,8 +216,8 @@ export function ModuleScreen({ moduleId }) {
     return (
       <Page>
         <ErrorState
-          title="That module could not be loaded"
-          body="Your bank is safe on the server. This is a connection problem, not lost work."
+          title="That module did not load"
+          body="The server did not answer. Your bank is on it, so nothing is lost. Check your connection and try again."
           detail={error}
           onRetry={reload}
         />
@@ -229,9 +229,9 @@ export function ModuleScreen({ moduleId }) {
     return (
       <Page>
         <ErrorState
-          title="There is no module by that name"
-          body="The three are Critical Thinking, Problem Solving and the Writing Task."
-          action={{ label: 'Back to TARA Drill', href: '/tara' }}
+          title="No module by that name"
+          body="There are three: Critical Thinking, Problem Solving and the Writing Task."
+          action={{ label: 'Back to TARA', href: '/tara' }}
         />
       </Page>
     );

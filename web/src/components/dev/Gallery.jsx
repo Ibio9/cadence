@@ -108,7 +108,7 @@ const TABLE_ROWS = [
   { id: 4, name: 'Market review', type: 'Markets', minutes: 30, rate: '9.0%' },
 ];
 
-export function Gallery({ themeId, label }) {
+export function Gallery({ label }) {
   const { toast } = useToast();
   const [tab, setTab] = useState('one');
   const [pillTab, setPillTab] = useState('all');
@@ -122,7 +122,7 @@ export function Gallery({ themeId, label }) {
   const [selectedRow, setSelectedRow] = useState(2);
 
   return (
-    <div data-theme={themeId} className="bg-paper text-ink">
+    <div className="bg-paper text-ink">
       <div className="flex flex-col gap-12 p-6 md:p-card">
         <p className="text-eyebrow text-ink-subtle">{label}</p>
 
@@ -147,7 +147,7 @@ export function Gallery({ themeId, label }) {
         {/* Emission ----------------------------------------------------- */}
         <Section title="Emission — the light rule">
           <p className="text-sm text-ink-muted max-w-prose">
-            Mint is light bleeding through the paper, never ink printed on it. It reaches the screen only through
+            Blue is light falling on the substrate, never ink printed on it. It reaches the screen only through
             these three shadows and the bloom. There is no utility that paints it on a border, a fill or a text
             colour. Where a mark has to be read rather than felt, it is drawn in <span className="font-mono">--signal</span>.
           </p>
@@ -380,7 +380,7 @@ export function Gallery({ themeId, label }) {
             <div className="flex flex-col">
               <RadioGroup
                 legend="Energy"
-                name={`energy-${themeId}`}
+                name="energy"
                 value={radio}
                 onChange={setRadio}
                 options={[
@@ -389,7 +389,7 @@ export function Gallery({ themeId, label }) {
                   { value: 'c', label: 'Light', disabled: true },
                 ]}
               />
-              <Radio name={`solo-${themeId}`} label="Invalid" error checked={false} onChange={() => {}} />
+              <Radio name="solo" label="Invalid" error checked={false} onChange={() => {}} />
             </div>
             <div className="flex flex-col">
               <Switch label="On" checked={switched} onChange={() => setSwitched((v) => !v)} />
