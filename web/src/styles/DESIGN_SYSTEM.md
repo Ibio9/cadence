@@ -215,9 +215,13 @@ light touches a fill.
   3px `--signal` segment where the rail passes through it. No secondary.
 - Today, between blocks: primary is the bead on the rail (`--glow-md`);
   secondary is the row that is next, at about a third of the strength —
-  `--glow-sm`, no bloom, no segment, and a filled tick rather than a hollow
-  one. Only one of *now* and *next* ever exists on a day, so these never
-  double up.
+  `--glow-sm`, no bloom, no segment, and a tick filled with **ink** rather
+  than a hollow one. Only one of *now* and *next* ever exists on a day, so
+  those two never double up — but *next* and the bead always co-exist, since
+  *next* is only drawn when nothing is running, which is exactly when there is
+  a bead. That is why the filled tick is ink and not mint: two mint dots on
+  one rail, the same size a few rows apart, and "you are here" stops being
+  obvious. Filled against hollow already does the job without the light.
 - Focus: primary is the session rail bead while the clock runs; secondary is
   the focused input (`--glow-sm`). Before the clock starts, neither of those is
   lit and the Start button is the only emitter on the screen — which is the
@@ -334,6 +338,16 @@ Written down because the reasons matter more than the result.
 - **The italic display accent line.** A magazine device that had drifted onto
   every screen, saying something decorative in a place that should carry a
   fact. Supporting lines are body type now, or absent.
+- **The block's title inside its own objective proposals.** The proposals wrote
+  the title into each sentence, which read as mail merge the moment a title was
+  a phrase rather than a bare noun: *"Write one paragraph of the Market failure
+  essay essay and stop."* Fixing the grammar was the obvious repair and the
+  wrong one — on Focus the objective sits directly under the title, set large,
+  so naming the topic again was repeating in small type the words immediately
+  above. The proposals now say only what you will do with the hour.
+- **"No objective yet" on a block that is already behind you.** True, and
+  useless: it is a note about a decision nobody can make any more, printed at
+  the weight of a real objective. It appears only on blocks still ahead.
 
 ### The one taken away
 

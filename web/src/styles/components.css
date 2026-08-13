@@ -1032,6 +1032,10 @@
   color: var(--ink-muted);
 }
 .cd-railrow__project { flex-shrink: 0; }
+/* An objective that has not been written yet. Italic so it reads as a gap
+   rather than as something someone typed, and still --ink-muted, because the
+   floor is 4.5:1 and a placeholder is not an excuse to go under it. */
+.cd-railrow__unset { font-style: italic; }
 .cd-railrow__marks {
   display: flex;
   align-items: center;
@@ -1071,14 +1075,21 @@
 .cd-railrow.is-now .cd-railrow__tick { display: none; }
 /* The one ahead, when nothing is running. The secondary emitter, at about a
    third of the strength: the glow without the bloom and without the signal
-   segment, and a filled tick instead of a hollow one. Only one of is-now and
-   is-next ever exists on a day, so this never doubles up. */
+   segment, and a filled tick instead of a hollow one.
+
+   The tick fills with ink rather than mint on purpose. is-now and is-next
+   never co-exist, but is-next and the bead always do — is-next only appears
+   when nothing is running, which is exactly when the bead is drawn. A mint
+   tick here put a second mint dot on the rail a few rows from the bead, the
+   same size and the same colour, and the one that means "you are here"
+   stopped being obvious. Filled against hollow already separates this row
+   from the ones after it, so it does not need the light as well. */
 .cd-railrow.is-next {
   box-shadow: var(--glow-sm);
   border-radius: var(--radius-sm);
 }
 .cd-railrow.is-next .cd-railrow__title { font-size: var(--text-lg); }
-.cd-railrow.is-next .cd-railrow__tick { background: var(--signal); border-color: var(--signal); }
+.cd-railrow.is-next .cd-railrow__tick { background: var(--ink); border-color: var(--ink); }
 
 /* On a phone the gutter is dead width, so the rail moves in and the times
    drop a size. The structure is identical; only the measure changes. */

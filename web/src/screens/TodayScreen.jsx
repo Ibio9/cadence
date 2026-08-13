@@ -70,6 +70,13 @@ function untilLabel(mins) {
 function RailRow({ block, project, state, nowMin }) {
   const until = state === 'next' && nowMin != null ? untilLabel(block.startMin - nowMin) : null;
 
+  // Saying an hour has no objective is only worth the line while you can still
+  // give it one. On a block that is behind you or already held it is a note
+  // about a decision nobody can make any more, printed at the same weight as a
+  // real objective, on the one screen whose argument is that a single thing
+  // matters.
+  const unset = state !== 'past' && block.status === 'pending';
+
   return (
     <li>
       <Link
@@ -89,7 +96,11 @@ function RailRow({ block, project, state, nowMin }) {
           <span className="cd-railrow__title">{block.title}</span>
           <span className="cd-railrow__meta">
             {project ? <span className="cd-railrow__project">{project.name}</span> : null}
-            <span className="truncate">{block.objective || 'No objective yet'}</span>
+            {block.objective ? (
+              <span className="truncate">{block.objective}</span>
+            ) : unset ? (
+              <span className="cd-railrow__unset">No objective yet</span>
+            ) : null}
           </span>
         </span>
 

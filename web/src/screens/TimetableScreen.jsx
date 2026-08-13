@@ -66,7 +66,15 @@ function BlockRow({ block, project, isNow }) {
           <span className="cd-railrow__title">{block.title}</span>
           <span className="cd-railrow__meta">
             {project ? <span className="cd-railrow__project">{project.name}</span> : null}
-            <span className="truncate">{block.objective || 'No objective yet'}</span>
+            {/* Same rule as the day spine: a missing objective is only worth
+                the line while the block can still be given one. Timetable has
+                no now to measure against on another day, so pending is the
+                whole test here. */}
+            {block.objective ? (
+              <span className="truncate">{block.objective}</span>
+            ) : block.status === 'pending' ? (
+              <span className="cd-railrow__unset">No objective yet</span>
+            ) : null}
           </span>
         </span>
 
