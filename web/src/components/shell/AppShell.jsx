@@ -28,7 +28,8 @@ export const VIEWS = [
   { href: '/', label: 'Today', icon: 'today', thumb: true },
   { href: '/timetable', label: 'Timetable', icon: 'timetable', thumb: true },
   { href: '/tara', label: 'TARA', icon: 'drill', thumb: true },
-  { href: '/notes', label: 'Notes', icon: 'notes', thumb: true },
+  { href: '/interview', label: 'Interview', icon: 'mic', thumb: true },
+  { href: '/notes', label: 'Notes', icon: 'notes' },
   { href: '/jarvis', label: 'Jarvis', icon: 'jarvis', thumb: true },
   { href: '/settings', label: 'Settings', icon: 'settings' },
 ];

@@ -3,8 +3,10 @@ import cors from 'cors';
 import { prisma } from './db.js';
 import { materialise, rebuildFuture } from './materialise.js';
 import { jarvis } from './routes/jarvis.js';
+import { mountInterview } from './routes/interview.js';
 import { mountTara } from './routes/tara.js';
 import { asyncRoutes } from './routes.js';
+import { ensureTopics } from './interview/topics.js';
 import { ensureBank } from './tara/bank.js';
 
 const app = express();
@@ -112,6 +114,7 @@ crud('projects', prisma.project);
 r.post('/api/jarvis', jarvis);
 
 mountTara(app);
+mountInterview(app);
 
 // The end of the line for anything the wrappers in routes.js caught. Must stay
 // last: Express picks error middleware by arity and by position.
@@ -138,5 +141,6 @@ app.listen(port, () => {
   // whole API down.
   setTimeout(() => {
     ensureBank().catch((e) => console.error('[bank]', e.message));
+    ensureTopics().catch((e) => console.error('[interview]', e.message));
   }, 5000).unref();
 });

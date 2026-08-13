@@ -46,6 +46,21 @@ export const api = {
     essay: (id) => call(`/api/tara/writing/essays/${id}`),
     essays: () => call('/api/tara/writing/essays'),
   },
+
+  /* The PPE interview drill. The sitting's stage lives on the server, so every
+     call returns the whole session and the client re-renders from it rather
+     than tracking where it thinks it is. */
+  interview: {
+    state: () => call('/api/interview/state'),
+    start: () => call('/api/interview/sessions', 'POST', {}),
+    session: (id) => call(`/api/interview/sessions/${id}`),
+    save: (id, body) => call(`/api/interview/sessions/${id}`, 'PATCH', body),
+    remove: (id) => call(`/api/interview/sessions/${id}`, 'DELETE'),
+    /* Marking is slow on purpose — a critique with live web search takes a
+       minute or two. The caller shows a real waiting state rather than a
+       spinner that looks stuck. */
+    mark: (id, body) => call(`/api/interview/sessions/${id}/rounds`, 'POST', body),
+  },
 };
 
 /** Drop empty params so a blank filter does not become `?module=`. */

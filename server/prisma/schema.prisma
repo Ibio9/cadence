@@ -199,3 +199,88 @@ model TaraEssay {
 
   @@index([promptId])
 }
+
+// ---------------------------------------------------------------------------
+// The PPE interview drill
+// ---------------------------------------------------------------------------
+
+/// One interview prompt. Not an essay title — a claim to interrogate, a
+/// counterintuitive result, or an ethical case, of the kind a tutor opens with.
+///
+/// Topics are written ahead of time and drawn from rather than generated on
+/// demand, because "press start and wait ninety seconds" is not how you build
+/// the habit of sitting down to practise.
+model InterviewTopic {
+  id        String   @id @default(cuid())
+  strand    String                      // philosophy | politics | economics
+  kind      String                      // claim | result | case
+  /// The prompt as a tutor would say it, out loud, in one or two sentences.
+  prompt    String
+  /// The one line of context a tutor would have in front of them.
+  context   String   @default("")
+  /// What this is actually testing. Never shown before the answer.
+  tests     String   @default("")
+  /// Set the first time it is used. An unseen topic is one where this is null.
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  sessions  InterviewSession[]
+
+  @@index([strand])
+  @@index([usedAt])
+}
+
+/// One sitting: prep, answer, critique, follow-up, critique again.
+model InterviewSession {
+  id        String         @id @default(cuid())
+  topic     InterviewTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  topicId   String
+  /// Frozen copies, so a session reads the same forever even if the topic
+  /// pool is rewritten underneath it.
+  strand    String
+  prompt    String
+  context   String         @default("")
+  /// Written during prep, kept afterwards — the critique reads them, because
+  /// what you planned to say and what you said are different failures.
+  notes     String         @default("")
+  prepSec   Int            @default(0)
+  /// prep | answering | marking | round1 | followup | done
+  stage     String         @default("prep")
+  /// The single biggest weakness across both rounds, and the one thing to do
+  /// differently. Written at the end of round two, because that is where the
+  /// real assessment is.
+  weakness  String?
+  nextTime  String?
+  createdAt DateTime       @default(now())
+  rounds    InterviewRound[]
+
+  @@index([createdAt])
+}
+
+/// One answer and its critique. Round 1 is the opening question; round 2 is the
+/// tutor's push-back on what you actually said.
+model InterviewRound {
+  id         String           @id @default(cuid())
+  session    InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId  String
+  n          Int                            // 1 | 2
+  /// What was asked. Round 1 is the prompt; round 2 is the tutor's follow-up,
+  /// written against the transcript of round 1.
+  question   String
+  transcript String           @default("")
+  seconds    Int              @default(0)
+  /// { structure: 6, reasoning: 5, evidence: 4, responsiveness: 7, delivery: 5 }
+  /// Flat integers so a trend is a query rather than a parse.
+  scores     Json?
+  /// The whole marking: where it collapsed, the hedges quoted back, how to
+  /// have prepared, what could have been said, the divergences.
+  critique   Json?
+  /// A full answer at the length you were asked to speak for. Prose, never
+  /// bullets — the point is to hear what it sounds like.
+  modelAnswer String?
+  /// [{ title, author, url, why }] — every one confirmed by search, because a
+  /// misattributed argument is worse than no argument.
+  sources    Json?
+  createdAt  DateTime         @default(now())
+
+  @@index([sessionId])
+}

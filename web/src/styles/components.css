@@ -1990,3 +1990,399 @@
   .cd-result__score { font-size: var(--text-4xl); }
   .cd-drillbar { flex-wrap: wrap; }
 }
+
+/* ==========================================================================
+   THE PPE INTERVIEW DRILL
+
+   The highest-stakes screen in the app, so it is the emptiest. A sitting is a
+   route without a shell: for the fifteen minutes you are looking at one
+   prompt, nothing else is doing anything useful.
+
+   Emission is spent on whatever is genuinely happening right now and nothing
+   else — the prep clock while it runs, the recording lamp while it records,
+   the marking mark while the model works. Never two at once, because the
+   stages are mutually exclusive by construction.
+   ========================================================================== */
+
+.cd-sitting {
+  min-height: 100dvh;
+  background: var(--paper);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-4) var(--shell-gutter) var(--space-16);
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+@media (min-width: 768px) { .cd-sitting { padding: var(--space-5) var(--shell-gutter-lg) var(--space-20); } }
+
+/* ---- the prompt ----
+   Set in the display face at reading size, because it is the one sentence the
+   next twenty minutes are about. It never moves and never shrinks out of the
+   way; on later stages it goes quiet rather than away. */
+.cd-sitprompt { display: flex; flex-direction: column; gap: var(--space-3); }
+.cd-sitprompt__context { font-size: var(--text-sm); color: var(--ink-muted); }
+.cd-sitprompt__text {
+  font-family: var(--font-display);
+  font-variation-settings: var(--display-opsz-lg);
+  font-size: var(--text-3xl);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-tight);
+  color: var(--ink);
+  text-wrap: pretty;
+  max-width: 30ch;
+}
+@media (min-width: 768px) { .cd-sitprompt__text { font-size: var(--text-4xl); max-width: 24ch; } }
+.cd-sitprompt--small .cd-sitprompt__text { font-size: var(--text-xl); max-width: 60ch; color: var(--ink-muted); }
+@media (min-width: 768px) { .cd-sitprompt--small .cd-sitprompt__text { font-size: var(--text-2xl); } }
+
+/* ---- the prep clock ----
+   The single emitter while prep runs. Deliberately not alarming: no red at two
+   minutes, no alarm at zero. Going over is allowed, counted, and drawn in warn
+   rather than alarm — you are late, not wrong. */
+.cd-prepbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  padding: var(--space-5) 0;
+  border-top: var(--hairline) solid var(--rule);
+  border-bottom: var(--hairline) solid var(--rule);
+}
+.cd-prepclock {
+  font-family: var(--font-mono);
+  font-size: var(--text-display);
+  line-height: 1;
+  letter-spacing: var(--tracking-tight);
+  color: var(--signal);
+  /* Lit, but not animated. The digits already change every second; breathing
+     a clock as well is two motions saying the same thing, and the brief for
+     this timer is calm. */
+  text-shadow: 0 0 44px rgba(var(--emission-rgb), 0.22);
+}
+.cd-prepclock.is-over { color: var(--warn); text-shadow: none; animation: none; }
+.cd-prepbar__side { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-3); }
+.cd-prepbar__label { font-size: var(--text-caption); color: var(--ink-muted); }
+
+/* ---- answering ---- */
+.cd-answer { display: grid; grid-template-columns: 1fr; gap: var(--space-6); align-items: start; }
+@media (min-width: 860px) { .cd-answer { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: var(--space-8); } }
+
+.cd-answer__camera {
+  position: relative;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--surface-sunken);
+  border: var(--hairline) solid var(--rule);
+  aspect-ratio: 4 / 3;
+}
+/* Mirrored: an un-mirrored self-view is disorienting to speak into, and this
+   is a rehearsal surface rather than a recording. */
+.cd-answer__video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+
+/* The recording lamp. The one emitter on this screen, and only while it is
+   genuinely recording — a lamp that glows when nothing is being captured is
+   the single most expensive lie this app could tell. */
+.cd-reclamp {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: rgba(3, 4, 6, 0.72);
+  font-size: var(--text-caption);
+  color: var(--ink-subtle);
+}
+.cd-reclamp__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--ink-subtle);
+}
+.cd-reclamp.is-live { color: var(--signal); }
+.cd-reclamp.is-live .cd-reclamp__dot {
+  background: var(--signal);
+  box-shadow: var(--glow-md);
+  animation: cd-breathe var(--dur-breathe) var(--ease) infinite;
+}
+
+/* The level meter. Without it, a muted microphone looks exactly like saying
+   nothing — and you find out four minutes later. */
+.cd-level {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: var(--space-3);
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: rgba(232, 236, 243, 0.14);
+  overflow: hidden;
+}
+.cd-level__fill {
+  display: block;
+  height: 100%;
+  width: var(--level, 0%);
+  background: var(--signal);
+  border-radius: var(--radius-pill);
+  transition: width 80ms linear;
+}
+
+.cd-answer__side { display: flex; flex-direction: column; gap: var(--space-2); }
+.cd-answerclock {
+  font-family: var(--font-mono);
+  font-size: var(--text-4xl);
+  line-height: 1;
+  color: var(--ink-muted);
+}
+.cd-answerclock.is-in { color: var(--ink); }
+.cd-answerclock__window { font-size: var(--text-sm); color: var(--ink-muted); }
+.cd-answerclock__pace { font-family: var(--font-mono); font-size: var(--text-caption); color: var(--ink-subtle); }
+.cd-answer__actions { display: flex; gap: var(--space-2); margin-top: var(--space-4); flex-wrap: wrap; }
+.cd-answer__note { font-size: var(--text-caption); color: var(--ink-muted); line-height: var(--leading-normal); }
+.cd-answer__problem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--alarm);
+  line-height: var(--leading-normal);
+}
+
+.cd-livetranscript {
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  color: var(--ink);
+  min-height: 6rem;
+  padding: var(--space-4);
+  background: var(--surface);
+  border-radius: var(--radius-card);
+}
+.cd-livetranscript__idle { color: var(--ink-subtle); font-style: italic; }
+/* The interim tail is provisional — the engine rewrites it as it changes its
+   mind — so it is drawn as provisional rather than as text. */
+.cd-livetranscript__interim { color: var(--ink-subtle); }
+
+.cd-pushback, .cd-nextround {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--surface);
+  border-left: 3px solid var(--rule-strong);
+  border-radius: var(--radius-card);
+}
+.cd-pushback__text, .cd-nextround__q {
+  font-family: var(--font-display);
+  font-variation-settings: var(--display-opsz-md);
+  font-size: var(--text-xl);
+  line-height: var(--leading-snug);
+  color: var(--ink);
+}
+.cd-nextround__why { font-size: var(--text-sm); color: var(--ink-muted); line-height: var(--leading-body); }
+.cd-nextround { align-items: flex-start; }
+
+/* ---- the verdict ---- */
+.cd-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6) 0;
+  border-top: var(--hairline) solid var(--rule);
+  border-bottom: var(--hairline) solid var(--rule);
+}
+.cd-verdict__weak {
+  font-family: var(--font-display);
+  font-variation-settings: var(--display-opsz-md);
+  font-size: var(--text-2xl);
+  line-height: var(--leading-snug);
+  color: var(--ink);
+  text-wrap: pretty;
+}
+.cd-verdict__next { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-base); color: var(--ink-muted); }
+
+/* ---- a round ---- */
+.cd-round { border-top: var(--hairline) solid var(--rule); }
+.cd-round__summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: var(--space-5) 0;
+  cursor: pointer;
+  list-style: none;
+}
+.cd-round__summary::-webkit-details-marker { display: none; }
+.cd-round__n { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--signal); }
+.cd-round__q { flex: 1; font-size: var(--text-base); color: var(--ink); }
+.cd-round__time { font-family: var(--font-mono); font-size: var(--text-caption); color: var(--ink-subtle); }
+.cd-round__chev { color: var(--ink-subtle); align-self: center; transition: transform var(--dur-fast) var(--ease); }
+.cd-round[open] .cd-round__chev { transform: rotate(180deg); }
+.cd-round__body { display: flex; flex-direction: column; gap: var(--space-10); padding-bottom: var(--space-10); }
+.cd-round__asked {
+  font-family: var(--font-display);
+  font-variation-settings: var(--display-opsz-md);
+  font-size: var(--text-lg);
+  color: var(--ink-muted);
+}
+
+/* The headline read. Set at reading size in the display face because it is
+   the sentence you came for. */
+.cd-read {
+  font-family: var(--font-display);
+  font-variation-settings: var(--display-opsz-md);
+  font-size: var(--text-xl);
+  line-height: var(--leading-snug);
+  color: var(--ink);
+  max-width: 46ch;
+  text-wrap: pretty;
+}
+
+/* ---- the five dimensions ---- */
+.cd-dimlist { display: flex; flex-direction: column; gap: var(--space-5); }
+.cd-dim { display: flex; flex-direction: column; gap: var(--space-2); }
+.cd-dim__head { display: flex; align-items: baseline; gap: var(--space-3); }
+.cd-dim__name { flex: 1; font-size: var(--text-base); color: var(--ink); font-weight: var(--weight-medium); }
+.cd-dim__score { font-family: var(--font-mono); font-size: var(--text-xl); color: var(--ink); }
+.cd-dim__of { font-size: var(--text-caption); color: var(--ink-subtle); }
+.cd-dim__track { height: 3px; border-radius: var(--radius-pill); background: var(--surface-raised); overflow: hidden; }
+.cd-dim__fill { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--ink-subtle); }
+.cd-dim__fill.is-held { background: var(--held); }
+.cd-dim__fill.is-warning { background: var(--warn); }
+.cd-dim__fill.is-danger { background: var(--alarm); }
+.cd-dim__verdict { font-size: var(--text-sm); color: var(--ink-muted); line-height: var(--leading-body); }
+
+/* ---- quoted back at you ---- */
+.cd-quotes { display: flex; flex-direction: column; gap: var(--space-4); }
+.cd-quote {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border-left: 3px solid var(--rule-strong);
+}
+.cd-quote.is-alarm { border-left-color: var(--alarm); }
+.cd-quote.is-warn { border-left-color: var(--warn); }
+.cd-quote__said {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  color: var(--ink);
+}
+.cd-quote__problem { font-size: var(--text-sm); color: var(--ink-muted); line-height: var(--leading-body); }
+
+.cd-prose { font-size: var(--text-base); line-height: var(--leading-body); color: var(--ink); max-width: 62ch; }
+
+.cd-searchlist { display: flex; flex-direction: column; gap: var(--space-3); padding-left: var(--space-5); }
+.cd-searchlist li { display: flex; flex-direction: column; gap: 2px; }
+.cd-searchlist__q { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--ink); }
+.cd-searchlist__for { font-size: var(--text-caption); color: var(--ink-muted); }
+
+.cd-framings { display: flex; flex-direction: column; gap: var(--space-3); }
+.cd-framings li { display: flex; flex-direction: column; gap: 2px; padding-top: var(--space-3); border-top: var(--hairline) solid var(--rule); }
+.cd-framings__name { font-size: var(--text-base); color: var(--ink); font-weight: var(--weight-medium); }
+.cd-framings__when { font-size: var(--text-sm); color: var(--ink-muted); }
+
+.cd-moves { display: flex; flex-direction: column; gap: var(--space-4); }
+.cd-moves dt {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ink-subtle);
+}
+.cd-moves dd { font-size: var(--text-base); color: var(--ink); line-height: var(--leading-body); max-width: 62ch; margin-top: var(--space-1); }
+
+/* The model answer is meant to be read out loud, so it is set as prose at a
+   reading measure — not as a card, not as a quote block. */
+.cd-modelanswer { display: flex; flex-direction: column; gap: var(--space-4); max-width: 38rem; }
+.cd-modelanswer p { font-size: var(--text-lg); line-height: var(--leading-relaxed); color: var(--ink); }
+
+.cd-sources { display: flex; flex-direction: column; gap: var(--space-3); }
+.cd-sources li { display: flex; flex-direction: column; gap: 2px; padding-top: var(--space-3); border-top: var(--hairline) solid var(--rule); }
+.cd-sources__title { font-size: var(--text-base); color: var(--ink); }
+.cd-sources__author { font-size: var(--text-caption); color: var(--ink-muted); }
+.cd-sources__why { font-size: var(--text-caption); color: var(--ink-subtle); }
+
+.cd-said summary { font-size: var(--text-caption); color: var(--ink-subtle); cursor: pointer; padding: var(--space-2) 0; }
+.cd-said__text {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  color: var(--ink-muted);
+  padding: var(--space-4);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-card);
+  white-space: pre-wrap;
+}
+
+/* ---- the home screen ---- */
+.cd-resume {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border-left: 3px solid var(--signal);
+  flex-wrap: wrap;
+}
+.cd-resume__label { font-size: var(--text-eyebrow); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-subtle); }
+.cd-resume__prompt { font-size: var(--text-base); color: var(--ink); }
+
+/* The trend. Five thin luminous lines on one axis — the shape is the
+   information, so there is no grid, no legend box and no tooltip. */
+.cd-trendplot { display: flex; flex-direction: column; gap: var(--space-5); }
+.cd-trendplot__svg { width: 100%; height: auto; overflow: visible; }
+.cd-trendplot__bar { stroke: var(--rule-strong); stroke-width: 1; stroke-dasharray: 3 5; }
+.cd-trendplot__line { fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0.9; }
+.cd-trendplot__dot { fill: var(--signal); }
+
+/* Five lines need five values, and the palette has one accent. So they are
+   separated by lightness along a single blue-to-neutral ramp rather than by
+   hue — which keeps the whole plot inside the palette, and reads on a
+   monochrome display or with any form of colour blindness. */
+.cd-trendplot__line.is-structure { stroke: var(--signal); }
+.cd-trendplot__line.is-reasoning { stroke: var(--ink); }
+.cd-trendplot__line.is-evidence { stroke: var(--held); }
+.cd-trendplot__line.is-responsiveness { stroke: var(--quiet); }
+.cd-trendplot__line.is-delivery { stroke: var(--ink-subtle); }
+
+.cd-trendkey { display: flex; flex-direction: column; gap: var(--space-2); }
+.cd-trendkey__row { display: flex; align-items: center; gap: var(--space-3); }
+.cd-trendkey__swatch { width: 14px; height: 2px; border-radius: var(--radius-pill); flex-shrink: 0; }
+.cd-trendkey__swatch.is-structure { background: var(--signal); }
+.cd-trendkey__swatch.is-reasoning { background: var(--ink); }
+.cd-trendkey__swatch.is-evidence { background: var(--held); }
+.cd-trendkey__swatch.is-responsiveness { background: var(--quiet); }
+.cd-trendkey__swatch.is-delivery { background: var(--ink-subtle); }
+.cd-trendkey__name { flex: 1; font-size: var(--text-sm); color: var(--ink); }
+.cd-trendkey__value { font-family: var(--font-mono); font-size: var(--text-base); color: var(--ink); }
+
+.cd-sitlist { display: flex; flex-direction: column; }
+.cd-sitrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-2);
+  border-bottom: var(--hairline) solid var(--rule);
+  text-decoration: none;
+  color: inherit;
+  transition: background var(--dur-fast) var(--ease);
+}
+.cd-sitrow:hover { background: var(--hover-tint); text-decoration: none; }
+.cd-sitrow__body { flex: 1; display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.cd-sitrow__strand { font-size: var(--text-eyebrow); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-subtle); }
+.cd-sitrow__prompt { font-size: var(--text-base); color: var(--ink); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.cd-sitrow__weak { font-size: var(--text-caption); color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-sitrow__marks { display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0; }
+.cd-sitrow__score { font-family: var(--font-mono); font-size: var(--text-lg); color: var(--ink); }
+.cd-sitrow__go { color: var(--ink-subtle); }
+
+.cd-poolline { font-size: var(--text-caption); color: var(--ink-subtle); line-height: var(--leading-body); max-width: 62ch; }
