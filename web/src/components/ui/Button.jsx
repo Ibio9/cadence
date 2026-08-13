@@ -13,6 +13,7 @@
  * only width the label can lose, so the reserved slot is added to both states.
  */
 
+import Link from 'next/link';
 import { forwardRef } from 'react';
 import { cn } from '../../lib/cn';
 import Icon from '../Icon';
@@ -96,6 +97,49 @@ export const Button = forwardRef(function Button(
         </span>
       ) : null}
     </button>
+  );
+});
+
+/**
+ * A button that is really a link.
+ *
+ * Somewhere to go is not the same as something to do. Rendering navigation as
+ * a <button> loses the middle-click, the copy-address, the open-in-new-tab and
+ * the "link" announcement — so anything that changes the URL uses this, and
+ * anything that acts on the page uses Button. They are the same object to look
+ * at and different objects to use.
+ */
+export const ButtonLink = forwardRef(function ButtonLink(
+  { href, variant = 'primary', size = 'md', icon, iconEnd, block = false, className, children, ...rest },
+  ref,
+) {
+  return (
+    <Link
+      ref={ref}
+      href={href}
+      className={cn(
+        'cd-btn',
+        VARIANTS[variant] || VARIANTS.primary,
+        size === 'sm' && 'cd-btn--sm',
+        size === 'lg' && 'cd-btn--lg',
+        block && 'cd-btn--block',
+        'no-underline',
+        className,
+      )}
+      {...rest}
+    >
+      {icon ? (
+        <span className="cd-btn__icon" aria-hidden="true">
+          <Icon name={icon} size={16} />
+        </span>
+      ) : null}
+      <span className="cd-btn__label">{children}</span>
+      {iconEnd ? (
+        <span className="cd-btn__icon" aria-hidden="true">
+          <Icon name={iconEnd} size={16} />
+        </span>
+      ) : null}
+    </Link>
   );
 });
 

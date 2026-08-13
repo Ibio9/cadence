@@ -21,7 +21,35 @@ export const api = {
   // never has to guess what the elapsed time became.
   session: (id, action) => call(`/api/blocks/${id}/${action}`, 'POST'),
   jarvis: (message, date) => call('/api/jarvis', 'POST', { message, date }),
+
+  /* TARA Drill. The bank is the server's; the client only ever asks for a set
+     and posts back what was answered. Grading happens on the server, so a
+     stale tab cannot write a score the bank disagrees with. */
+  tara: {
+    state: () => call('/api/tara/state'),
+    reference: () => call('/api/tara/reference'),
+    progress: () => call('/api/tara/progress'),
+    drill: (params) => call(`/api/tara/drill?${new URLSearchParams(clean(params))}`),
+    record: (attempts) => call('/api/tara/attempts', 'POST', { attempts }),
+    generate: (body) => call('/api/tara/generate', 'POST', body),
+    questions: (params) => call(`/api/tara/questions?${new URLSearchParams(clean(params))}`),
+    addQuestion: (body) => call('/api/tara/questions', 'POST', body),
+    editQuestion: (id, body) => call(`/api/tara/questions/${id}`, 'PATCH', body),
+    removeQuestion: (id) => call(`/api/tara/questions/${id}`, 'DELETE'),
+    newPrompts: () => call('/api/tara/writing/prompts', 'POST', {}),
+    saveEssay: (body) => call('/api/tara/writing/essays', 'POST', body),
+    markEssay: (id, body) => call(`/api/tara/writing/essays/${id}/mark`, 'POST', body),
+    essay: (id) => call(`/api/tara/writing/essays/${id}`),
+    essays: () => call('/api/tara/writing/essays'),
+  },
 };
+
+/** Drop empty params so a blank filter does not become `?module=`. */
+function clean(params = {}) {
+  return Object.fromEntries(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ''),
+  );
+}
 
 export const hhmm = (m) => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
 export const parseT = (s) => { const [h, m] = String(s || '0:0').split(':'); return (+h) * 60 + (+(m || 0)); };

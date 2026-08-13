@@ -33,6 +33,16 @@ const PATHS = {
       <path d="M12 7v5l3.5 2" />
     </>
   ),
+  // TARA Drill: a marked answer sheet. Rows with one of them ticked.
+  drill: (
+    <>
+      <rect x="4" y="3" width="16" height="18" rx="2.5" />
+      <path d="M8 8h3M8 12h3M8 16h3" />
+      <path d="M14.5 7.6l1.2 1.2 2.3-2.3" />
+      <circle cx="15.5" cy="12" r="1" />
+      <circle cx="15.5" cy="16" r="1" />
+    </>
+  ),
   jarvis: (
     <>
       <circle cx="12" cy="12" r="3.2" />

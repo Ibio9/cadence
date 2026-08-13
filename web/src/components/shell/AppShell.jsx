@@ -25,6 +25,7 @@ import { useTheme } from '../../context/ThemeContext';
 export const VIEWS = [
   { href: '/', label: 'Today', icon: 'today' },
   { href: '/timetable', label: 'Timetable', icon: 'timetable' },
+  { href: '/tara', label: 'TARA', icon: 'drill' },
   { href: '/notes', label: 'Notes', icon: 'notes' },
   { href: '/jarvis', label: 'Jarvis', icon: 'jarvis' },
   { href: '/settings', label: 'Settings', icon: 'settings' },

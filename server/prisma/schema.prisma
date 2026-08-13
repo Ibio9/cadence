@@ -93,3 +93,109 @@ model ChatMessage {
   text      String
   createdAt DateTime @default(now())
 }
+
+// ---------------------------------------------------------------------------
+// TARA Drill
+// ---------------------------------------------------------------------------
+
+/// One multiple-choice question, kept for good.
+///
+/// The bank is the point: a question is written once and then drilled,
+/// re-drilled and reviewed against the attempt history below. Nothing here is
+/// discarded after a session, which is why `retired` exists — a question that
+/// turns out to be wrong is hidden, not deleted, so the attempts that
+/// reference it keep their meaning.
+model TaraQuestion {
+  id          String   @id @default(cuid())
+  module      String                      // ct | ps
+  subcategory String                      // a leaf id from the taxonomy
+  /// The stimulus: an argument for Critical Thinking, a scenario or data for
+  /// Problem Solving. Empty only where the stem is self-contained.
+  passage     String   @default("")
+  /// The question itself, asked separately from the passage the way the real
+  /// paper asks it.
+  stem        String
+  /// Exactly five: [{ label: "A", text: "..." }, ...].
+  options     Json
+  answer      String                      // A | B | C | D | E
+  /// Why the key is right. Written to be read after answering, not before.
+  why         String
+  /// How you were meant to get there. For Problem Solving this is the
+  /// calculator-free route in at most three steps, which is what makes the
+  /// no-calculator rule checkable rather than merely asserted; for Critical
+  /// Thinking it is the argument's skeleton in letters.
+  route       String   @default("")
+  /// Why each of the other four fails, keyed by label: { "B": "...", ... }.
+  /// Every wrong option names the specific mistake that produces it — that is
+  /// what makes a distractor teach rather than merely fill a slot.
+  distractors Json
+  difficulty  String   @default("medium")  // easy | medium | hard
+  /// generated | real. Real questions are TSA past-paper items entered by
+  /// hand and are the volume source; generated ones fill the gaps.
+  origin      String   @default("generated")
+  /// Where a real question came from, e.g. "TSA 2019 S1 Q12".
+  source      String?
+  /// For Critical Thinking: the flaw-catalogue key the question turns on.
+  flaw        String?
+  retired     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  attempts    TaraAttempt[]
+
+  @@index([module, subcategory])
+  @@index([origin])
+}
+
+/// One answer to one question. Never overwritten — the history is the progress
+/// view, and "answered correctly twice" is a count over these rows.
+model TaraAttempt {
+  id         String       @id @default(cuid())
+  question   TaraQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  questionId String
+  /// A | B | C | D | E, or null for a question left blank. There is no
+  /// negative marking, so a skip is never the right move and is recorded as
+  /// its own thing rather than as a wrong answer.
+  chosen     String?
+  correct    Boolean      @default(false)
+  seconds    Int          @default(0)
+  mode       String       @default("practice") // practice | timed | mock | weakness | review
+  createdAt  DateTime     @default(now())
+
+  @@index([questionId])
+  @@index([createdAt])
+}
+
+/// A writing-task prompt in the official shape: a statement, then the three
+/// questions that are always asked of it.
+model TaraPrompt {
+  id        String      @id @default(cuid())
+  statement String
+  q1        String
+  q2        String
+  q3        String
+  origin    String      @default("generated")
+  createdAt DateTime    @default(now())
+  essays    TaraEssay[]
+}
+
+/// One attempt at one prompt, with its marking.
+model TaraEssay {
+  id          String     @id @default(cuid())
+  prompt      TaraPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  promptId    String
+  text        String     @default("")
+  words       Int        @default(0)
+  seconds     Int        @default(0)
+  submitted   Boolean    @default(false)
+  /// The structured mark: per-criterion verdicts, the typo list, the overall
+  /// read. Null until it has been marked.
+  mark        Json?
+  /// A 750-word answer to the same prompt, written after marking so it can be
+  /// held against what was actually written.
+  exemplar    String?
+  /// [{ mine, alternative, note }] — where the essay diverged from the model
+  /// answer, quoting both sides.
+  divergences Json?
+  createdAt   DateTime   @default(now())
+
+  @@index([promptId])
+}

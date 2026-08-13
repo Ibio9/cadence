@@ -1,6 +1,6 @@
 /** The primitive surface. Screens import only from here. */
 
-export { Button, IconButton, Spinner } from './Button';
+export { Button, ButtonLink, IconButton, Spinner } from './Button';
 export { Card, CardHeader, CardBody, CardFooter, CardDivider } from './Card';
 export { PageHeading } from './PageHeading';
 export { Skeleton, SkeletonText } from './Skeleton';

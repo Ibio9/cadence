@@ -3,6 +3,8 @@ import cors from 'cors';
 import { prisma } from './db.js';
 import { materialise, rebuildFuture } from './materialise.js';
 import { jarvis } from './routes/jarvis.js';
+import { mountTara } from './routes/tara.js';
+import { asyncRoutes } from './routes.js';
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -18,8 +20,11 @@ app.use('/api', (req, res, next) => {
 
 app.get('/health', (_, res) => res.json({ ok: true }));
 
+/** Async-safe route registration. See src/routes.js for why it is needed. */
+const r = asyncRoutes(app);
+
 /* ---------- state ---------- */
-app.get('/api/state', async (req, res) => {
+r.get('/api/state', async (req, res) => {
   const date = String(req.query.date || new Date().toISOString().slice(0, 10));
   await materialise(date);
   const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
@@ -37,17 +42,17 @@ app.get('/api/state', async (req, res) => {
 
 /* ---------- generic CRUD ---------- */
 const crud = (name, model, hooks = {}) => {
-  app.post(`/api/${name}`, async (req, res) => {
+  r.post(`/api/${name}`, async (req, res) => {
     const row = await model.create({ data: req.body });
     await hooks.after?.(req);
     res.json(row);
   });
-  app.patch(`/api/${name}/:id`, async (req, res) => {
+  r.patch(`/api/${name}/:id`, async (req, res) => {
     const row = await model.update({ where: { id: req.params.id }, data: req.body });
     await hooks.after?.(req);
     res.json(row);
   });
-  app.delete(`/api/${name}/:id`, async (req, res) => {
+  r.delete(`/api/${name}/:id`, async (req, res) => {
     await model.delete({ where: { id: req.params.id } });
     await hooks.after?.(req);
     res.json({ ok: true });
@@ -60,7 +65,7 @@ crud('blocks', prisma.block);
 /* ---------- one block, by id ----------
    Focus is a real, linkable route: it is opened by id, without a date, so it
    has to be able to load a single block on its own. */
-app.get('/api/blocks/:id', async (req, res) => {
+r.get('/api/blocks/:id', async (req, res) => {
   const block = await prisma.block.findUnique({
     where: { id: req.params.id },
     include: { project: true },
@@ -80,7 +85,7 @@ const bank = (block) =>
     : block.elapsedSec;
 
 const session = (name, next) => {
-  app.post(`/api/blocks/:id/${name}`, async (req, res) => {
+  r.post(`/api/blocks/:id/${name}`, async (req, res) => {
     const block = await prisma.block.findUnique({ where: { id: req.params.id } });
     if (!block) return res.status(404).json({ error: 'That block is not on any day. It may have been deleted.' });
     const row = await prisma.block.update({
@@ -103,7 +108,20 @@ crud('inbox', prisma.inboxItem);
 crud('rhythms', prisma.rhythm, { after: () => rebuildFuture(today()) });
 crud('projects', prisma.project);
 
-app.post('/api/jarvis', jarvis);
+r.post('/api/jarvis', jarvis);
+
+mountTara(app);
+
+// The end of the line for anything the wrappers in routes.js caught. Must stay
+// last: Express picks error middleware by arity and by position.
+app.use((err, _req, res, _next) => {
+  console.error('[api]', err);
+  if (res.headersSent) return;
+  const known = err?.code === 'P2025';
+  res.status(known ? 404 : 500).json({
+    error: known ? 'That record is no longer here.' : 'The server could not complete that. Try again.',
+  });
+});
 
 const port = process.env.PORT || 8080;
 app.listen(port, () => console.log(`Cadence API on :${port}`));
