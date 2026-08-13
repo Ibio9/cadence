@@ -2386,3 +2386,95 @@
 .cd-sitrow__go { color: var(--ink-subtle); }
 
 .cd-poolline { font-size: var(--text-caption); color: var(--ink-subtle); line-height: var(--leading-body); max-width: 62ch; }
+
+/* ==========================================================================
+   RETENTION
+
+   Thin luminous lines and nothing else. No axes, no gridlines, no legend box,
+   no rounded plot area, no tooltip — a chart library supplies all six and five
+   of them are brighter than the data. On this substrate the line IS the
+   drawing.
+
+   The line is drawn twice: solid up to now, faint past it. Everything after
+   today is a projection of a model, and a forecast that looks like history is
+   a lie about what is known.
+   ========================================================================== */
+
+.cd-curve { display: block; width: 100%; height: auto; overflow: visible; flex-shrink: 0; }
+
+/* The floor: where a topic stops being worth calling remembered. One
+   reference line, not a grid. */
+.cd-curve__floor { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 2 6; }
+
+.cd-curve__line { fill: none; stroke: var(--quiet); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.cd-curve__ahead { fill: none; stroke: var(--ink-subtle); stroke-width: 1.5; stroke-dasharray: 2 4; opacity: 0.55; }
+.cd-curve__session { fill: var(--ink-subtle); }
+
+/* Where you are now. The only thing on a curve that may emit, and only when
+   the topic has genuinely gone cold — the light means "this one, now", which
+   is exactly what a faded topic is asking for. */
+.cd-curve__now { fill: var(--ink); }
+.cd-curve__now.is-lit {
+  fill: var(--signal);
+  filter: drop-shadow(0 0 8px rgba(var(--emission-rgb), 0.55));
+}
+
+/* ---- the revise list ---- */
+.cd-revise {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5) 0;
+  border-top: var(--hairline) solid var(--rule);
+  border-bottom: var(--hairline) solid var(--rule);
+}
+.cd-revise__none { font-size: var(--text-base); color: var(--ink-muted); }
+.cd-revise__list { display: flex; flex-direction: column; }
+.cd-revise__item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: var(--hairline) solid var(--rule);
+}
+.cd-revise__item:last-child { border-bottom: none; }
+.cd-revise__n { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--ink-subtle); width: 1.2em; }
+.cd-revise__name { flex: 1; font-size: var(--text-base); color: var(--ink); min-width: 0; }
+.cd-revise__ago { font-family: var(--font-mono); font-size: var(--text-caption); color: var(--ink-muted); white-space: nowrap; }
+
+/* ---- one topic ---- */
+.cd-topiclist { display: flex; flex-direction: column; }
+.cd-topicrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-4) 0;
+  border-bottom: var(--hairline) solid var(--rule);
+  flex-wrap: wrap;
+}
+.cd-topicrow:last-child { border-bottom: none; }
+.cd-topicrow__body { flex: 1; min-width: 12rem; display: flex; flex-direction: column; gap: var(--space-1); }
+.cd-topicrow__name { font-size: var(--text-base); color: var(--ink); font-weight: var(--weight-medium); }
+.cd-topicrow__meta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-size: var(--text-caption);
+  color: var(--ink-muted);
+}
+.cd-topicrow .cd-curve { width: 200px; flex: 0 0 200px; }
+@media (max-width: 640px) { .cd-topicrow .cd-curve { width: 100%; flex: 1 0 100%; } }
+
+/* ---- the small version, on Focus ---- */
+.cd-retain { display: flex; flex-direction: column; gap: var(--space-3); }
+.cd-retain__line { font-size: var(--text-base); color: var(--ink); }
+.cd-retain__line strong { font-weight: var(--weight-medium); }
+.cd-retain .cd-curve { width: 100%; max-width: 260px; }
+.cd-retain__note { font-size: var(--text-caption); color: var(--ink-muted); line-height: var(--leading-normal); }
+
+/* ---- the marker on the day spine ----
+   A fact about the calendar, not an alarm. It is warn rather than alarm, it
+   does not glow, and it is the same size as the chevron beside it — the spine
+   already has exactly one thing on it that is allowed to be loud. */
+.cd-fadedmark { display: inline-flex; align-items: center; color: var(--warn); opacity: 0.75; }

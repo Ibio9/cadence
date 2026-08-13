@@ -27,6 +27,8 @@ import {
   Textarea,
   useToast,
 } from '../components/ui';
+import Curve from '../components/Curve';
+import { agoLabel, halfLifeLabel, standingOf } from '../lib/retention';
 import { playOpen } from '../lib/openBlock';
 import { proposeObjectives } from '../lib/proposals';
 import { formatDayLabel } from '../lib/useDay';
@@ -289,6 +291,42 @@ function Objective({ block, project, onSave }) {
   );
 }
 
+/**
+ * How long since you last did this, and the shape of what has happened since.
+ *
+ * One line and one sentence. It is here because the single most useful fact
+ * when you sit down to an hour is whether you are continuing something or
+ * restarting it, and that is a fact about the calendar rather than about the
+ * block — nothing else on this screen knows it.
+ */
+function Retention({ retention }) {
+  if (!retention || retention.sessions < 1) return null;
+  const s = standingOf(retention.strength);
+  const half = halfLifeLabel(retention.half);
+
+  return (
+    <section className="cd-retain" aria-labelledby="retain-heading">
+      <h2 id="retain-heading" className="cd-eyebrow">
+        Since last time
+      </h2>
+      <p className="cd-retain__line">
+        You last did this <strong>{agoLabel(retention.daysSince)}</strong>
+        {retention.sessions > 1 ? `, over ${retention.sessions} sessions` : ''}.
+      </p>
+      <Curve topic={retention} width={260} height={54} lit={s.tone === 'danger'} />
+      <p className="cd-retain__note">
+        {s.tone === 'danger'
+          ? 'It has gone cold. Budget the first ten minutes for getting back in.'
+          : s.tone === 'warning'
+            ? 'Slipping. This is the session that saves the ones before it.'
+            : half
+              ? `Still holding — half gone in ${half}.`
+              : 'Still holding.'}
+      </p>
+    </section>
+  );
+}
+
 /** How the block's minutes are meant to go. Derived from its length, not fetched. */
 function Plan({ block }) {
   return (
@@ -410,6 +448,7 @@ export function FocusScreen({ id }) {
       <div className="cd-focus__grid">
         <div className="cd-focus__col">
           <Objective block={block} project={block.project} onSave={(objective) => patch({ objective })} />
+          <Retention retention={block.retention} />
           <Plan block={block} />
         </div>
 

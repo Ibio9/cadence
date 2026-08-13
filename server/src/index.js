@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { prisma } from './db.js';
 import { materialise, rebuildFuture } from './materialise.js';
+import { FADED_BELOW, forTopic, loadRetention } from './retention.js';
 import { jarvis } from './routes/jarvis.js';
 import { mountInterview } from './routes/interview.js';
 import { mountTara } from './routes/tara.js';
@@ -40,7 +41,17 @@ r.get('/api/state', async (req, res) => {
     prisma.task.findMany({ orderBy: { createdAt: 'desc' } }),
     prisma.chatMessage.findMany({ orderBy: { createdAt: 'asc' }, take: 60 }),
   ]);
-  res.json({ date, projects, rhythms, blocks, history, inbox, tasks, chat });
+  // The spine marks a block whose topic has badly decayed. Computed here
+  // rather than fetched separately, so the marker arrives with the row and
+  // the day never renders once without it and once with.
+  const { topics } = await loadRetention();
+  const retention = {};
+  for (const b of blocks) {
+    const t = forTopic(topics, { title: b.title, projectId: b.projectId });
+    if (t) retention[b.id] = { strength: t.strength, daysSince: t.daysSince, sessions: t.sessions, faded: t.strength < FADED_BELOW };
+  }
+
+  res.json({ date, projects, rhythms, blocks, history, inbox, tasks, chat, retention });
 });
 
 /* ---------- generic CRUD ---------- */
@@ -74,7 +85,10 @@ r.get('/api/blocks/:id', async (req, res) => {
     include: { project: true },
   });
   if (!block) return res.status(404).json({ error: 'That block is not on any day. It may have been deleted.' });
-  res.json(block);
+
+  // The small version of the curve, for the one topic this hour is about.
+  const { topics } = await loadRetention();
+  res.json({ ...block, retention: forTopic(topics, { title: block.title, projectId: block.projectId }) });
 });
 
 /* ---------- the session clock ----------
@@ -112,6 +126,13 @@ crud('rhythms', prisma.rhythm, { after: () => rebuildFuture(today()) });
 crud('projects', prisma.project);
 
 r.post('/api/jarvis', jarvis);
+
+/* ---------- retention ----------
+   One computation, read by the retention screen. Everything else that needs
+   it gets it folded into the response it was already making. */
+r.get('/api/retention', async (_req, res) => {
+  res.json(await loadRetention());
+});
 
 mountTara(app);
 mountInterview(app);

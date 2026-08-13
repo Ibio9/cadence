@@ -23,6 +23,7 @@ import Icon from '../components/Icon';
 import { Badge, EmptyState, ErrorState, Skeleton } from '../components/ui';
 import { formatDateLong } from '../lib/store';
 import { openBlock } from '../lib/openBlock';
+import { agoLabel } from '../lib/retention';
 import { useChecklist } from '../lib/useChecklist';
 import { useDay } from '../lib/useDay';
 
@@ -67,7 +68,7 @@ function untilLabel(mins) {
 /* The rail                                                                   */
 /* -------------------------------------------------------------------------- */
 
-function RailRow({ block, project, state, nowMin }) {
+function RailRow({ block, project, state, nowMin, faded }) {
   const until = state === 'next' && nowMin != null ? untilLabel(block.startMin - nowMin) : null;
 
   // Saying an hour has no objective is only worth the line while you can still
@@ -112,6 +113,15 @@ function RailRow({ block, project, state, nowMin }) {
               happening now. Missed is the one thing that still wants you. */}
           {block.status === 'done' ? <span className="cd-when">Held</span> : null}
           {block.status === 'missed' ? <Badge tone="warning">Missed</Badge> : null}
+          {/* A block whose topic has gone cold. Subtle on purpose: it is a
+              fact about the calendar, not an alarm, and the day spine already
+              has exactly one thing on it that is allowed to be loud. */}
+          {faded ? (
+            <span className="cd-fadedmark" title={`Last worked ${faded} — this one has gone cold`}>
+              <Icon name="curve" size={14} />
+              <span className="sr-only">Topic has gone cold; last worked {faded}</span>
+            </span>
+          ) : null}
           <Icon name="chevronRight" size={15} className="cd-railrow__go" />
         </span>
       </Link>
@@ -185,6 +195,17 @@ export function TodayScreen() {
     () => [...(state?.blocks ?? [])].sort((a, b) => a.startMin - b.startMin),
     [state],
   );
+
+  /* Which blocks carry a topic that has gone cold. The server computes it
+     with the day, so the row never renders once without the mark and once
+     with it. */
+  const fadedById = useMemo(() => {
+    const out = {};
+    for (const [id, r] of Object.entries(state?.retention ?? {})) {
+      if (r.faded) out[id] = agoLabel(r.daysSince);
+    }
+    return out;
+  }, [state]);
 
   const projectsById = useMemo(() => {
     const map = {};
@@ -282,6 +303,7 @@ export function TodayScreen() {
                   project={projectsById[block.projectId]}
                   state={states[block.id] || 'later'}
                   nowMin={nowMin}
+                  faded={fadedById[block.id]}
                 />
               </Fragment>
             );

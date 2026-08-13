@@ -95,6 +95,24 @@ the server validates against real project ids and real open gaps before applying
 just a token in a header. If you ever add a second user, that's the seam to
 replace.
 
+**The bank stocks itself.** On boot the server measures the TARA question bank
+and writes whatever is missing — fifteen per subcategory, three model calls at a
+time, off the request path. It tops up whenever a type drops below ten *unseen*
+questions, because a hundred you have already answered twice are worth nothing
+to drill against. See `server/src/tara/bank.js`.
+
+**Retention is derived, not tracked.** Nothing writes a "topic touched" row.
+`server/src/retention.js` reads the blocks you actually held and the questions
+you actually answered, and runs a forgetting curve over them — so it is right
+about history nothing was recording, and it cannot drift out of step with the
+thing it describes. A topic is a block's own title, so it works with no tagging.
+Read the header of that file before believing a number off it.
+
+**The interview drill needs HTTPS.** Camera and microphone are gated on a secure
+context, so the sitting screen works on Vercel and on `localhost`, and nowhere
+else. Transcription is the browser's own Web Speech API — no audio leaves the
+machine and it costs nothing; the critique is one Claude call with web search on.
+
 ## Things worth building next
 
 - A **shutdown review** at 21:30: Jarvis walks the day, then drafts tomorrow.

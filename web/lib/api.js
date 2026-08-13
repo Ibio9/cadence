@@ -21,6 +21,9 @@ export const api = {
   // never has to guess what the elapsed time became.
   session: (id, action) => call(`/api/blocks/${id}/${action}`, 'POST'),
   jarvis: (message, date) => call('/api/jarvis', 'POST', { message, date }),
+  /* Every topic and its curve. Derived on the server from the blocks you have
+     actually held, so it is right about history nothing was tracking. */
+  retention: () => call('/api/retention'),
 
   /* TARA Drill. The bank is the server's; the client only ever asks for a set
      and posts back what was answered. Grading happens on the server, so a

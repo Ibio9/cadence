@@ -1,4 +1,5 @@
 import { prisma } from './../db.js';
+import { decayed, loadRetention } from './../retention.js';
 
 const hhmm = (m) => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
 const parseT = (s) => { const [h, m] = String(s).split(':'); return (+h) * 60 + (+(m || 0)); };
@@ -13,7 +14,11 @@ You can act on his system by ending your reply with a fenced json block:
  "tasks":[{"title":"...","projectId":"ss","energy":"deep","est":45}],
  "clearInbox":["exact inbox text you converted"]}
 \`\`\`
-Rules: only schedule inside the listed openGaps; never overlap a fixed block; never schedule a time that has already passed; use real project ids from the state. Omit keys you aren't using, and omit the json block entirely if you're only talking.`;
+Rules: only schedule inside the listed openGaps; never overlap a fixed block; never schedule a time that has already passed; use real project ids from the state. Omit keys you aren't using, and omit the json block entirely if you're only talking.
+
+DECAY DRIVES WHAT YOU PROPOSE. The state carries "decayedTopics": things he has built up and then left, worst first, with how long since and how many sessions built it. When he asks what to do with an hour, or when you are filling a gap or naming an objective for a block, take from that list first and say which one and how long it has been. A topic with several sessions behind it that has slipped is worth more than a fresh one — the work is already there and is about to be wasted.
+
+The strength numbers are a model, not a measurement of his memory. Use them to order what you suggest. Never quote one back at him as a fact.`;
 
 async function buildContext(date) {
   const [projects, blocks, inbox, tasks] = await Promise.all([
@@ -31,6 +36,10 @@ async function buildContext(date) {
   let cur = Math.max(nowMin, 6 * 60);
   for (const b of blocks) { if (b.startMin - cur >= 25) gaps.push([cur, b.startMin]); cur = Math.max(cur, b.endMin); }
   if (23 * 60 - cur >= 25) gaps.push([cur, 23 * 60]);
+
+  // What has slipped. Read straight into the context so every reply is
+  // grounded in it rather than needing to be asked for.
+  const { topics } = await loadRetention();
 
   const byDay = {};
   for (const b of recent) {
@@ -52,6 +61,12 @@ async function buildContext(date) {
     inbox: inbox.map((i) => i.text),
     openTasks: tasks.map((t) => ({ title: t.title, project: t.project.name, energy: t.energy, mins: t.est })),
     last7Days: byDay,
+    decayedTopics: decayed(topics, { limit: 8 }).map((t) => ({
+      topic: t.label,
+      lastWorkedDaysAgo: t.daysSince,
+      sessionsBehindIt: t.sessions,
+      halfLifeDays: t.half,
+    })),
   };
 }
 

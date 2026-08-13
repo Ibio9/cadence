@@ -9,6 +9,7 @@
  */
 
 import { prisma } from '../db.js';
+import { loadRetention } from '../retention.js';
 import { asyncRoutes } from '../routes.js';
 import {
   SEED_TARGET,
@@ -288,14 +289,28 @@ export function mountTara(app) {
 
     let pool = await prisma.taraQuestion.findMany({ where });
 
-    // A weakness set ignores the requested subcategory and goes where the
-    // accuracy is worst — that is the whole point of it.
+    /* A weakness set ignores the requested subcategory and goes where you are
+       worst. Two things make a type weak, and they are not the same thing: a
+       low score, and a type you were fine at and have not touched since. The
+       second is invisible to accuracy — it looks identical to a type you have
+       mastered right up until you sit the paper — so decay is folded in
+       rather than left as a separate mode nobody would remember to use. */
     if (mode === 'weakness') {
-      const { bySub } = await loadStats();
+      const [{ bySub }, { topics }] = await Promise.all([loadStats(), loadRetention()]);
+      const strengthOf = {};
+      for (const t of topics) if (t.kind === 'tara' && t.module === module) strengthOf[t.subcategory] = t.strength;
+
       const ranked = getModule(module)
-        .subcategories.map((s) => ({ id: s.id, acc: accuracy(bySub[`${module}:${s.id}`] || {}) }))
-        .filter((s) => s.acc != null)
-        .sort((a, b) => a.acc - b.acc)
+        .subcategories.map((s) => {
+          const acc = accuracy(bySub[`${module}:${s.id}`] || {});
+          if (acc == null) return null;
+          // An untouched type has no retention row, which is exactly the case
+          // where decay should count for most — treat it as fully faded.
+          const held = strengthOf[s.id] ?? 0;
+          return { id: s.id, score: acc * 0.6 + held * 0.4 };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.score - b.score)
         .slice(0, 3)
         .map((s) => s.id);
       if (ranked.length) pool = pool.filter((q) => ranked.includes(q.subcategory));
