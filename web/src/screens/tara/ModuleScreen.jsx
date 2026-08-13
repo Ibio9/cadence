@@ -27,7 +27,8 @@ import {
   useToast,
 } from '../../components/ui';
 import { api } from '../../../lib/api';
-import { pct, secs, standing, useTaraState } from '../../lib/tara';
+import BankBuild from '../../components/tara/BankBuild';
+import { pct, secs, standing, useBankBuild, useTaraState } from '../../lib/tara';
 import WritingScreen from './WritingScreen';
 
 const COUNTS = [
@@ -195,6 +196,7 @@ function SubRow({ sub, module, onOpen }) {
 export function ModuleScreen({ moduleId }) {
   const { data, status, error, reload } = useTaraState();
   const [open, setOpen] = useState(null);
+  const build = useBankBuild({ onDone: reload });
 
   const module = useMemo(() => data?.modules.find((m) => m.id === moduleId), [data, moduleId]);
 
@@ -263,11 +265,12 @@ export function ModuleScreen({ moduleId }) {
         }
       />
 
-      {module.bank === 0 ? (
+      <BankBuild state={build} />
+
+      {module.bank === 0 && !build?.running ? (
         <EmptyState
-          icon="layers"
-          title={`No ${module.name} questions yet`}
-          body="Pick a type below and generate a first set. Each one is written from that type's own construction rules and checked before it is saved."
+          title={`${module.name} is still being written`}
+          body="Fifteen questions for every type below, each written from that type's own construction rules and checked before it goes in. It happens on the server. Open a type to start one early."
         />
       ) : null}
 

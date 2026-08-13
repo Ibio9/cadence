@@ -54,6 +54,52 @@ export const useTaraState = () => useResource(() => api.tara.state(), []);
 export const useTaraProgress = () => useResource(() => api.tara.progress(), []);
 export const useReference = () => useResource(() => api.tara.reference(), []);
 
+/**
+ * How the bank build is going.
+ *
+ * Polls only while something is actually happening, and once more after it
+ * stops so the strip settles on a final count rather than freezing one tick
+ * short. A failed poll is not surfaced: the bank writing itself is background
+ * work, and an error banner about a thing nobody asked for is noise.
+ *
+ * `onDone` fires on the transition from running to not running, so the screen
+ * around it can reload and show the questions that just arrived.
+ */
+export function useBankBuild({ interval = 4000, onDone } = {}) {
+  const [state, setState] = useState(null);
+  const wasRunning = useRef(false);
+  const done = useRef(onDone);
+  done.current = onDone;
+
+  useEffect(() => {
+    let alive = true;
+    let timer;
+
+    const poll = async () => {
+      try {
+        const next = await api.tara.bank();
+        if (!alive) return;
+        setState(next);
+        if (wasRunning.current && !next.running) done.current?.();
+        wasRunning.current = next.running;
+        // Idle costs one request a minute; a running build costs one every
+        // few seconds, which is what the moving number is worth.
+        timer = setTimeout(poll, next.running ? interval : 60000);
+      } catch {
+        if (alive) timer = setTimeout(poll, 30000);
+      }
+    };
+
+    poll();
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [interval]);
+
+  return state;
+}
+
 /* --------------------------------------------------------------------------
    Formatting
    -------------------------------------------------------------------------- */

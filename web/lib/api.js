@@ -32,6 +32,10 @@ export const api = {
     drill: (params) => call(`/api/tara/drill?${new URLSearchParams(clean(params))}`),
     record: (attempts) => call('/api/tara/attempts', 'POST', { attempts }),
     generate: (body) => call('/api/tara/generate', 'POST', body),
+    /* The bank stocks itself. These two only report on it and, if you are
+       impatient, start it early — nothing here blocks a drill. */
+    bank: () => call('/api/tara/bank'),
+    buildBank: (force = false) => call('/api/tara/bank', 'POST', { force }),
     questions: (params) => call(`/api/tara/questions?${new URLSearchParams(clean(params))}`),
     addQuestion: (body) => call('/api/tara/questions', 'POST', body),
     editQuestion: (id, body) => call(`/api/tara/questions/${id}`, 'PATCH', body),

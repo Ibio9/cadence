@@ -1635,6 +1635,56 @@
 .cd-readiness__score { font-family: var(--font-mono); font-size: var(--text-xl); color: var(--ink); }
 .cd-readiness__of { font-size: var(--text-caption); color: var(--ink-subtle); }
 
+/* ---- the bank writing itself ----
+   Background work, so it is a strip rather than a panel: no border, no card,
+   no shadow. The only lit thing is the head of the fill, on the same grounds
+   Jarvis is allowed to glow — something is genuinely happening. */
+.cd-bankbuild {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-top: var(--hairline) solid var(--rule);
+  border-bottom: var(--hairline) solid var(--rule);
+}
+.cd-bankbuild__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); }
+.cd-bankbuild__line { font-size: var(--text-sm); color: var(--ink); min-width: 0; }
+.cd-bankbuild__count { display: flex; align-items: baseline; gap: var(--space-2); flex-shrink: 0; }
+.cd-bankbuild__written { font-family: var(--font-mono); font-size: var(--text-lg); color: var(--ink); }
+.cd-bankbuild__of { font-family: var(--font-mono); font-size: var(--text-caption); color: var(--ink-subtle); }
+
+.cd-bankbuild__rail {
+  position: relative;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--rule-strong);
+  overflow: visible;
+}
+.cd-bankbuild__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--progress, 0%);
+  border-radius: var(--radius-pill);
+  background: var(--signal);
+  /* Only the leading edge carries the light, so a long bar does not become a
+     long lamp. */
+  box-shadow: 6px 0 20px -6px rgba(var(--emission-rgb), 0.5);
+  transition: width var(--dur-slow) linear;
+}
+
+.cd-bankbuild__foot { font-size: var(--text-caption); color: var(--ink-muted); line-height: var(--leading-normal); }
+.cd-bankbuild__problem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--alarm);
+  line-height: var(--leading-normal);
+}
+.cd-bankbuild--stalled { border-bottom-color: transparent; }
+
 /* ---- the three modules ---- */
 .cd-modules { display: flex; flex-direction: column; gap: var(--space-3); }
 .cd-modulecard {

@@ -282,6 +282,50 @@ Write ${count} question${count === 1 ? '' : 's'}.`;
    -------------------------------------------------------------------------- */
 
 /**
+ * The maths ceiling, checked rather than merely asked for.
+ *
+ * The prompt states the ceiling plainly and the model mostly respects it, but
+ * "mostly" is not a guarantee, and a Problem Solving question that needs
+ * simultaneous equations is not a hard question — it is the wrong paper. So the
+ * intended route is scanned for the machinery that only appears above the
+ * ceiling, and a hit sends the question back to be written again.
+ *
+ * This runs over the route rather than the passage on purpose: a passage may
+ * legitimately mention a formula in words, but the route is the model's own
+ * account of how it got there, so algebra in the route means algebra in the
+ * solution.
+ */
+/**
+ * Only unambiguous signals belong here. A heuristic that fires on a legitimate
+ * question is worse than one that misses an illegitimate one: a false positive
+ * silently throws away good work and burns a retry, and there is nowhere for it
+ * to be noticed. So `x²` is not on the list — it cannot be told apart from
+ * `cm²` without more care than the rule is worth — and "pounds" is only matched
+ * as `(lb`, never as currency.
+ */
+const OVER_CEILING = [
+  // Algebra past a single trivial rearrangement.
+  { re: /\bsimultaneous\b|\bquadratic|\bfactoris|\bfactoriz/i, why: 'simultaneous equations or factorising' },
+  { re: /\bsolve\s+for\s+[a-z]\b/i, why: 'solving for an unknown' },
+  { re: /\blet\s+[a-z]\s*(=|be\b)/i, why: 'introducing an algebraic unknown' },
+  // Above GCSE outright.
+  { re: /\btrigonometr|\bsine\b|\bcosine\b|\bsin\(|\bcos\(|\btan\(/i, why: 'trigonometry' },
+  { re: /\blogarithm|\blog_|\bln\(/i, why: 'logarithms' },
+  { re: /\bstandard form\b|\bscientific notation\b/i, why: 'standard form' },
+  { re: /\bderivative\b|\bintegrat|\bcalculus\b/i, why: 'calculus' },
+  { re: /\bcompound interest\b|\bbinomial\b|\bstandard deviation\b|\bnormal distribution\b/i, why: 'a formula above the ceiling' },
+  // Conversions the paper does not assume you know, and does not supply.
+  { re: /\bmiles?\b|\binch(es)?\b|\bfeet\b|\bpounds? \(lb|\bounces?\b|\bgallons?\b/i, why: 'imperial units' },
+];
+
+/** The reason this question breaks the ceiling, or null if it does not. */
+export function ceilingBreach(q) {
+  const text = `${q.route || ''}\n${q.why || ''}`;
+  for (const rule of OVER_CEILING) if (rule.re.test(text)) return rule.why;
+  return null;
+}
+
+/**
  * What the schema could not enforce. A question failing any of these is
  * dropped: an item with a mislabelled key or an unexplained distractor is
  * actively misleading to drill against.
@@ -313,6 +357,11 @@ export function validateQuestion(q, module) {
   // The no-calculator guarantee is only worth having if it is written down.
   if (module === 'ps' && !q.route?.trim()) return 'no calculator-free route given';
   if (q.flaw && !FLAW_IDS.includes(q.flaw)) return `unknown flaw "${q.flaw}"`;
+
+  if (module === 'ps') {
+    const over = ceilingBreach(q);
+    if (over) return `above the ceiling: the route uses ${over}`;
+  }
 
   return null;
 }

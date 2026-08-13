@@ -5,6 +5,7 @@ import { materialise, rebuildFuture } from './materialise.js';
 import { jarvis } from './routes/jarvis.js';
 import { mountTara } from './routes/tara.js';
 import { asyncRoutes } from './routes.js';
+import { ensureBank } from './tara/bank.js';
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -124,4 +125,18 @@ app.use((err, _req, res, _next) => {
 });
 
 const port = process.env.PORT || 8080;
-app.listen(port, () => console.log(`Cadence API on :${port}`));
+app.listen(port, () => {
+  console.log(`Cadence API on :${port}`);
+
+  // Stock the question bank. On the first boot this writes a few hundred
+  // questions over the following half hour; on every boot after that it
+  // measures the bank, finds it full, and does nothing.
+  //
+  // Delayed so a cold start serves its first request before the model calls
+  // start competing for the process, and swallowed because a bank that cannot
+  // build itself is a thing the TARA screens report — not a reason to take the
+  // whole API down.
+  setTimeout(() => {
+    ensureBank().catch((e) => console.error('[bank]', e.message));
+  }, 5000).unref();
+});

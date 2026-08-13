@@ -10,6 +10,13 @@
 
 import { prisma } from '../db.js';
 import { asyncRoutes } from '../routes.js';
+import {
+  SEED_TARGET,
+  TOPUP_FLOOR,
+  ensureBank,
+  fullStatus,
+  nudge,
+} from '../tara/bank.js';
 import { CONDITIONAL_FORMS, FLAWS, PS_MATHS_CEILING } from '../tara/catalogue.js';
 import { generateQuestions } from '../tara/generate.js';
 import {
@@ -193,6 +200,10 @@ export function mountTara(app) {
       prisma.taraEssay.count({ where: { submitted: true } }),
     ]);
 
+    // Opening the section is the natural moment to notice the bank is thin.
+    // It runs behind the response, so this costs the request nothing.
+    nudge();
+
     res.json({
       modules: shapeTree(bySub),
       writing: {
@@ -209,7 +220,20 @@ export function mountTara(app) {
         marked: essays,
       },
       readiness: readiness(attempts, qById),
+      bank: { seedTarget: SEED_TARGET, topupFloor: TOPUP_FLOOR },
     });
+  });
+
+  /* ---- how the bank is coming along ----
+     Polled by the progress strip while a build runs. Two cheap queries, no
+     model calls: asking how it is going must never itself be expensive. */
+  r.get('/api/tara/bank', async (_req, res) => {
+    res.json(await fullStatus());
+  });
+
+  /** Start a build by hand. Idempotent — if one is running, this returns it. */
+  r.post('/api/tara/bank', async (req, res) => {
+    res.json(await ensureBank({ force: Boolean(req.body?.force) }));
   });
 
   /* ---- the reference material ----
@@ -319,6 +343,12 @@ export function mountTara(app) {
     if (!data.length) return res.status(400).json({ error: 'None of those questions are in the bank.' });
 
     await prisma.taraAttempt.createMany({ data });
+
+    // Answering is what turns unseen stock into seen stock, so this is the one
+    // moment the usable bank definitely shrank. Check the floor behind the
+    // response rather than making the person wait to find out their score.
+    nudge();
+
     res.json({ recorded: data.length, correct: data.filter((d) => d.correct).length });
   });
 

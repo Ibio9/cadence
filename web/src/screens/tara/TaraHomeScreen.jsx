@@ -10,10 +10,13 @@
  */
 
 import Link from 'next/link';
+import { useState } from 'react';
+import { api } from '../../../lib/api';
 import { Page } from '../../components/shell/AppShell';
 import Icon from '../../components/Icon';
-import { Badge, ButtonLink, EmptyState, ErrorState, PageHeading, Skeleton } from '../../components/ui';
-import { pct, standing, useTaraState } from '../../lib/tara';
+import BankBuild from '../../components/tara/BankBuild';
+import { Badge, ButtonLink, EmptyState, ErrorState, PageHeading, Skeleton, useToast } from '../../components/ui';
+import { pct, standing, useBankBuild, useTaraState } from '../../lib/tara';
 
 function HomeSkeleton() {
   return (
@@ -95,7 +98,7 @@ function ModuleCard({ module }) {
           )}
           <Icon name="chevronRight" size={15} className="cd-modulecard__go" />
         </span>
-        {empty ? <span className="cd-modulecard__warn">Empty — generate some questions to start.</span> : null}
+        {empty ? <span className="cd-modulecard__warn">Still being written.</span> : null}
       </Link>
     </li>
   );
@@ -103,6 +106,22 @@ function ModuleCard({ module }) {
 
 export function TaraHomeScreen() {
   const { data, status, error, reload } = useTaraState();
+  const { toast } = useToast();
+  const [starting, setStarting] = useState(false);
+
+  // When a build finishes, the counts on this screen are stale by exactly the
+  // number of questions it just wrote, so pull them again.
+  const build = useBankBuild({ onDone: reload });
+
+  const startBuild = async () => {
+    setStarting(true);
+    try {
+      await api.tara.buildBank();
+    } catch (e) {
+      toast({ tone: 'danger', title: 'The bank did not start writing', description: e.message });
+    }
+    setStarting(false);
+  };
 
   if (status === 'loading' && !data) return <HomeSkeleton />;
   if (status === 'error' && !data) {
@@ -140,13 +159,21 @@ export function TaraHomeScreen() {
 
       <Readiness readiness={data.readiness} />
 
-      {totalBank === 0 && !data.writing.prompts.length ? (
+      {/* From cold, the empty state below already offers to start it, and two
+          identical buttons on one screen is one button too many. So the strip
+          keeps the diagnosis and gives up the verb. */}
+      <BankBuild
+        state={build}
+        onStart={totalBank === 0 ? undefined : startBuild}
+        starting={starting}
+      />
+
+      {totalBank === 0 && !build?.running ? (
         <EmptyState
-          icon="layers"
-          title="The bank is empty"
-          body="Open a module, pick a question type and generate a first set — or add a past-paper question by hand. Everything you add is kept, so the bank only ever grows."
-          action={{ label: 'Open Critical Thinking', href: '/tara/ct', icon: 'arrowRight' }}
-          secondaryAction={{ label: 'Add a real question', href: '/tara/bank', icon: 'plus' }}
+          title="The bank fills itself"
+          body="Fifteen questions for every type, written from that type's own construction rules and checked before they go in. It runs on the server and takes about half an hour from cold. Nothing here needs you — come back later, or start it now if it has not begun."
+          action={{ label: 'Write them now', onClick: startBuild, icon: 'sparkle', loading: starting }}
+          secondaryAction={{ label: 'Add a past-paper question', href: '/tara/bank', icon: 'plus' }}
         />
       ) : (
         <ul className="cd-modules list-none">
