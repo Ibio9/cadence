@@ -19,6 +19,7 @@ import { diag } from '../lib/hands'
 const MOVES: { gesture: string; hand: string; does: string }[] = [
   { gesture: 'point', hand: '☝', does: 'move the cursor' },
   { gesture: 'pinch', hand: '🤏', does: 'click · or hold on a blade to move it' },
+  { gesture: 'throw', hand: '🎯', does: 'pinch a blade, carry it towards a device, push and let go' },
   { gesture: 'open', hand: '🖐', does: 'let go' },
   { gesture: 'peace', hand: '✌', does: 'two fingers up-down to scroll' },
   { gesture: 'frame', hand: '📐', does: 'two L-corners to resize' },
@@ -69,7 +70,7 @@ export function GestureGuide({ live }: { live: boolean }) {
         >
           <div className="gguide-head">HAND CONTROL</div>
           {MOVES.map((m) => (
-            <div key={m.gesture} className="gguide-row">
+            <div key={`${m.gesture}${m.does}`} className="gguide-row">
               <span className="gguide-icon">{m.hand}</span>
               <span className="gguide-name">{m.gesture}</span>
               <span className="gguide-does">{m.does}</span>

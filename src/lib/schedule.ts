@@ -81,7 +81,7 @@ export function upcoming(count = 7, from = new Date()): Day[] {
  * marked as assumed until he says what the work actually is. From
  * shared/week.json, which the bridge reads too.
  */
-export const SET_WORK: { subject: string; weekday: number }[] = WEEK.setWork
+export const SET_WORK: { subject: string; weekday: number; dueTime?: string }[] = WEEK.setWork
 
 /** Assumed due the same weekday a week later, until he says otherwise. */
 export const SET_WORK_DUE_DAYS: number = WEEK.setWorkDueDays
@@ -298,6 +298,12 @@ export function plan(todos: Plannable[], now = new Date(), days = 7): Block[] {
     return true
   }
   const inHorizon = (day: string) => day >= today && day <= isoDay(horizon[horizon.length - 1])
+  // The due day's own evening is usable only when the work is due after it:
+  // Maths at 23:59 yes, Philosophy at 09:30 no.
+  const lastEvening = (t: Plannable) => {
+    const at = SET_WORK.find((w) => w.subject === t.subject)?.dueTime
+    return at && toMin(at) >= hwStart + hwLen
+  }
   // Each piece on its own evening first, so a new set of work always gets the
   // evening it was set, whatever is running late.
   const late = setWork.filter((t) => !(t.setOn && inHorizon(t.setOn) && eveningFor(t, t.setOn)))
@@ -306,7 +312,7 @@ export function plan(todos: Plannable[], now = new Date(), days = 7): Block[] {
     .forEach((t) => {
       for (const d of horizon) {
         const day = isoDay(d)
-        if (t.due && day >= t.due) break
+        if (t.due && (day > t.due || (day === t.due && !lastEvening(t)))) break
         if (t.setOn && day < t.setOn) continue
         if (eveningFor(t, day)) break
       }

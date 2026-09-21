@@ -39,6 +39,7 @@ import { startAnalyser, micLevel } from './lib/audio'
 import { probeCapabilities } from './lib/capabilities'
 import { env } from './config'
 import { plan } from './lib/schedule'
+import { startSync } from './lib/sync'
 
 /**
  * The conversation.
@@ -99,6 +100,9 @@ export default function App() {
    * open over the weekend still picks up Monday's.
    */
   useEffect(() => {
+    // Sharing with his other devices starts with the bridge connection; this
+    // only registers for it, so it costs nothing until he powers up.
+    startSync()
     const check = () => store.getState().ensureWeekly()
     check()
     const every = window.setInterval(check, 10 * 60 * 1000)

@@ -58,8 +58,8 @@
     ]
   },
   "setWork": [
-    { "subject": "Philosophy", "weekday": 1 },
-    { "subject": "Maths", "weekday": 3 }
+    { "subject": "Philosophy", "weekday": 1, "dueTime": "09:30" },
+    { "subject": "Maths", "weekday": 3, "dueTime": "23:59" }
   ],
   "setWorkDueDays": 7,
   "homework": { "start": "17:00", "minutes": 120 },

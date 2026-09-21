@@ -397,6 +397,10 @@ const filters = new Map<number, Filters>()
 
 /** Recent cursor positions per hand, so a press can aim from before the pinch. */
 const trails = new Map<number, { x: number; y: number; at: number }[]>()
+/** Recent hand sizes per hand, for telling a push at the screen from a drag across it. */
+const spans = new Map<number, { at: number; span: number }[]>()
+/** Long enough to cover the push and the release that follows it. */
+const THRUST_WINDOW_MS = 600
 /** When the fingers first closed, per hand — see PINCH_CONFIRM_MS. */
 const pinchSince = new Map<number, number>()
 /** When a held pinch's fingers first read apart, per hand — see RELEASE_MS. */
@@ -909,6 +913,7 @@ function dropHand(i: number) {
   settling.delete(i)
   sideVote.delete(i)
   trails.delete(i)
+  spans.delete(i)
   pinchSince.delete(i)
   openSince.delete(i)
   poseChangedAt.delete(i)
@@ -996,6 +1001,10 @@ function loop(mine: number) {
     })
 
     const span = dist(points[WRIST], points[MIDDLE_MCP]) || 1
+    const recent = spans.get(i) ?? []
+    recent.push({ at: now, span })
+    while (recent.length > 1 && now - recent[0].at > THRUST_WINDOW_MS) recent.shift()
+    spans.set(i, recent)
 
     /*
      * The pinch is measured in the camera's own geometry, not on screen.
@@ -1217,6 +1226,7 @@ export function disableHands(): void {
   settling.clear()
   sideVote.clear()
   trails.clear()
+  spans.clear()
   pinchSince.clear()
   openSince.clear()
   poseChangedAt.clear()
@@ -1247,6 +1257,27 @@ export function disableHands(): void {
  * Published as a plain distance. This file does not know what is on screen and
  * has no business deciding that a bigger box means a bigger blade.
  */
+/**
+ * How much a hand has grown on screen in the last moment: 1 is not at all,
+ * 1.25 is a quarter bigger.
+ *
+ * A hand pushed toward the camera grows; one moved across the screen does
+ * not. That difference is the darts throw: grip a blade, push it at the
+ * screen and let go. Measured as the biggest growth from any earlier sample
+ * to any later one, so it survives the hand easing back as the fingers open.
+ */
+export function thrustOf(id: number): number {
+  const recent = spans.get(id)
+  if (!recent || recent.length < 2) return 1
+  let low = recent[0].span
+  let best = 1
+  for (const p of recent) {
+    best = Math.max(best, p.span / (low || 1))
+    low = Math.min(low, p.span)
+  }
+  return best
+}
+
 /**
  * How many hands are currently pinching.
  *

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useStore, type Archived, type Tab, type Todo } from '../store'
+import { useStore, type Archived, type Device, type Tab, type Todo } from '../store'
+import { forgetDevice, placeDevice, renameDevice, thisDevice } from '../lib/sync'
 import {
   dueLabel,
   isoDay,
@@ -39,6 +40,7 @@ const TABS: { id: Exclude<Tab, null>; label: string }[] = [
   { id: 'briefing', label: 'BRIEFING' },
   { id: 'news', label: 'NEWS' },
   { id: 'history', label: 'HISTORY' },
+  { id: 'devices', label: '⇄' },
 ]
 
 /* ------------------------------------------------------------------ timetable */
@@ -591,10 +593,135 @@ function HistoryPanel() {
   )
 }
 
+/* -------------------------------------------------------------------- devices */
+
+const ICON: Record<Device['kind'], string> = { laptop: '💻', desktop: '🖥', phone: '📱', tablet: '▭' }
+
+/**
+ * Where his devices physically sit, so a throw knows which way each one is.
+ *
+ * Every device he has JARVIS open on appears here by itself, because it is
+ * connected to the same bridge; nothing is paired. Dragging an icon moves it
+ * for every device, since there is only one room. The icons are divs rather
+ * than buttons on purpose: a pinch on a button clicks it, and these have to
+ * be picked up.
+ */
+function DevicesPanel() {
+  const devices = useStore((s) => s.devices)
+  const mine = thisDevice().id
+  const box = useRef<HTMLDivElement>(null)
+  const [held, held_] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [naming, naming_] = useState(false)
+  const [name, name_] = useState('')
+
+  const pickUp = (e: React.PointerEvent, d: Device) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const rect = box.current?.getBoundingClientRect()
+    if (!rect) return
+    const pointer = e.pointerId
+    let last: { x: number; y: number } | null = null
+    const where = (ev: PointerEvent) => ({
+      x: Math.min(0.97, Math.max(0.03, (ev.clientX - rect.left) / rect.width)),
+      y: Math.min(0.95, Math.max(0.05, (ev.clientY - rect.top) / rect.height)),
+    })
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointer) return
+      last = where(ev)
+      held_({ id: d.id, ...last })
+    }
+    const done = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointer) return
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', done)
+      window.removeEventListener('pointercancel', done)
+      if (last) placeDevice(d.id, last.x, last.y)
+      held_(null)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', done)
+    window.addEventListener('pointercancel', done)
+  }
+
+  const me = devices.find((d) => d.id === mine)
+  const offline = devices.filter((d) => !d.online)
+
+  return (
+    <div className="tabpanel-body" data-hit-rescue>
+      <p className="dev-hint">
+        Every device with JARVIS open shows up here. Drag them to where they really sit, then throw a
+        blade towards one: pinch it, carry it that way, and push it at the screen as you let go. With a
+        mouse or a finger, flick it.
+      </p>
+
+      <div className="dev-map" ref={box}>
+        {devices.length === 0 && <p className="tt-empty dev-empty">Connecting…</p>}
+        {devices.map((d) => {
+          const at = held?.id === d.id ? held : d
+          return (
+            <div
+              key={d.id}
+              className={
+                'dev-icon' +
+                (d.id === mine ? ' dev-me' : '') +
+                (d.online ? ' dev-on' : ' dev-off') +
+                (held?.id === d.id ? ' dev-held' : '')
+              }
+              style={{ left: `${at.x * 100}%`, top: `${at.y * 100}%` }}
+              onPointerDown={(e) => pickUp(e, d)}
+            >
+              <span className="dev-glyph">{ICON[d.kind] ?? '💻'}</span>
+              <span className="dev-name">{d.name}</span>
+              <span className="dev-state">{d.id === mine ? 'this one' : d.online ? 'open' : 'closed'}</span>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="dev-actions">
+        {naming ? (
+          <input
+            className="todo-field todo-edit dev-rename"
+            value={name}
+            autoFocus
+            onFocus={(e) => e.currentTarget.select()}
+            onChange={(e) => name_(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                renameDevice(mine, name)
+                naming_(false)
+              }
+              if (e.key === 'Escape') naming_(false)
+            }}
+            onBlur={() => naming_(false)}
+            aria-label="Name for this device"
+          />
+        ) : (
+          <button
+            className="tab-action"
+            onClick={() => {
+              name_(me?.name ?? thisDevice().name)
+              naming_(true)
+            }}
+          >
+            RENAME THIS DEVICE
+          </button>
+        )}
+        {offline.map((d) => (
+          <button key={d.id} className="tab-action tab-action-dim" onClick={() => forgetDevice(d.id)}>
+            FORGET {d.name.toUpperCase()}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function Tabs({ onAsk }: { onAsk: (prompt: string) => void }) {
   const phase = useStore((s) => s.phase)
   const tab = useStore((s) => s.tab)
   const openTab = useStore((s) => s.openTab)
+  const others = useStore((s) => s.devices.filter((d) => d.online && d.id !== thisDevice().id).length)
 
   if (phase === 'offline' || phase === 'boot') return null
 
@@ -604,10 +731,12 @@ export function Tabs({ onAsk }: { onAsk: (prompt: string) => void }) {
         {TABS.map((t) => (
           <button
             key={t.id}
-            className={tab === t.id ? 'tab tab-on' : 'tab'}
+            className={(tab === t.id ? 'tab tab-on' : 'tab') + (t.id === 'devices' ? ' tab-icon' : '')}
             onClick={() => openTab(t.id)}
+            aria-label={t.id === 'devices' ? 'Devices' : undefined}
           >
             {t.label}
+            {t.id === 'devices' && others > 0 && <span className="tab-count">{others}</span>}
           </button>
         ))}
       </div>
@@ -631,6 +760,7 @@ export function Tabs({ onAsk }: { onAsk: (prompt: string) => void }) {
             {tab === 'briefing' && <Briefing onAsk={onAsk} />}
             {tab === 'news' && <News onAsk={onAsk} />}
             {tab === 'history' && <HistoryPanel />}
+            {tab === 'devices' && <DevicesPanel />}
           </motion.section>
         )}
       </AnimatePresence>

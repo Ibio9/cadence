@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useStore, accentFor, type Phase } from '../store'
 import { Suggestions } from './Suggestions'
 import { PUSH_TO_TALK } from '../config'
-import { Blades } from './Blades'
+import { Blades, ThrowAim } from './Blades'
 import { Effects } from './Effects'
 import { Pointer } from './Pointer'
 import { GestureGuide } from './GestureGuide'
@@ -330,6 +330,7 @@ export function Hud() {
           here now; Panels.tsx is unmounted rather than deleted so the design
           system it documents stays findable. */}
       <Blades />
+      <ThrowAim />
 
       {ui.chrome.suggestions && <Suggestions />}
 

@@ -51,6 +51,10 @@ export type Blade = {
   mode?: 'reader' | 'live'
   size: 'compact' | 'tall' | 'wide' | 'full'
   hold: 'turn' | 'sticky'
+  /** Thrown here from another device: which edge it flies in from. */
+  arrive?: 'left' | 'right' | 'top' | 'bottom'
+  /** Thrown here from another device: its name, shown in the header. */
+  from?: string
 }
 
 /**
@@ -64,7 +68,19 @@ export type Blade = {
 export type Archived = Blade & { at: number }
 
 /** The tabs along the top. null is "none open". */
-export type Tab = 'timetable' | 'todo' | 'briefing' | 'news' | 'history' | null
+export type Tab = 'timetable' | 'todo' | 'briefing' | 'news' | 'history' | 'devices' | null
+
+/** A browser he has JARVIS open in, as the bridge reports it. */
+export type Device = {
+  id: string
+  name: string
+  kind: 'laptop' | 'desktop' | 'phone' | 'tablet'
+  /** Where he has put it on the device map, 0 to 1 across and down. */
+  x: number
+  y: number
+  online: boolean
+  lastSeen?: number
+}
 
 /**
  * One thing to do.
@@ -98,6 +114,12 @@ export type Todo = {
   subject?: string
   /** Set work only: the day it was set, whose evening gets the two hours. */
   setOn?: string
+  /**
+   * When it last changed, for syncing between devices: the newer copy wins.
+   * The weekly placeholders are created at 0 so any edit of his beats one
+   * another device creates later.
+   */
+  updatedAt?: number
 }
 
 export type Turn = {
@@ -298,6 +320,14 @@ type State = {
   archive: Archived[]
   /** The to-do list. Survives a reload; see `loadTodos`. */
   todos: Todo[]
+  /** Deleted items and when, so a deletion syncs rather than being undone. */
+  todoGone: Record<string, number>
+  /** Every device he has JARVIS open on, and where they sit. */
+  devices: Device[]
+  /** While a blade is being aimed at a device: which one, and from what angle. */
+  aim: { name: string; angle: number } | null
+  /** A line of feedback about a throw, shown briefly. */
+  note: string | null
   /** Which top tab is open, or null for none. */
   tab: Tab
   /** The blade the user has pulled forward, or null for "the newest one". */
@@ -332,6 +362,10 @@ type State = {
   ensureWeekly: (now?: Date) => void
   toggleTodo: (id: string) => void
   removeTodo: (id: string) => void
+  setDevices: (list: Device[]) => void
+  setAim: (aim: { name: string; angle: number } | null) => void
+  /** Show a short line for a few seconds. */
+  showNote: (note: string) => void
   focusBlade: (id: string | null) => void
   expandBlade: (id: string | null) => void
   setPhase: (p: Phase) => void
@@ -477,6 +511,49 @@ function kindOf(t: Record<string, unknown>): Partial<Todo> {
   return {}
 }
 
+/**
+ * The id a weekly item has on every device.
+ *
+ * Random ids made each device's "Philosophy homework" a different item, so
+ * syncing two devices produced two of them. Built from what the item is and
+ * which week it belongs to, the placeholder another device made is the same
+ * item as this one's, and the merge keeps whichever he has touched.
+ */
+function weeklyId(kind: 'setwork' | 'response', subject: string, day: string) {
+  return `${kind === 'setwork' ? 'sw' : 'rs'}-${subject.toLowerCase()}-${day}`
+}
+
+let noteTimer = 0
+
+const GONE_KEY = 'jarvis.todos.gone.v1'
+
+function loadGone(): Record<string, number> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(GONE_KEY) ?? '{}')
+    if (!parsed || typeof parsed !== 'object') return {}
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([k, v]) => typeof k === 'string' && typeof v === 'number'),
+    ) as Record<string, number>
+  } catch {
+    return {}
+  }
+}
+
+/** For sync: what this device has already put on the list, by key. */
+export const seenKeys = () => loadSetWorkSeen()
+export const rememberSeen = (keys: string[]) => saveSetWorkSeen(keys)
+
+/** A weekly item saved under a random id gets the id every device agrees on. */
+function stableId(t: Todo): Todo {
+  if (t.kind === 'setwork' && t.subject && t.setOn) return { ...t, id: weeklyId('setwork', t.subject, t.setOn) }
+  if (t.kind === 'response' && t.subject && t.due) {
+    const monday = parseIso(t.due)
+    monday.setDate(monday.getDate() - 6)
+    return { ...t, id: weeklyId('response', t.subject, isoDay(monday)) }
+  }
+  return t
+}
+
 function loadTodos(): Todo[] {
   try {
     const raw = localStorage.getItem(TODO_KEY)
@@ -492,8 +569,10 @@ function loadTodos(): Todo[] {
         due: typeof t.due === 'string' ? t.due : null,
         at: Number(t.at) || Date.now(),
         ...(t.assumed === true ? { assumed: true } : null),
+        ...(typeof t.updatedAt === 'number' ? { updatedAt: t.updatedAt } : null),
         ...kindOf(t),
       }))
+      .map(stableId)
   } catch {
     return []
   }
@@ -514,6 +593,10 @@ export const useStore = create<State>((set) => ({
   blades: [],
   archive: loadArchive(),
   todos: loadTodos(),
+  todoGone: loadGone(),
+  devices: [],
+  aim: null,
+  note: null,
   tab: null,
   focusedBlade: null,
   expandedBlade: null,
@@ -631,6 +714,7 @@ export const useStore = create<State>((set) => ({
           done: false,
           due: due ?? null,
           at: Date.now(),
+          updatedAt: Date.now(),
         },
       ].slice(-200),
     })),
@@ -648,7 +732,7 @@ export const useStore = create<State>((set) => ({
         // item it is stays.
         const { assumed: _assumed, ...rest } = t
         void _assumed
-        return { ...rest, text, due, done }
+        return { ...rest, text, due, done, updatedAt: Date.now() }
       }),
     }))
     return found
@@ -656,13 +740,12 @@ export const useStore = create<State>((set) => ({
 
   ensureWeekly: (now = new Date()) => {
     const seen = loadSetWorkSeen()
-    const newId = () => `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
     const { monday, sunday } = weekOf(now)
 
     const setWork: Todo[] = setWorkSoFar(now)
       .filter((w) => !seen.includes(w.key))
       .map((w) => ({
-        id: newId(),
+        id: weeklyId('setwork', w.subject, w.set),
         text: `${w.subject} homework`,
         done: false,
         due: w.due,
@@ -671,6 +754,7 @@ export const useStore = create<State>((set) => ({
         kind: 'setwork',
         subject: w.subject,
         setOn: w.set,
+        updatedAt: 0,
       }))
 
     // An hour of Response a subject a week, due by Sunday. Added whenever the
@@ -682,13 +766,14 @@ export const useStore = create<State>((set) => ({
     const response: Todo[] = responseKeys
       .filter((r) => !seen.includes(r.key))
       .map((r) => ({
-        id: newId(),
+        id: weeklyId('response', r.subject, monday),
         text: `${r.subject} response`,
         done: false,
         due: sunday,
         at: Date.now(),
         kind: 'response',
         subject: r.subject,
+        updatedAt: 0,
       }))
 
     const state = useStore.getState()
@@ -698,22 +783,43 @@ export const useStore = create<State>((set) => ({
     const stale = state.todos.some((t) => t.kind === 'response' && t.due && t.due < monday)
     if (!setWork.length && !response.length && !stale) return
 
+    // Anything this device already has, from another device, is not added
+    // twice: the ids are the same on every device by construction.
+    const have = new Set(state.todos.map((t) => t.id))
+    const pruned = state.todos.filter((t) => t.kind === 'response' && t.due && t.due < monday)
     set((s) => ({
       todos: [
         ...s.todos.filter((t) => !(t.kind === 'response' && t.due && t.due < monday)),
-        ...setWork,
-        ...response,
+        ...setWork.filter((t) => !have.has(t.id) && !(s.todoGone[t.id] >= 0)),
+        ...response.filter((t) => !have.has(t.id) && !(s.todoGone[t.id] >= 0)),
       ].slice(-200),
+      // The pruning is recorded like a deletion, so a device that has not
+      // pruned yet does not sync last week's hours back.
+      todoGone: pruned.length
+        ? { ...s.todoGone, ...Object.fromEntries(pruned.map((t) => [t.id, Date.now()])) }
+        : s.todoGone,
     }))
     saveSetWorkSeen([...seen, ...setWork.map((w) => `${w.subject!.toLowerCase()}:${w.setOn}`), ...responseKeys.map((r) => r.key)])
   },
 
   toggleTodo: (id) =>
     set((s) => ({
-      todos: s.todos.map((t) => (t.id === id ? { ...t, done: !t.done } : t)),
+      todos: s.todos.map((t) => (t.id === id ? { ...t, done: !t.done, updatedAt: Date.now() } : t)),
     })),
 
-  removeTodo: (id) => set((s) => ({ todos: s.todos.filter((t) => t.id !== id) })),
+  removeTodo: (id) =>
+    set((s) => ({
+      todos: s.todos.filter((t) => t.id !== id),
+      todoGone: { ...s.todoGone, [id]: Date.now() },
+    })),
+
+  setDevices: (devices) => set({ devices }),
+  setAim: (aim) => set({ aim }),
+  showNote: (note) => {
+    set({ note })
+    window.clearTimeout(noteTimer)
+    noteTimer = window.setTimeout(() => set({ note: null }), 3200)
+  },
 
   focusBlade: (focusedBlade) => set({ focusedBlade }),
   expandBlade: (expandedBlade) => set({ expandedBlade }),
@@ -850,6 +956,17 @@ useStore.subscribe((s) => {
   if (s.archive === lastArchive) return
   lastArchive = s.archive
   saveArchive(s.archive)
+})
+
+let lastGone = useStore.getState().todoGone
+useStore.subscribe((s) => {
+  if (s.todoGone === lastGone) return
+  lastGone = s.todoGone
+  try {
+    localStorage.setItem(GONE_KEY, JSON.stringify(s.todoGone))
+  } catch {
+    /* the session copy still syncs */
+  }
 })
 
 let lastTodos = useStore.getState().todos

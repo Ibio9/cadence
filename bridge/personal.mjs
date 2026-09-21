@@ -110,7 +110,11 @@ export function personalContext(now = new Date(), { hosted = false } = {}) {
   const clock = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
   const setToday = WEEK.setWork.filter((w) => w.weekday === dow).map((w) => w.subject)
   const setWork = WEEK.setWork
-    .map((w) => `- ${w.subject} homework is set every ${DAY_NAMES[w.weekday]}.`)
+    .map(
+      (w) =>
+        `- ${w.subject} homework is set every ${DAY_NAMES[w.weekday]}` +
+        (w.dueTime ? `, due the next ${DAY_NAMES[w.weekday]} at ${w.dueTime}.` : '.'),
+    )
     .join('\n')
   const hours = WEEK.homework.minutes / 60
   const setLine = setToday.length

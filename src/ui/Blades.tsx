@@ -4,7 +4,8 @@ import { useStore, type Blade } from '../store'
 import { BRIDGE_HTTP_URL } from '../config'
 import { withMedia } from '../lib/auth'
 import { sanitisePanelHtml } from './sanitise'
-import { frameSpan, peaceScroll, pointScroll } from '../lib/hands'
+import { frameSpan, peaceScroll, pointScroll, thrustOf } from '../lib/hands'
+import { targetFor, throwBlade } from '../lib/sync'
 import * as camera from '../lib/camera'
 
 /**
@@ -237,6 +238,41 @@ const Body = memo(function Body({ blade }: { blade: Blade }) {
   return <p className="bl-note">Nothing to show.</p>
 })
 
+/* ------------------------------------------------------------------ throwing */
+
+/**
+ * Throwing a blade to another device.
+ *
+ * Two ways to throw, because a hand and a finger on glass move differently:
+ *
+ *   - Darts, by hand: grip the blade with a pinch, carry it towards the
+ *     device you mean, then push it at the screen and let go. The push is
+ *     what makes it a throw: the hand grows on camera as it comes forward,
+ *     which a drag across the screen never does (see thrustOf in hands.ts).
+ *   - A flick, by mouse or touch: let go while moving fast.
+ *
+ * Which device is decided by direction on the device map (DEVICES tab), from
+ * where the blade was carried, or failing that from which way it was moving.
+ * Nothing is thrown unless another device is open, so a quick drag with only
+ * one device on behaves exactly as it always has.
+ */
+
+/** A mouse or touch release this fast, in px per ms, is a flick. */
+const FLICK = 1.1
+/** A hand release this fast counts even without the push. */
+const HAND_FLICK = 2.0
+/** How much a hand must grow on camera to count as pushed at the screen. */
+const THRUST = 1.2
+/** How far a blade must be carried towards a device for that to be the aim. */
+const AIM_PX = 80
+
+type Release = { dx: number; dy: number; vx: number; vy: number; pointerId: number }
+
+const othersOnline = () => {
+  const s = useStore.getState()
+  return s.devices.filter((d) => d.online).length > 1
+}
+
 /* -------------------------------------------------------------------- card */
 
 function Card({
@@ -301,6 +337,7 @@ function Card({
   const grab = (
     e: React.PointerEvent,
     onMove: (dx: number, dy: number) => void,
+    onRelease?: (r: Release) => void,
   ) => {
     e.preventDefault()
     e.stopPropagation()
@@ -318,9 +355,13 @@ function Card({
      * following one of them removes the need for either.
      */
     const id = e.pointerId
+    // The last few positions, for how fast it was moving when it was let go.
+    const trail: { t: number; x: number; y: number }[] = [{ t: performance.now(), x: sx, y: sy }]
 
     const move = (ev: PointerEvent) => {
       if (ev.pointerId !== id) return
+      trail.push({ t: performance.now(), x: ev.clientX, y: ev.clientY })
+      if (trail.length > 16) trail.shift()
       onMove(ev.clientX - sx, ev.clientY - sy)
     }
     const done = (ev: PointerEvent) => {
@@ -328,10 +369,74 @@ function Card({
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', done)
       window.removeEventListener('pointercancel', done)
+      if (!onRelease || ev.type === 'pointercancel') return
+      const last = trail[trail.length - 1]
+      const first = trail.find((p) => last.t - p.t <= 110) ?? last
+      const dt = Math.max(1, last.t - first.t)
+      onRelease({
+        dx: last.x - sx,
+        dy: last.y - sy,
+        vx: first === last ? 0 : (last.x - first.x) / dt,
+        vy: first === last ? 0 : (last.y - first.y) / dt,
+        pointerId: id,
+      })
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', done)
     window.addEventListener('pointercancel', done)
+  }
+
+  const setAim = useStore((s) => s.setAim)
+  const showNote = useStore((s) => s.showNote)
+  /** Set while the blade is on its way to another device. */
+  const [flying, flying_] = useState<{ x: number; y: number } | null>(null)
+  const throwable = blade.kind !== 'camera'
+
+  /** While carrying: name the device it would go to, if there is one that way. */
+  const aimAt = (dx: number, dy: number) => {
+    if (!throwable || !othersOnline()) return
+    if (Math.hypot(dx, dy) < AIM_PX) {
+      if (useStore.getState().aim) setAim(null)
+      return
+    }
+    const angle = Math.atan2(dy, dx)
+    const to = targetFor(angle)
+    setAim(to ? { name: to.name, angle } : null)
+  }
+
+  /** On letting go: put it down, or throw it. `from` is where it was picked up. */
+  const release = (from: { x: number; y: number }) => (r: Release) => {
+    setAim(null)
+    if (!throwable || expanded || !othersOnline()) return
+    const speed = Math.hypot(r.vx, r.vy)
+    const hand = r.pointerId >= 9000
+    const pushed = hand && thrustOf(r.pointerId - 9000) >= THRUST
+    const flicked = speed >= (hand ? HAND_FLICK : FLICK)
+    if (!pushed && !flicked) return
+
+    const carried = Math.hypot(r.dx, r.dy) >= AIM_PX
+    // A push aims where the blade was carried; a flick aims where it was going.
+    const angle =
+      pushed && carried
+        ? Math.atan2(r.dy, r.dx)
+        : speed > 0.2
+          ? Math.atan2(r.vy, r.vx)
+          : carried
+            ? Math.atan2(r.dy, r.dx)
+            : null
+    if (angle === null) {
+      showNote('Carry it towards a device first, then throw.')
+      return
+    }
+    const to = throwBlade(blade, angle)
+    if (!to) {
+      showNote('No device that way. Arrange them in the DEVICES tab.')
+      setPos(from)
+      return
+    }
+    showNote(`Sent to ${to.name}.`)
+    flying_({ x: Math.cos(angle) * 1800, y: Math.sin(angle) * 1800 })
+    window.setTimeout(onClose, 320)
   }
 
   const onHeadDown = (e: React.PointerEvent) => {
@@ -341,7 +446,14 @@ function Card({
     if (!focused) onFocus()
     if (expanded) return
     const from = { ...pos }
-    grab(e, (dx, dy) => setPos({ x: from.x + dx, y: from.y + dy }))
+    grab(
+      e,
+      (dx, dy) => {
+        setPos({ x: from.x + dx, y: from.y + dy })
+        aimAt(dx, dy)
+      },
+      release(from),
+    )
   }
 
   /**
@@ -363,7 +475,14 @@ function Card({
     if (!focused) onFocus()
     if (expanded) return
     const from = { ...pos }
-    grab(e, (dx, dy) => setPos({ x: from.x + dx, y: from.y + dy }))
+    grab(
+      e,
+      (dx, dy) => {
+        setPos({ x: from.x + dx, y: from.y + dy })
+        aimAt(dx, dy)
+      },
+      release(from),
+    )
   }
 
   /**
@@ -523,7 +642,23 @@ function Card({
      */
     <motion.div
       className="bl-slot"
-      initial={{ opacity: 0, y: 26, scale: 0.96, filter: 'blur(6px)' }}
+      // Thrown here from another device, it flies in from that device's side.
+      initial={
+        blade.arrive
+          ? {
+              opacity: 0,
+              scale: 0.9,
+              filter: 'blur(4px)',
+              ...(blade.arrive === 'left'
+                ? { x: -900 }
+                : blade.arrive === 'right'
+                  ? { x: 900 }
+                  : blade.arrive === 'top'
+                    ? { y: -700 }
+                    : { y: 700 }),
+            }
+          : { opacity: 0, y: 26, scale: 0.96, filter: 'blur(6px)' }
+      }
       animate={{
         opacity: expanded || depth === 0 ? 1 : Math.max(0.3, 1 - depth * 0.24),
         y: expanded ? 0 : depth * -13,
@@ -540,14 +675,17 @@ function Card({
         className={
           `bl bl-${blade.size}` +
           (expanded ? ' bl-expanded' : '') +
-          (focused ? ' bl-front' : '')
+          (focused ? ' bl-front' : '') +
+          (flying ? ' bl-flying' : '')
         }
         // Position and size are ours rather than framer's — see `grab` above for
         // why. Applied as a plain transform because the depth animation lives on
         // the slot wrapper, so nothing is competing for this element's own one.
         style={{
           ...(size && !expanded ? { width: size.w, height: size.h } : null),
-          transform: expanded ? undefined : `translate(${pos.x}px, ${pos.y}px)`,
+          transform: expanded
+            ? undefined
+            : `translate(${pos.x + (flying?.x ?? 0)}px, ${pos.y + (flying?.y ?? 0)}px)`,
         }}
         // pointerdown, not mousedown: a hand dispatches PointerEvents, and a
         // mousedown handler simply never hears them. Focusing a blade by pinch
@@ -563,7 +701,7 @@ function Card({
 
         <header className="bl-head" onPointerDown={onHeadDown}>
           <span className="bl-title">{blade.title}</span>
-          <span className="bl-kind">{blade.kind}</span>
+          <span className="bl-kind">{blade.from ? `from ${blade.from}` : blade.kind}</span>
           <span className="bl-acts">
             {(size || pos.x || pos.y) && !expanded && (
               <button
@@ -712,5 +850,60 @@ export function Blades() {
         </div>
       )}
     </div>
+  )
+}
+
+/* ------------------------------------------------------------ aim and notes */
+
+/**
+ * While a blade is being carried towards another device, the edge of the
+ * screen facing it lights and names it, so the throw is aimed rather than
+ * hoped for. Also carries the one-line notes a throw leaves behind.
+ */
+export function ThrowAim() {
+  const aim = useStore((s) => s.aim)
+  const note = useStore((s) => s.note)
+
+  let label: { left: number; top: number; edge: string } | null = null
+  if (aim) {
+    const w = window.innerWidth
+    const h = window.innerHeight
+    const cx = Math.cos(aim.angle)
+    const cy = Math.sin(aim.angle)
+    const margin = 70
+    const t = Math.min(
+      Math.abs(cx) > 1e-3 ? (w / 2 - margin) / Math.abs(cx) : Infinity,
+      Math.abs(cy) > 1e-3 ? (h / 2 - margin) / Math.abs(cy) : Infinity,
+    )
+    const edge = Math.abs(cx) * h >= Math.abs(cy) * w ? (cx < 0 ? 'left' : 'right') : cy < 0 ? 'top' : 'bottom'
+    label = { left: w / 2 + cx * t, top: h / 2 + cy * t, edge }
+  }
+
+  return (
+    <>
+      {label && aim && (
+        <>
+          <div className={`throw-edge throw-edge-${label.edge}`} />
+          <div className="throw-aim" style={{ left: label.left, top: label.top }}>
+            <span className="throw-arrow" style={{ transform: `rotate(${aim.angle}rad)` }}>
+              →
+            </span>
+            {aim.name}
+          </div>
+        </>
+      )}
+      <AnimatePresence>
+        {note && (
+          <motion.div
+            className="throw-note"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+          >
+            {note}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   )
 }

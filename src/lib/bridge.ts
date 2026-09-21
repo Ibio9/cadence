@@ -143,6 +143,30 @@ export function watchConnection(fn: (state: ConnectionState) => void) {
   onConnection = fn
 }
 
+/**
+ * Syncing between devices rides the same socket as everything else: the
+ * bridge relays device lists, shared lists and thrown blades. See sync.ts.
+ */
+const SYNC_FRAMES = new Set(['devices', 'sync', 'catch', 'thrown'])
+let onSync: ((msg: Record<string, unknown>) => void) | null = null
+export function watchSync(fn: (msg: Record<string, unknown>) => void) {
+  onSync = fn
+}
+
+/** Run on every connection, first and after each reconnect. */
+const openHooks: (() => void)[] = []
+export function onBridgeOpen(fn: () => void) {
+  openHooks.push(fn)
+  if (socket?.readyState === WebSocket.OPEN) fn()
+}
+
+/** Send a frame if the socket is open; false if it is not. */
+export function sendFrame(msg: object): boolean {
+  if (socket?.readyState !== WebSocket.OPEN) return false
+  socket.send(JSON.stringify(msg))
+  return true
+}
+
 export function isConnected(): boolean {
   return socket?.readyState === WebSocket.OPEN
 }
@@ -252,6 +276,8 @@ function dispatch(ws: WebSocket) {
           .then(reply)
           .catch((err) => reply({ error: String(err?.message ?? err) }))
       }
+    } else if (msg.type && SYNC_FRAMES.has(msg.type)) {
+      onSync?.(msg as unknown as Record<string, unknown>)
     } else if (msg.type === 'ui' && msg.op) {
       // A `ui` frame with no args is normal — reset and clear take none — so an
       // absent args object is an empty one, not a reason to drop the command.
@@ -300,6 +326,7 @@ function connect(): Promise<WebSocket> {
       settle(null)
       onConnection?.(everConnected ? 'reconnected' : 'open')
       everConnected = true
+      openHooks.forEach((fn) => fn())
     }
     ws.onerror = () => {
       /**

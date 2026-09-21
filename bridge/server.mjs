@@ -49,6 +49,7 @@ import { readFile, realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
 import { openRemote, proxyError, vetTarget, PROXY_UA } from './net.mjs'
 import { probeUrl, renderPage } from './page.mjs'
+import { SYNC_TYPES, leaveSync, onSyncMessage, syncInfo } from './sync.mjs'
 
 /*
  * London time, wherever this runs. A hosted bridge sits on a UTC server, and
@@ -1306,6 +1307,11 @@ server.listen(PORT, () => {
       `[jarvis] claude login: ${process.env.CLAUDE_CODE_OAUTH_TOKEN ? 'token present' : 'NOT configured (set CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`)'}`,
     )
   }
+  const store = syncInfo()
+  console.log(
+    `[jarvis] sync: ${store.file}` +
+      (HOSTED && !store.onVolume ? ' (NOT on a volume: shared lists reset on every redeploy)' : ''),
+  )
 })
 
 console.log(`[jarvis] bridge listening on ws://localhost:${PORT}`)
@@ -1754,6 +1760,12 @@ wss.on('connection', (socket) => {
       return
     }
 
+    // Devices, shared state and throws: nothing to do with the agent.
+    if (SYNC_TYPES.has(msg?.type)) {
+      onSyncMessage(socket, msg)
+      return
+    }
+
     if (msg.type === 'ask' && typeof msg.text === 'string') {
       /**
        * Queued behind any interrupt that is still settling.
@@ -1807,6 +1819,7 @@ wss.on('connection', (socket) => {
 
   socket.on('close', () => {
     console.log('[jarvis] client disconnected')
+    leaveSync(socket)
     closed = true
     deliver?.(null)
     session.close?.()
