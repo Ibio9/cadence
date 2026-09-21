@@ -18,7 +18,7 @@ import { diag } from '../lib/hands'
 
 const MOVES: { gesture: string; hand: string; does: string }[] = [
   { gesture: 'point', hand: '☝', does: 'move the cursor' },
-  { gesture: 'pinch', hand: '🤏', does: 'grab a blade · move it · press' },
+  { gesture: 'pinch', hand: '🤏', does: 'click · or hold on a bar to drag' },
   { gesture: 'open', hand: '🖐', does: 'let go' },
   { gesture: 'peace', hand: '✌', does: 'two fingers up-down to scroll' },
   { gesture: 'frame', hand: '📐', does: 'two L-corners to resize' },

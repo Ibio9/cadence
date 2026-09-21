@@ -76,17 +76,73 @@ export function Pointer() {
       return c || '#19c4c4'
     }
 
+    /**
+     * Where each hand is DRAWN, as opposed to where it was last measured.
+     *
+     * The tracker measures once per camera frame, thirty times a second on
+     * most webcams, while this canvas redraws at the display's rate, sixty to a
+     * hundred and forty-four. Drawing the measurement directly meant the hand
+     * sat still for several frames and then jumped, which no filter on the
+     * measurement can fix: it is a sampling problem, not a noise one. So each
+     * frame eases the drawn position a fraction of the way toward the latest
+     * measurement, and the steps become a glide.
+     *
+     * The fraction is derived from elapsed time, not a per-frame constant, so
+     * the feel is identical on a 60Hz and a 144Hz display. TAU is the time
+     * constant: small enough that the cursor never visibly trails the hand,
+     * large enough to bridge the gap between two camera frames.
+     *
+     * Only the picture is smoothed. Presses and hovers still use the measured
+     * position, so this adds no delay to what a pinch lands on.
+     */
+    const TAU = 0.04
+    const shown = new Map<number, { x: number; y: number; pts: { x: number; y: number }[] }>()
+    let lastFrame = performance.now()
+
+    const glide = (id: number, x: number, y: number, pts: { x: number; y: number }[], k: number) => {
+      const s = shown.get(id)
+      if (!s || s.pts.length !== pts.length) {
+        // A hand that has just appeared snaps into place: gliding in from
+        // wherever the last one vanished would look like a cursor flying across
+        // the screen.
+        const fresh = { x, y, pts: pts.map((q) => ({ x: q.x, y: q.y })) }
+        shown.set(id, fresh)
+        return fresh
+      }
+      s.x += (x - s.x) * k
+      s.y += (y - s.y) * k
+      for (let i = 0; i < pts.length; i++) {
+        s.pts[i].x += (pts[i].x - s.pts[i].x) * k
+        s.pts[i].y += (pts[i].y - s.pts[i].y) * k
+      }
+      return s
+    }
+
     const draw = () => {
       raf.current = requestAnimationFrame(draw)
+      const now = performance.now()
+      // Clamped so a tab returning from the background does not resolve a
+      // two-second gap in one enormous step.
+      const dt = Math.min(0.1, (now - lastFrame) / 1000)
+      lastFrame = now
+      const k = 1 - Math.exp(-dt / TAU)
+
       if (!fit()) return
       ctx.clearRect(0, 0, w, h)
-      if (!diag.enabled || !hands.length) return
+      if (!diag.enabled || !hands.length) {
+        shown.clear()
+        return
+      }
+      // Forget hands that have left, so one returning later snaps rather than
+      // gliding in from where it was.
+      for (const id of shown.keys()) if (!hands.some((q) => q.id === id)) shown.delete(id)
 
       const accent = accentOf()
 
       for (const hand of hands) {
-        const p = hand.points
-        if (!p || p.length < 21) continue
+        if (!hand.points || hand.points.length < 21) continue
+        const g = glide(hand.id, hand.x, hand.y, hand.points, k)
+        const p = g.pts
 
         // Line weight tracks how large the hand is on screen, so a hand held
         // close does not become a bundle of hairlines.
@@ -153,8 +209,8 @@ export function Pointer() {
         // Drawn at the hand's aimed point rather than at the raw fingertip:
         // that point drifts to the middle of the pinch as the fingers close,
         // which is where a press actually lands.
-        const cx = hand.x
-        const cy = hand.y
+        const cx = g.x
+        const cy = g.y
         const ring = (17 - hand.closeness * 8) * scale
 
         ctx.globalAlpha = 0.75 + hand.closeness * 0.25

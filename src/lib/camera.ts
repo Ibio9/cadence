@@ -67,7 +67,17 @@ export async function holdCamera(): Promise<HTMLVideoElement> {
 
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 1280, height: 720, facingMode: 'user' },
+      video: {
+        width: 1280,
+        height: 720,
+        facingMode: 'user',
+        // Hand tracking measures once per camera frame, so the frame rate IS
+        // the tracking rate: sixty halves the delay between moving a finger
+        // and the cursor knowing, and halves the gap the display has to glide
+        // across. `ideal`, never `min` — a webcam that only does thirty still
+        // opens, it just opens at thirty.
+        frameRate: { ideal: 60 },
+      },
     })
     const el = document.createElement('video')
     el.autoplay = true

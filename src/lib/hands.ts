@@ -411,6 +411,43 @@ type Press = {
   /** Where the press began — for telling a click from a drag. */
   downX: number
   downY: number
+  /**
+   * The press landed on a control and was settled when the fingers met
+   * (clicked, or deliberately not), so the release must not click.
+   */
+  clicked: boolean
+}
+
+/**
+ * The last control a pinch clicked, and when.
+ *
+ * A pinch that flickers open for a frame and shuts again would otherwise be two
+ * clicks, which on a toggle — a tab, a to-do tick — is the same as none: it
+ * opens and closes before he sees it. Shared across hands on purpose; a second
+ * hand pinching the same control a moment later is the same accident.
+ */
+let lastClick: { el: Element | null; at: number } = { el: null, at: 0 }
+const REPEAT_GUARD_MS = 350
+
+/** Text you type into: a pinch should put the caret there, not "click" it. */
+const TEXT_ENTRY = 'input:not([type=button]):not([type=submit]):not([type=checkbox]):not([type=radio]), textarea, select'
+
+/**
+ * Click a control the way a finger on glass would.
+ *
+ * `HTMLElement.click()` rather than a dispatched MouseEvent, because it is the
+ * one call that also performs the default action: a submit button submits, a
+ * checkbox toggles, a link follows. A synthetic MouseEvent reaches React's
+ * handlers and does none of that.
+ */
+function activate(control: HTMLElement): boolean {
+  if ((control as HTMLButtonElement).disabled) return false
+  const now = performance.now()
+  if (lastClick.el === control && now - lastClick.at < REPEAT_GUARD_MS) return false
+  lastClick = { el: control, at: now }
+  if (control.matches(TEXT_ENTRY)) control.focus()
+  else control.click()
+  return true
 }
 
 const presses = new Map<number, Press>()
@@ -500,7 +537,7 @@ function resolveTarget(x: number, y: number): Element | null {
 function emit(h: Hand) {
   let p = presses.get(h.id)
   if (!p) {
-    p = { captured: null, wasPinched: false, downX: h.x, downY: h.y }
+    p = { captured: null, wasPinched: false, downX: h.x, downY: h.y, clicked: false }
     presses.set(h.id, p)
   }
 
@@ -536,9 +573,38 @@ function emit(h: Hand) {
     p.downX = h.x
     p.downY = h.y
     fire(target, 'pointerdown', h, true, aim)
+
+    /**
+     * PINCH IS A CLICK, the moment the fingers meet.
+     *
+     * It used to click on release, and only if the hand had stayed within a
+     * few pixels while closed. That is how a mouse button works, and it is
+     * wrong for a hand: holding a pinch did nothing, and drifting while closed
+     * turned a press into a drag and swallowed it. A finger on glass taps the
+     * instant it lands, and that is the model to copy.
+     *
+     * Only for controls. On anything that is not one — a blade's title bar,
+     * its body, the resize grip — the pinch stays a grab, so dragging works
+     * exactly as before: pointerdown now, moves while held, pointerup on
+     * release. Which of the two it is depends on what is under the aim point,
+     * so it is decided once, here, and never changes mid-press.
+     */
+    const control = target?.closest?.(INTERACTIVE) as HTMLElement | null
+    // Settled here either way. Even when activate() declines — a disabled
+    // control, or the repeat guard catching a flicker — the release must not
+    // fall back to clicking, or the guard would be undone a moment later.
+    p.clicked = Boolean(control)
+    if (control) activate(control)
   } else if (!h.pinched && p.wasPinched) {
     const target = p.captured ?? over
     fire(target, 'pointerup', h, false)
+    // Clicked already when the fingers met: the release only lets go.
+    if (p.clicked) {
+      p.clicked = false
+      p.captured = null
+      p.wasPinched = false
+      return
+    }
     // Only a press that ends roughly where it began is a click. One that
     // travelled was a drag, and a drag that also clicked would close the very
     // blade it had just finished moving.
@@ -581,6 +647,7 @@ function releasePress(id: number, at: { x: number; y: number }) {
   fire(p.captured, 'pointercancel', ghost, false)
   p.wasPinched = false
   p.captured = null
+  p.clicked = false
 }
 
 /* ------------------------------------------------------------------ geometry */
