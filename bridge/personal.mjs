@@ -89,8 +89,8 @@ function dateLine(iso, now) {
 
 /**
  * @param {Date} now
- * @param {{ hosted?: boolean }} opts  A hosted bridge cannot drive the owner's
- *   Chrome, so the practice bank has to be offered as a link instead.
+ * @param {{ hosted?: boolean }} opts  A hosted bridge reads mail through
+ *   jarvis_mail, and the model needs its tool names.
  */
 export function personalContext(now = new Date(), { hosted = false } = {}) {
   const dow = now.getDay()
@@ -125,12 +125,9 @@ export function personalContext(now = new Date(), { hosted = false } = {}) {
     .map((f) => `- ${dateLine(f.on, now)}: ${f.what}`)
     .join('\n')
 
-  // A hosted bridge has no Chrome of his to drive, so the practice bank is
-  // handed over as a link he presses rather than opened for him.
-  const openBank = hosted
-    ? 'You cannot open his browser from where you run, so put the link on the\n' +
-      'display as a markup card with a normal <a href> he can press, and say'
-    : 'Open it with chrome_navigate when he wants to practise, and say'
+  // open_site opens a new tab in the browser he is using, hosted or local,
+  // so the practice bank is opened for him rather than handed over as a link.
+  const openBank = 'Open it with open_site when he wants to practise or says "start TARA", and say'
 
   // Hosted, the inbox comes through jarvis_mail rather than the claude.ai
   // connector, and the model needs to know its tool names and query language.

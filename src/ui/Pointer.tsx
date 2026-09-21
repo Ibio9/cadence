@@ -31,7 +31,7 @@ import { BONES, INDEX_TIP, THUMB_TIP, TIPS, WRIST, diag, hands } from '../lib/ha
 const GLOW_WIDTH = 4
 const LINE_WIDTH = 1.2
 /** How much of the skeleton shows, bones and joints alike. */
-const SKELETON_ALPHA = 0.38
+const SKELETON_ALPHA = 0.2
 
 export function Pointer() {
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -162,7 +162,7 @@ export function Pointer() {
         ctx.lineJoin = 'round'
 
         // -- bones: soft pass, then the bright line ------------------------
-        ctx.globalAlpha = 0.12 * lit
+        ctx.globalAlpha = 0.05 * lit
         ctx.strokeStyle = accent
         ctx.shadowColor = accent
         ctx.shadowBlur = 8 * scale
@@ -202,7 +202,7 @@ export function Pointer() {
         // press, visible before it happens.
         const t = p[THUMB_TIP]
         const x = p[INDEX_TIP]
-        ctx.globalAlpha = 0.25 + hand.closeness * 0.55
+        ctx.globalAlpha = 0.12 + hand.closeness * 0.4
         ctx.strokeStyle = hand.pinched ? '#ffffff' : accent
         ctx.shadowColor = hand.pinched ? '#ffffff' : accent
         ctx.shadowBlur = (2 + hand.closeness * 8) * scale
@@ -222,7 +222,7 @@ export function Pointer() {
         const cy = g.y
         const ring = (17 - hand.closeness * 8) * scale
 
-        ctx.globalAlpha = 0.75 + hand.closeness * 0.25
+        ctx.globalAlpha = 0.55 + hand.closeness * 0.35
         ctx.strokeStyle = hand.pinched ? '#ffffff' : accent
         ctx.shadowColor = hand.pinched ? '#ffffff' : accent
         ctx.shadowBlur = 8 * scale
@@ -252,7 +252,7 @@ export function Pointer() {
         // Below the wrist, quiet. Worth showing because when a gesture is
         // misread this is the only way to see that it was read at all.
         if (hand.gesture !== 'none') {
-          ctx.globalAlpha = 0.45
+          ctx.globalAlpha = 0.25
           ctx.shadowBlur = 0
           ctx.fillStyle = accent
           ctx.font = `500 ${Math.round(9 * Math.min(scale, 1.4))}px ui-monospace, monospace`

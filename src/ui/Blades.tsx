@@ -6,7 +6,7 @@ import { withMedia } from '../lib/auth'
 import { sanitisePanelHtml } from './sanitise'
 import { diag as handDiag, frameSpan, peaceScroll, pointScroll, throwOf } from '../lib/hands'
 import { isConnected } from '../lib/bridge'
-import { nearestTo, targetFor, throwBlade, way } from '../lib/sync'
+import { nearestTo, targetFor, thisDevice, throwBlade, way } from '../lib/sync'
 import * as camera from '../lib/camera'
 
 /**
@@ -261,8 +261,8 @@ const Body = memo(function Body({ blade }: { blade: Blade }) {
 
 /** A mouse or touch movement this fast, in px per ms, is a flick. */
 const FLICK = 1.1
-/** How much of the hold must be the OK sign for letting go to send. */
-const OK_SHARE = 0.6
+/** How much of the hold must have the fingers up for letting go to send. */
+const OK_SHARE = 0.5
 /** How far a blade must be carried for a mouse flick to aim by the carry. */
 const AIM_PX = 80
 /**
@@ -545,13 +545,20 @@ function Card({
         showNote('No other device is open. Power JARVIS up on the other one first.')
         return
       }
+      // Fingers up sends it over. With one other device open there is only one
+      // place for it to go; with several, the index picks by pointing.
+      const others = useStore.getState().devices.filter((d) => d.online && d.id !== thisDevice().id)
       const px = r.px ?? 0
       const py = r.py ?? 0
-      if (Math.hypot(px, py) < 1) {
-        handDiag.lastThrow = 'OK sign, but the index was not seen pointing anywhere'
+      let angle: number
+      if (others.length === 1) {
+        angle = nearestTo(0)?.angle ?? 0
+      } else if (Math.hypot(px, py) >= 1) {
+        angle = Math.atan2(py, px)
+      } else {
+        handDiag.lastThrow = 'fingers up, but the index was not seen pointing at any device'
         return
       }
-      const angle = Math.atan2(py, px)
       handDiag.lastThrow = `OK sign ${pct}%, index pointing ${way(angle)}: sending`
       launch(angle, from)
       return

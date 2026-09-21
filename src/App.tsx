@@ -563,6 +563,27 @@ export default function App() {
         case 'screen':
           s.clearScreen(a.what ?? 'all')
           break
+        case 'open': {
+          // A new tab, so JARVIS stays put. Browsers only let a page open one
+          // straight after a real click or key press, and a spoken request
+          // is seconds old by the time the answer arrives, so this is often
+          // refused; then he gets a button, which is a real click.
+          const url = String(a.url ?? '')
+          const label = String(a.label ?? '') || url
+          if (!/^https?:\/\//i.test(url)) break
+          const tab = window.open(url, '_blank')
+          if (tab) {
+            try {
+              tab.opener = null
+            } catch {
+              /* cross-origin already; nothing to cut */
+            }
+            s.setOpening(null)
+          } else {
+            s.setOpening({ url, label })
+          }
+          break
+        }
         default:
           console.warn('[jarvis] unknown ui op:', op, args)
       }

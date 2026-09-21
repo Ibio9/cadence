@@ -336,6 +336,8 @@ type State = {
    * edge from the middle of the screen; `at` restarts the animation.
    */
   flash: { kind: 'sent' | 'arrived'; text: string; angle: number; at: number } | null
+  /** A site JARVIS was asked to open that the browser would not let it: shown as a button. */
+  opening: { url: string; label: string } | null
   /** Which top tab is open, or null for none. */
   tab: Tab
   /** The blade the user has pulled forward, or null for "the newest one". */
@@ -376,6 +378,7 @@ type State = {
   /** Show a short line for a few seconds. */
   showNote: (note: string) => void
   showFlash: (flash: { kind: 'sent' | 'arrived'; text: string; angle: number }) => void
+  setOpening: (opening: { url: string; label: string } | null) => void
   focusBlade: (id: string | null) => void
   expandBlade: (id: string | null) => void
   setPhase: (p: Phase) => void
@@ -610,6 +613,7 @@ export const useStore = create<State>((set) => ({
   aim: null,
   note: null,
   flash: null,
+  opening: null,
   tab: null,
   focusedBlade: null,
   expandedBlade: null,
@@ -834,6 +838,7 @@ export const useStore = create<State>((set) => ({
     window.clearTimeout(noteTimer)
     noteTimer = window.setTimeout(() => set({ note: null }), 3200)
   },
+  setOpening: (opening) => set({ opening }),
   showFlash: (flash) => {
     set({ flash: { ...flash, at: Date.now() } })
     window.clearTimeout(flashTimer)

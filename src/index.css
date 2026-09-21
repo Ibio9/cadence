@@ -3653,3 +3653,80 @@ kbd { font-size: 10px; }
    tabs. */
 .blades-stack-full { inset: 62px 0 72px 0; }
 .bl-expanded { width: 94vw; height: calc(100vh - 150px); }
+
+/* -- what to be doing now, under the orb -- */
+
+.now-line {
+  position: fixed;
+  left: 50%;
+  top: calc(50% + 84px);
+  transform: translateX(-50%);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: nowrap;
+}
+.now-row { display: flex; align-items: baseline; gap: 10px; }
+.now-k {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: color-mix(in srgb, var(--accent) 70%, #fff);
+}
+.now-v { font-size: 14px; color: var(--ink); }
+.now-next .now-v { font-size: 12.5px; color: var(--ink-2); }
+.now-next .now-k { opacity: 0.7; }
+
+/* -- a site to open with one click -- */
+
+.open-card {
+  position: fixed;
+  top: 78px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 95;
+  width: min(420px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--glass-fill));
+  box-shadow: inset 0 1px 0 var(--glass-shine), 0 26px 64px -26px rgba(0, 0, 0, 0.8);
+  pointer-events: auto;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.open-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: color-mix(in srgb, var(--accent) 75%, #fff);
+}
+.open-card-x {
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  font-size: 13px;
+  cursor: pointer;
+}
+.open-card-go {
+  width: 100%;
+  min-height: 46px;
+  margin: 12px 0 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, rgba(255, 255, 255, 0.3));
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.04)),
+    color-mix(in srgb, var(--accent) 30%, rgba(20, 30, 40, 0.4));
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.open-card-hint { margin: 0; font-size: 12px; line-height: 1.5; color: var(--ink-2); }

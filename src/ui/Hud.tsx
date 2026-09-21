@@ -7,6 +7,7 @@ import { Blades, ThrowAim } from './Blades'
 import { Effects } from './Effects'
 import { Pointer } from './Pointer'
 import { GestureGuide } from './GestureGuide'
+import { NowLine } from './NowLine'
 import { diag as handDiag, hands as trackedHands } from '../lib/hands'
 
 const statusText: Record<Phase, string> = {
@@ -344,8 +345,10 @@ export function Hud() {
           the model had to make on grounds it could not know. Everything renders
           here now; Panels.tsx is unmounted rather than deleted so the design
           system it documents stays findable. */}
+      <NowLine />
       <Blades />
       <ThrowAim />
+      <OpenCard />
 
       {ui.chrome.suggestions && <Suggestions />}
 
@@ -387,6 +390,49 @@ export function Hud() {
         </div>
       )}
       <GestureGuide />
+    </div>
+  )
+}
+
+/**
+ * A site JARVIS was asked to open that the browser would not let it open.
+ *
+ * Browsers only let a page open a tab straight after a real click or key
+ * press, and a spoken request is seconds old by the time the answer arrives.
+ * This card is the real click. Allowing pop-ups for the site once (the icon at
+ * the right of the address bar) lets JARVIS open sites by itself after that,
+ * including from a pinch, which the browser does not count as a click.
+ */
+function OpenCard() {
+  const opening = useStore((s) => s.opening)
+  const setOpening = useStore((s) => s.setOpening)
+  if (!opening) return null
+  const open = () => {
+    const tab = window.open(opening.url, '_blank')
+    if (tab) {
+      try {
+        tab.opener = null
+      } catch {
+        /* cross-origin already */
+      }
+      setOpening(null)
+    }
+  }
+  return (
+    <div className="open-card" role="dialog" aria-label={`Open ${opening.label}`}>
+      <div className="open-card-head">
+        <span>OPEN {opening.label.toUpperCase()}</span>
+        <button className="open-card-x" onClick={() => setOpening(null)} aria-label="Dismiss">
+          ✕
+        </button>
+      </div>
+      <button className="open-card-go" onClick={open}>
+        Open {opening.label} ↗
+      </button>
+      <p className="open-card-hint">
+        Your browser stopped JARVIS opening it by itself. To let it open sites directly next time,
+        click the blocked pop-up icon at the right of the address bar and choose always allow.
+      </p>
     </div>
   )
 }
