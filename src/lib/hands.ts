@@ -141,12 +141,16 @@ const SKELETON_BETA = 0.03
  */
 const PINCH_ON = 0.28
 /*
- * Letting go takes clearly opening, well past where a pinch starts: a hand
- * dragging something relaxes its grip without meaning to, and at a tight
- * release line an ordinary drag drifted over it partway across and dropped
- * what it was carrying. With RELEASE_MS behind it, 0.65 holds a drag.
+ * Letting go happens at almost the distance a pinch starts, on his word: at
+ * 0.65, far wider than 0.28, opening the fingers took too long to count as
+ * letting go. It is a hair above PINCH_ON rather than equal to it, so a pinch
+ * held right at the line does not flicker on and off. The cost is that a grip
+ * relaxing mid-drag lets go; that is the trade he chose.
  */
-const PINCH_OFF = 0.65
+const PINCH_OFF = 0.32
+
+/** The span over which the cursor's ring tightens as the fingers close. */
+const CLOSENESS_BAND = 0.4
 
 /**
  * A held pinch lets go only once the fingers have stayed apart this long.
@@ -156,11 +160,11 @@ const PINCH_OFF = 0.65
  * the hand is moving, because motion blur is exactly what makes a fingertip
  * landmark jump, and it is why dragging a blade by hand did not work at all:
  * the blade was dropped within a few frames of being picked up, and picking it
- * up again needed the tighter PINCH_ON the moving hand was not managing. About
- * four frames, which is more than a blurred frame or two and still well under
- * the point where letting go would feel late.
+ * up again needed the tighter PINCH_ON the moving hand was not managing. Two
+ * frames: enough to ride over a single blurred frame, short enough that
+ * opening the fingers lets go at once (it was 140ms, which he felt as lag).
  */
-const RELEASE_MS = 140
+const RELEASE_MS = 60
 
 /**
  * The part of the camera's view that maps onto the whole screen.
@@ -1193,7 +1197,9 @@ function loop(mine: number) {
       })
     }
     if (!pinched) openSince.delete(i)
-    hand.closeness = Math.max(0, Math.min(1, 1 - (gap - PINCH_ON) / (PINCH_OFF - PINCH_ON)))
+    // Over a fixed band rather than PINCH_ON to PINCH_OFF, which is now too
+    // narrow to show the fingers closing: the ring tightens as they approach.
+    hand.closeness = Math.max(0, Math.min(1, 1 - (gap - PINCH_ON) / CLOSENESS_BAND))
 
     /**
      * Where the cursor sits: the index fingertip, and nothing else.
@@ -1278,7 +1284,9 @@ function loop(mine: number) {
       hand.gesture !== wasGesture &&
       hand.gesture !== 'pinch' &&
       wasGesture !== 'pinch' &&
-      gap >= PINCH_OFF
+      // "Already closing" is the whole approach, not just the release line,
+      // which now sits right at the pinch and would count almost nothing.
+      gap >= PINCH_ON + CLOSENESS_BAND
     ) {
       poseChangedAt.set(i, now)
     }
