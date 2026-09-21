@@ -243,30 +243,58 @@ const Body = memo(function Body({ blade }: { blade: Blade }) {
 /**
  * Throwing a blade to another device.
  *
- * Two ways to throw, because a hand and a finger on glass move differently:
+ * A throw is a fast movement ending in a release, from wherever the blade
+ * is: pinch it and flick your hand towards the device like a dart, or flick
+ * it with a mouse or a finger. Its direction is the direction of the fastest
+ * part of the movement, which picks the device on the map (DEVICES tab).
  *
- *   - Darts, by hand: grip the blade with a pinch, carry it towards the
- *     device you mean, then push it at the screen and let go. The push is
- *     what makes it a throw: the hand grows on camera as it comes forward,
- *     which a drag across the screen never does (see thrustOf in hands.ts).
- *   - A flick, by mouse or touch: let go while moving fast.
+ * The fastest part, not the last part. A hand's release is only known about a
+ * seventh of a second after the fingers open (see RELEASE_MS in hands.ts),
+ * and by then a real throw has slowed, and the hand is often swinging back.
+ * Reading the direction off those last moments pointed throws the wrong way,
+ * which is why a throw that was lit up as aimed at the iPad arrived as "no
+ * device that way". A mouse lets go at once, so it looks back only briefly;
+ * a fast drag followed by a pause is a put-down, not a throw.
  *
- * Which device is decided by direction on the device map (DEVICES tab), from
- * where the blade was carried, or failing that from which way it was moving.
- * Nothing is thrown unless another device is open, so a quick drag with only
- * one device on behaves exactly as it always has.
+ * A push at the screen still counts, aimed where the blade was carried (see
+ * thrustOf in hands.ts). Nothing is thrown unless another device is open, so
+ * a quick drag with one device on behaves exactly as it always has.
  */
 
-/** A mouse or touch release this fast, in px per ms, is a flick. */
+/** A mouse or touch movement this fast, in px per ms, is a flick. */
 const FLICK = 1.1
-/** A hand release this fast counts even without the push. */
-const HAND_FLICK = 2.0
+/** A hand movement this fast is a throw. */
+const HAND_FLICK = 1.5
 /** How much a hand must grow on camera to count as pushed at the screen. */
 const THRUST = 1.2
 /** How far a blade must be carried towards a device for that to be the aim. */
 const AIM_PX = 80
+/** How far back from the release to look for the throw, by hand and otherwise. */
+const HAND_LOOKBACK_MS = 480
+const FLICK_LOOKBACK_MS = 150
 
-type Release = { dx: number; dy: number; vx: number; vy: number; pointerId: number }
+type Release = { dx: number; dy: number; vx: number; vy: number; speed: number; pointerId: number }
+type Sample = { t: number; x: number; y: number }
+
+/**
+ * The fastest the pointer moved, over any stretch of about 70ms ending within
+ * `lookback` of the last sample, and in which direction.
+ */
+function peakVelocity(trail: Sample[], lookback: number) {
+  const end = trail[trail.length - 1]
+  let best = { vx: 0, vy: 0, speed: 0 }
+  for (let j = trail.length - 1; j > 0 && end.t - trail[j].t <= lookback; j--) {
+    let i = j
+    while (i > 0 && trail[j].t - trail[i - 1].t <= 70) i--
+    const dt = trail[j].t - trail[i].t
+    if (dt < 12) continue
+    const vx = (trail[j].x - trail[i].x) / dt
+    const vy = (trail[j].y - trail[i].y) / dt
+    const speed = Math.hypot(vx, vy)
+    if (speed > best.speed) best = { vx, vy, speed }
+  }
+  return best
+}
 
 const othersOnline = () => {
   const s = useStore.getState()
@@ -355,13 +383,14 @@ function Card({
      * following one of them removes the need for either.
      */
     const id = e.pointerId
-    // The last few positions, for how fast it was moving when it was let go.
-    const trail: { t: number; x: number; y: number }[] = [{ t: performance.now(), x: sx, y: sy }]
+    // The last moment of positions, for how it was moving when it was let go.
+    const trail: Sample[] = [{ t: performance.now(), x: sx, y: sy }]
 
     const move = (ev: PointerEvent) => {
       if (ev.pointerId !== id) return
-      trail.push({ t: performance.now(), x: ev.clientX, y: ev.clientY })
-      if (trail.length > 16) trail.shift()
+      const now = performance.now()
+      trail.push({ t: now, x: ev.clientX, y: ev.clientY })
+      while (trail.length > 2 && now - trail[0].t > 800) trail.shift()
       onMove(ev.clientX - sx, ev.clientY - sy)
     }
     const done = (ev: PointerEvent) => {
@@ -371,15 +400,8 @@ function Card({
       window.removeEventListener('pointercancel', done)
       if (!onRelease || ev.type === 'pointercancel') return
       const last = trail[trail.length - 1]
-      const first = trail.find((p) => last.t - p.t <= 110) ?? last
-      const dt = Math.max(1, last.t - first.t)
-      onRelease({
-        dx: last.x - sx,
-        dy: last.y - sy,
-        vx: first === last ? 0 : (last.x - first.x) / dt,
-        vy: first === last ? 0 : (last.y - first.y) / dt,
-        pointerId: id,
-      })
+      const peak = peakVelocity(trail, id >= 9000 ? HAND_LOOKBACK_MS : FLICK_LOOKBACK_MS)
+      onRelease({ dx: last.x - sx, dy: last.y - sy, ...peak, pointerId: id })
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', done)
@@ -408,24 +430,17 @@ function Card({
   const release = (from: { x: number; y: number }) => (r: Release) => {
     setAim(null)
     if (!throwable || expanded || !othersOnline()) return
-    const speed = Math.hypot(r.vx, r.vy)
     const hand = r.pointerId >= 9000
+    const flicked = r.speed >= (hand ? HAND_FLICK : FLICK)
     const pushed = hand && thrustOf(r.pointerId - 9000) >= THRUST
-    const flicked = speed >= (hand ? HAND_FLICK : FLICK)
-    if (!pushed && !flicked) return
+    if (!flicked && !pushed) return
 
+    // A throw goes the way its fastest movement went; a push with no real
+    // movement goes where the blade was carried.
     const carried = Math.hypot(r.dx, r.dy) >= AIM_PX
-    // A push aims where the blade was carried; a flick aims where it was going.
-    const angle =
-      pushed && carried
-        ? Math.atan2(r.dy, r.dx)
-        : speed > 0.2
-          ? Math.atan2(r.vy, r.vx)
-          : carried
-            ? Math.atan2(r.dy, r.dx)
-            : null
+    const angle = flicked ? Math.atan2(r.vy, r.vx) : carried ? Math.atan2(r.dy, r.dx) : null
     if (angle === null) {
-      showNote('Carry it towards a device first, then throw.')
+      showNote('Flick it towards a device to throw it.')
       return
     }
     const to = throwBlade(blade, angle)

@@ -110,8 +110,13 @@ function applyRemote(msg: Record<string, unknown>) {
 /** The device map is twice as wide as it is tall; directions are measured on it. */
 const MAP_W = 2
 const MAP_H = 1
-/** How far off the line to a device a throw may be and still reach it. */
-const CONE = (55 * Math.PI) / 180
+/**
+ * How far off the line to a device a throw may be and still reach it. With
+ * one other device open it only has to be thrown towards its side of the
+ * room; with several, direction has to choose between them.
+ */
+const CONE_ONE = (90 * Math.PI) / 180
+const CONE_MANY = (60 * Math.PI) / 180
 
 const angleTo = (from: Device, to: Device) => Math.atan2((to.y - from.y) * MAP_H, (to.x - from.x) * MAP_W)
 const between = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)))
@@ -124,17 +129,17 @@ export function targetFor(angle: number): Device | null {
   const { devices } = useStore.getState()
   const here = devices.find((d) => d.id === thisDevice().id)
   if (!here) return null
+  const others = devices.filter((d) => d.id !== here.id && d.online)
   let best: Device | null = null
   let off = Infinity
-  for (const d of devices) {
-    if (d.id === here.id || !d.online) continue
+  for (const d of others) {
     const diff = between(angleTo(here, d), angle)
     if (diff < off) {
       best = d
       off = diff
     }
   }
-  return off <= CONE ? best : null
+  return off <= (others.length === 1 ? CONE_ONE : CONE_MANY) ? best : null
 }
 
 /** Send a blade to whichever device is that way. Null if nothing is. */
