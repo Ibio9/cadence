@@ -92,6 +92,18 @@ export default function App() {
   useEffect(() => {
     void auth.probe().then((r) => setGate(r === 'login' ? 'login' : 'ready'))
   }, [])
+
+  /*
+   * This week's set work goes on the list at load, before the briefing reads
+   * it, and is checked again every ten minutes so a tab left open over the
+   * weekend still picks up Monday's Philosophy.
+   */
+  useEffect(() => {
+    const check = () => store.getState().ensureSetWork()
+    check()
+    const every = window.setInterval(check, 10 * 60 * 1000)
+    return () => window.clearInterval(every)
+  }, [store])
   const speaker = useRef<ReturnType<typeof createSpeaker> | null>(null)
   const voice = useRef<Voice | null>(null)
 
@@ -450,6 +462,13 @@ export default function App() {
         if (!text) return { error: 'Nothing to add.' }
         s.addTodo(text, req.due ?? null)
         return { ok: true }
+      }
+      if (req.op === 'update') {
+        const found = s.updateTodo(String(req.task ?? ''), {
+          text: typeof req.text === 'string' ? req.text : undefined,
+          due: req.due,
+        })
+        return found ? { ok: true } : { error: 'There is no item with that id on the list.' }
       }
       return { todos: s.todos }
     })

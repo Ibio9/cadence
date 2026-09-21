@@ -37,6 +37,8 @@ type Frame = {
   when?: string
   /** 'tasks' frames: which operation, and the item when it is an add. */
   due?: string | null
+  /** Which to-do item an update is about; `id` is taken by the request. */
+  task?: string
   servers?: Array<string | { name?: string }>
 }
 
@@ -94,7 +96,13 @@ export function watchCapture(fn: (req: CaptureRequest) => Promise<CaptureResult>
  * and has to ask. Answers travel back against the request's id exactly as a
  * captured frame does.
  */
-export type TaskRequest = { op: 'list' | 'add'; text?: string; due?: string | null }
+export type TaskRequest = {
+  op: 'list' | 'add' | 'update'
+  text?: string
+  /** undefined leaves the day alone; null clears it. */
+  due?: string | null
+  task?: string
+}
 export type TaskResult = { todos?: unknown[]; ok?: boolean; error?: string }
 
 let onTasks: ((req: TaskRequest) => TaskResult) | null = null
@@ -214,7 +222,8 @@ function dispatch(ws: WebSocket) {
         answer({ error: 'The interface has no task list.' })
       } else {
         try {
-          answer(onTasks({ op: msg.op === 'add' ? 'add' : 'list', text: msg.text, due: msg.due }))
+          const op = msg.op === 'add' || msg.op === 'update' ? msg.op : 'list'
+          answer(onTasks({ op, text: msg.text, due: msg.due, task: msg.task }))
         } catch (err) {
           answer({ error: String((err as Error)?.message ?? err) })
         }

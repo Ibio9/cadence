@@ -2283,6 +2283,89 @@ kbd {
 .todo-row:hover .todo-x { color: color-mix(in srgb, var(--accent) 40%, transparent); }
 .todo-x:hover { color: #fff; }
 
+/* The words are a button now, so a pinch can open them for editing; dressed
+   back down to plain text. */
+button.todo-text {
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: text;
+}
+.todo-edit {
+  padding: 4px 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* A placeholder the weekly set-work rule added, until he says what it is. */
+.todo-assumed {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 50%, transparent);
+  color: color-mix(in srgb, var(--accent) 75%, #fff);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  vertical-align: 2px;
+  text-decoration: none;
+}
+
+/* The due day, pressable to change. Two classes on the states so they hold
+   against the legibility section further down, which sets .todo-due. */
+button.todo-due {
+  min-height: 26px;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  background: none;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+button.todo-due:hover { border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.todo-due.todo-due-soon { color: color-mix(in srgb, var(--accent) 70%, #fff); }
+.todo-due.todo-due-late { color: #ff8a8a; }
+.todo-due.todo-due-none { color: color-mix(in srgb, var(--accent) 55%, transparent); }
+
+/* Choosing a day: whole buttons for the usual answers, the picker for the rest. */
+.todo-when {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 0 6px 32px;
+}
+.todo-chip {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: color-mix(in srgb, var(--accent) 80%, #fff);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.todo-chip:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); color: #fff; }
+.todo-chip-dim { background: transparent; color: color-mix(in srgb, var(--accent) 65%, transparent); }
+
+.todo-date {
+  width: 136px;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
+  background: transparent;
+  color: color-mix(in srgb, var(--accent) 75%, #fff);
+  font-family: inherit;
+  font-size: 12px;
+}
+.todo-date:focus { outline: none; }
+.todo-date::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.8; }
+.todo-when .todo-date { border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+
+.tt-late { color: #ff8a8a; }
+
 /* -- tab actions -- */
 
 .tab-action {

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { setWorkSoFar } from './lib/schedule'
 
 export type Phase =
   | 'offline'   // waiting for the click that unlocks audio
@@ -74,8 +75,12 @@ export type Tab = 'timetable' | 'todo' | 'briefing' | 'news' | null
  * on the list without being promised to a particular day, which is where most
  * things sit.
  *
- * Nothing is ever removed by JARVIS. He can add and he can tick off; the list
+ * Nothing is ever removed by JARVIS. He can add, fill in and tick off; the list
  * only shrinks when Ibrahim says so.
+ *
+ * `assumed` marks a placeholder the weekly set-work rule put there (see
+ * SET_WORK) rather than something he said. It clears the moment the item is
+ * edited, by him or on his word, because from then on it is his.
  */
 export type Todo = {
   id: string
@@ -83,6 +88,7 @@ export type Todo = {
   done: boolean
   due: string | null
   at: number
+  assumed?: boolean
 }
 
 export type Turn = {
@@ -309,6 +315,10 @@ type State = {
   /** Opening the tab that is already open closes it. */
   openTab: (t: Tab) => void
   addTodo: (text: string, due?: string | null) => void
+  /** Change the words or the day. Either counts as confirming an assumed item. */
+  updateTodo: (id: string, patch: { text?: string; due?: string | null }) => boolean
+  /** Put this week's set work on the list, once per piece; see SET_WORK. */
+  ensureSetWork: (now?: Date) => void
   toggleTodo: (id: string) => void
   removeTodo: (id: string) => void
   focusBlade: (id: string | null) => void
@@ -347,6 +357,39 @@ type State = {
  */
 const TODO_KEY = 'jarvis.todos.v1'
 
+/**
+ * Which pieces of set work have already been put on the list.
+ *
+ * Kept apart from the list itself so that deleting a placeholder is final:
+ * checking the list for it would put it straight back on the next load, and
+ * he would be deleting the same Philosophy homework every half hour.
+ */
+const SET_WORK_KEY = 'jarvis.setwork.v1'
+
+/** The same record in memory, for a browser that refuses storage. */
+const setWorkSeenHere = new Set<string>()
+
+function loadSetWorkSeen(): string[] {
+  let stored: string[] = []
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SET_WORK_KEY) ?? '[]')
+    if (Array.isArray(parsed)) stored = parsed.filter((k) => typeof k === 'string')
+  } catch {
+    /* fall through to what this session remembers */
+  }
+  return [...new Set([...stored, ...setWorkSeenHere])]
+}
+
+function saveSetWorkSeen(keys: string[]) {
+  keys.forEach((k) => setWorkSeenHere.add(k))
+  try {
+    // Two a week; a term's worth is plenty to stop anything repeating.
+    localStorage.setItem(SET_WORK_KEY, JSON.stringify(keys.slice(-60)))
+  } catch {
+    /* remembered in memory above, so it still will not repeat this session */
+  }
+}
+
 function loadTodos(): Todo[] {
   try {
     const raw = localStorage.getItem(TODO_KEY)
@@ -361,6 +404,7 @@ function loadTodos(): Todo[] {
         done: Boolean(t.done),
         due: typeof t.due === 'string' ? t.due : null,
         at: Number(t.at) || Date.now(),
+        ...(t.assumed === true ? { assumed: true } : null),
       }))
   } catch {
     return []
@@ -499,6 +543,40 @@ export const useStore = create<State>((set) => ({
         },
       ].slice(-200),
     })),
+
+  updateTodo: (id, patch) => {
+    let found = false
+    set((s) => ({
+      todos: s.todos.map((t) => {
+        if (t.id !== id) return t
+        found = true
+        const text = patch.text === undefined ? t.text : patch.text.trim().slice(0, 200) || t.text
+        const due = patch.due === undefined ? t.due : patch.due
+        return { id: t.id, text, done: t.done, due, at: t.at }
+      }),
+    }))
+    return found
+  },
+
+  ensureSetWork: (now = new Date()) => {
+    const seen = loadSetWorkSeen()
+    const fresh = setWorkSoFar(now).filter((w) => !seen.includes(w.key))
+    if (!fresh.length) return
+    set((s) => ({
+      todos: [
+        ...s.todos,
+        ...fresh.map((w) => ({
+          id: `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+          text: `${w.subject} homework`,
+          done: false,
+          due: w.due,
+          at: Date.now(),
+          assumed: true,
+        })),
+      ].slice(-200),
+    }))
+    saveSetWorkSeen([...seen, ...fresh.map((w) => w.key)])
+  },
 
   toggleTodo: (id) =>
     set((s) => ({

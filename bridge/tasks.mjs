@@ -11,10 +11,15 @@ import { z } from 'zod'
  * same request/reply channel the camera uses rather than the one-way push the
  * display tools get.
  *
- * Two tools, not five. The bridge's own guidance is to keep the count low, and
- * the missing verbs are missing on purpose: there is no delete and no edit,
- * because a list that an assistant can quietly rewrite is a list you cannot
- * trust. He removes things. JARVIS adds them and ticks them off.
+ * Three tools, not five. The bridge's own guidance is to keep the count low,
+ * and delete is missing on purpose: a list an assistant can quietly shrink is
+ * a list you cannot trust. He removes things.
+ *
+ * Edit arrived with the weekly set-work placeholders. Teams will not say what
+ * was set, so the list guesses "Philosophy homework, due next Monday", and the
+ * guess is only useful if his answer ("it's the Descartes essay, due
+ * Thursday") can be written back into it. The tool says it is for exactly
+ * that: changing an item on his word, never tidying the list by itself.
  */
 
 const LIST_DESCRIPTION = `Read Ibrahim's to-do list.
@@ -25,9 +30,14 @@ intends to do; his calendar holds the fixed points and this holds everything
 else, so a plan built without reading it is a plan built from half the
 information.
 
-Returns each item with whether it is done and the day it is promised to, if
-any. Items with no day are on the list without being committed to a date,
-which is usually where the useful slack is.`
+Returns each item with whether it is done, the day it is due, if any, and its
+id for update_task. Items with no day are on the list without being committed
+to a date, which is usually where the useful slack is.
+
+An item marked (assumed) is a placeholder the interface put there because
+that subject is always set on that weekday. The day is a guess too: a week
+after it was set. Ask him what the work actually is and when it is due, then
+fix it with update_task.`
 
 const ADD_DESCRIPTION = `Put something on Ibrahim's to-do list.
 
@@ -38,7 +48,21 @@ and it is the thing that makes a list stop being trustworthy.
 
 One item per call, phrased the way he said it rather than formalised. \`due\`
 is optional and must be an exact date, YYYY-MM-DD, which you work out from
-today's date rather than passing words like "tomorrow" through.`
+today's date rather than passing words like "tomorrow" through. If he gives a
+deadline ("due Friday", "by the 2nd"), always pass it as \`due\`, not in the
+text.`
+
+const UPDATE_DESCRIPTION = `Change an item on Ibrahim's to-do list: its words, its due day, or both.
+
+Only on his word. The main use is filling in an assumed placeholder once he
+tells you what was set: "Philosophy homework" becomes "Philosophy: Descartes
+essay, 800 words" and the guessed day becomes the real one. Also for "move the
+essay to Thursday" or "the maths sheet has no deadline". Never to tidy,
+reword or reschedule the list on your own initiative.
+
+\`task\` is the id from list_tasks; read the list first if you do not have it.
+Leave out what is not changing. \`due\` is YYYY-MM-DD, or "none" to take the
+date off.`
 
 /** @param {(kind: string, args: object) => Promise<any>} ask */
 export function tasksServer(ask) {
@@ -47,7 +71,7 @@ export function tasksServer(ask) {
     version: '1.0.0',
     instructions:
       "Ibrahim's to-do list, stored in the interface. Read it before planning " +
-      'anything; add to it only when he asks you to.',
+      'anything; add to it or change it only when he asks you to.',
     // Never deferred behind tool search. If the model has to go looking for the
     // list, it will plan his day without it and the plan will be wrong.
     alwaysLoad: true,
@@ -80,8 +104,9 @@ export function tasksServer(ask) {
         // between the list and the sentence.
         const lines = items.map((t) => {
           const box = t.done ? '[done]' : '[ ]'
-          const when = t.due ? ` (for ${t.due})` : ''
-          return `${box} ${t.text}${when}`
+          const when = t.due ? ` (due ${t.due})` : ''
+          const guess = t.assumed ? ' (assumed)' : ''
+          return `${box} ${t.text}${when}${guess} [id ${t.id}]`
         })
         const open = items.filter((t) => !t.done).length
         return {
@@ -137,6 +162,60 @@ export function tasksServer(ask) {
               { type: 'text', text: `Added: ${text}${due ? ` for ${due}` : ''}.` },
             ],
           }
+        },
+      ),
+
+      tool(
+        'update_task',
+        UPDATE_DESCRIPTION,
+        {
+          task: z.string().describe('The item id from list_tasks.'),
+          text: z
+            .string()
+            .optional()
+            .catch(undefined)
+            .describe('The new wording, in his words. Leave out to keep it.'),
+          due: z
+            .string()
+            .optional()
+            .catch(undefined)
+            .describe('YYYY-MM-DD, or "none" to clear it. Leave out to keep it.'),
+        },
+        async (args) => {
+          const task = String(args.task ?? '').trim()
+          const text = typeof args.text === 'string' && args.text.trim() ? args.text.trim().slice(0, 200) : undefined
+          const raw = typeof args.due === 'string' ? args.due.trim() : undefined
+          let due
+          if (raw === undefined || raw === '') due = undefined
+          else if (/^none$/i.test(raw)) due = null
+          else if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) due = raw
+          else {
+            return {
+              isError: true,
+              content: [{ type: 'text', text: `Not changed: "${raw}" is not a date. Use YYYY-MM-DD or "none".` }],
+            }
+          }
+          if (!task || (text === undefined && due === undefined)) {
+            return {
+              isError: true,
+              content: [{ type: 'text', text: 'Not changed: give the item id and what to change.' }],
+            }
+          }
+
+          let reply
+          try {
+            reply = await ask('tasks', { op: 'update', task, text, due })
+          } catch (err) {
+            return {
+              isError: true,
+              content: [{ type: 'text', text: `Could not change it: ${err?.message ?? err}. Tell him it did not save.` }],
+            }
+          }
+          if (reply?.error) {
+            return { isError: true, content: [{ type: 'text', text: `Not changed: ${reply.error} Read the list again.` }] }
+          }
+          const what = [text && `now "${text}"`, due === null ? 'no date' : due && `due ${due}`].filter(Boolean)
+          return { content: [{ type: 'text', text: `Changed: ${what.join(', ')}.` }] }
         },
       ),
     ],

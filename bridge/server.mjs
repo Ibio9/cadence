@@ -50,6 +50,15 @@ import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
 import { openRemote, proxyError, vetTarget, PROXY_UA } from './net.mjs'
 import { probeUrl, renderPage } from './page.mjs'
 
+/*
+ * London time, wherever this runs. A hosted bridge sits on a UTC server, and
+ * every date it tells him (today's name, countdowns, which homework was set)
+ * would be an hour behind all summer: wrong about the day between midnight
+ * and one. Node reads TZ at the moment it is assigned, so this takes effect
+ * for everything after it. An explicit TZ in the environment still wins.
+ */
+if (!process.env.TZ) process.env.TZ = 'Europe/London'
+
 // Before anything else: a hosted bridge that cannot lock itself does not start.
 assertLocked()
 
@@ -368,8 +377,9 @@ function decideTool(name) {
     // indicator the user can see for as long as it is live.
     if (server === 'jarvis_eyes') return true
 
-    // The to-do list. `add_task` reads as a write to the verb rules and would
-    // be held behind ALLOW_WRITES, which would leave the model able to read
+    // The to-do list. `add_task` and `update_task` read as writes to the verb
+    // rules and would be held behind ALLOW_WRITES, which would leave the model
+    // able to read
     // the list and never able to answer "add that to my list" — the one thing
     // it is for. Named here rather than exempted by verb because the scope is
     // what makes it safe: this server writes to a list in the user's own

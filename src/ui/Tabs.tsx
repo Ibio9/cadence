@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useStore, type Tab } from '../store'
-import { upcoming } from '../lib/schedule'
+import { useStore, type Tab, type Todo } from '../store'
+import { dueLabel, isoDay, parseDue, setOn, upcoming } from '../lib/schedule'
 import { OPENING_BRIEFING, NEWS_BRIEFING } from '../lib/briefing'
 
 /**
@@ -37,12 +37,16 @@ function Timetable() {
   return (
     <div className="tabpanel-body" data-hit-rescue>
       {days.map((d) => {
-        // Anything promised to this day, plus — on today only — everything with
-        // no date at all. Undated work has to surface somewhere or it is
-        // invisible, and today is the only day it is actually actionable.
+        // Anything promised to this day, plus, on today only, everything with
+        // no date and everything overdue. Undated work has to surface somewhere
+        // or it is invisible, and today is the only day it is actionable; late
+        // work belongs on today because today is when it still has to happen.
         const due = todos.filter((t) => t.due === d.iso)
+        const late = d.isToday ? todos.filter((t) => t.due && t.due < d.iso && !t.done) : []
         const loose = d.isToday ? todos.filter((t) => !t.due && !t.done) : []
-        const items = [...due, ...loose]
+        const items = [...late, ...due, ...loose]
+        const [y, m, day] = d.iso.split('-').map(Number)
+        const set = setOn(new Date(y, m - 1, day))
 
         return (
           <div className={d.isToday ? 'tt-day tt-today' : 'tt-day'} key={d.iso}>
@@ -59,12 +63,20 @@ function Timetable() {
               </div>
             )}
 
+            {set.map((w) => (
+              <div className="tt-slot tt-fixed" key={w.subject}>
+                {w.subject} homework set
+              </div>
+            ))}
+
             {items.length === 0 ? (
               <div className="tt-slot tt-empty">nothing on the list</div>
             ) : (
               items.map((t) => (
                 <div className={t.done ? 'tt-slot tt-done' : 'tt-slot'} key={t.id}>
                   {t.text}
+                  {t.due && t.due < d.iso && <span className="tt-late"> · overdue</span>}
+                  {t.assumed && <span className="todo-assumed">assumed</span>}
                 </div>
               ))
             )}
@@ -77,22 +89,57 @@ function Timetable() {
 
 /* ----------------------------------------------------------------------- todo */
 
+/** Open work by due day, soonest first and undated last; ties in the order added. */
+function byDue(a: Todo, b: Todo) {
+  const x = a.due ?? '9999-99-99'
+  const y = b.due ?? '9999-99-99'
+  return x < y ? -1 : x > y ? 1 : a.at - b.at
+}
+
+/** A day `n` after today, as the list stores it. */
+function fromToday(n: number) {
+  const now = new Date()
+  return isoDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + n))
+}
+
 function TodoList() {
   const todos = useStore((s) => s.todos)
   const add = useStore((s) => s.addTodo)
+  const update = useStore((s) => s.updateTodo)
   const toggle = useStore((s) => s.toggleTodo)
   const remove = useStore((s) => s.removeTodo)
   const [draft, draft_] = useState('')
+  const [draftDue, draftDue_] = useState('')
+  /** The row whose words or day are open for editing, if any. One at a time. */
+  const [editing, editing_] = useState<{ id: string; what: 'text' | 'due' } | null>(null)
+  const [words, words_] = useState('')
 
   const submit = (e: React.SyntheticEvent) => {
     e.preventDefault()
-    const text = draft.trim()
+    // "econ essay due fri" files the essay under Friday; the date box, if
+    // set, wins over anything typed.
+    const { text, due } = parseDue(draft)
     if (!text) return
-    add(text)
+    add(text, draftDue || due)
     draft_('')
+    draftDue_('')
   }
 
-  const open = todos.filter((t) => !t.done)
+  const startText = (t: Todo) => {
+    words_(t.text)
+    editing_({ id: t.id, what: 'text' })
+  }
+  const saveText = (t: Todo) => {
+    const next = words.trim()
+    if (next && next !== t.text) update(t.id, { text: next })
+    editing_(null)
+  }
+  const setDue = (t: Todo, due: string | null) => {
+    update(t.id, { due })
+    editing_(null)
+  }
+
+  const open = todos.filter((t) => !t.done).sort(byDue)
   const done = todos.filter((t) => t.done)
 
   return (
@@ -109,9 +156,16 @@ function TodoList() {
           onKeyDown={(e) => {
             if (e.key === 'Enter') submit(e)
           }}
-          placeholder="ADD SOMETHING"
+          placeholder="ADD SOMETHING · “DUE FRI” SETS A DAY"
           aria-label="Add a task"
           autoComplete="off"
+        />
+        <input
+          className="todo-date"
+          type="date"
+          value={draftDue}
+          onChange={(e) => draftDue_(e.target.value)}
+          aria-label="Due date"
         />
         <button className="todo-plus" type="submit" disabled={!draft.trim()} aria-label="Add">
           +
@@ -120,24 +174,82 @@ function TodoList() {
 
       {todos.length === 0 && <p className="tt-empty">Nothing on the list yet.</p>}
 
-      {/* Open first, done underneath. A list that keeps completed work inline
-          makes him re-read the same finished line every time he looks. */}
-      {[...open, ...done].map((t) => (
-        <div className={t.done ? 'todo-row todo-is-done' : 'todo-row'} key={t.id}>
-          <button
-            className="todo-tick"
-            onClick={() => toggle(t.id)}
-            aria-label={t.done ? 'Mark as not done' : 'Mark as done'}
-          >
-            {t.done ? '✓' : ''}
-          </button>
-          <span className="todo-text">{t.text}</span>
-          {t.due && <span className="todo-due">{t.due.slice(5)}</span>}
-          <button className="todo-x" onClick={() => remove(t.id)} aria-label="Remove">
-            ✕
-          </button>
-        </div>
-      ))}
+      {/* Open first by due day, done underneath. A list that keeps completed
+          work inline makes him re-read the same finished line every time. */}
+      {[...open, ...done].map((t) => {
+        const due = t.due ? dueLabel(t.due) : null
+        const editingText = editing?.id === t.id && editing.what === 'text'
+        const editingDue = editing?.id === t.id && editing.what === 'due'
+        return (
+          <div className={t.done ? 'todo-row todo-is-done' : 'todo-row'} key={t.id}>
+            <button
+              className="todo-tick"
+              onClick={() => toggle(t.id)}
+              aria-label={t.done ? 'Mark as not done' : 'Mark as done'}
+            >
+              {t.done ? '✓' : ''}
+            </button>
+
+            {editingText ? (
+              <input
+                className="todo-field todo-edit"
+                value={words}
+                autoFocus
+                // Selected, so typing replaces a placeholder rather than adding to it.
+                onFocus={(e) => e.currentTarget.select()}
+                onChange={(e) => words_(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') saveText(t)
+                  if (e.key === 'Escape') editing_(null)
+                }}
+                onBlur={() => saveText(t)}
+                aria-label="Edit task"
+              />
+            ) : (
+              // A button, so a pinch can open it for editing like anything else.
+              <button className="todo-text" onClick={() => startText(t)} title="Edit">
+                {t.text}
+                {t.assumed && <span className="todo-assumed">assumed</span>}
+              </button>
+            )}
+
+            <button
+              className={due ? `todo-due todo-due-${due.state}` : 'todo-due todo-due-none'}
+              onClick={() => editing_(editingDue ? null : { id: t.id, what: 'due' })}
+              aria-label={due ? `Due ${due.text}, change` : 'Set a due date'}
+            >
+              {due ? due.text : '+ date'}
+            </button>
+
+            <button className="todo-x" onClick={() => remove(t.id)} aria-label="Remove">
+              ✕
+            </button>
+
+            {editingDue && (
+              // Whole buttons for the common answers, because a native date
+              // picker is a small target for a hand; the picker is still
+              // there for anything further out.
+              <div className="todo-when">
+                <button className="todo-chip" onClick={() => setDue(t, fromToday(0))}>today</button>
+                <button className="todo-chip" onClick={() => setDue(t, fromToday(1))}>tomorrow</button>
+                <button className="todo-chip" onClick={() => setDue(t, fromToday(7))}>in a week</button>
+                <input
+                  className="todo-date"
+                  type="date"
+                  value={t.due ?? ''}
+                  onChange={(e) => e.target.value && setDue(t, e.target.value)}
+                  aria-label="Pick a due date"
+                />
+                {t.due && (
+                  <button className="todo-chip todo-chip-dim" onClick={() => setDue(t, null)}>
+                    no date
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

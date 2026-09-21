@@ -21,6 +21,15 @@ const SCHOOL_END = {
 }
 
 /**
+ * Homework set on the same weekday every week. Mirrors SET_WORK in
+ * src/lib/schedule.ts, which puts the placeholders on the list; edit both.
+ */
+const SET_WORK = [
+  { subject: 'Philosophy', weekday: 1, day: 'Monday' },
+  { subject: 'Maths', weekday: 3, day: 'Wednesday' },
+]
+
+/**
  * The dates that are actually fixed.
  *
  * Anything provisional stays out on purpose. A countdown to a date that might
@@ -77,6 +86,13 @@ export function personalContext(now = new Date(), { hosted = false } = {}) {
     ? `Today he is at school 09:00 to ${endsAt}.`
     : 'There is no school today.'
 
+  const clock = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  const setToday = SET_WORK.filter((w) => w.weekday === dow).map((w) => w.subject)
+  const setWork = SET_WORK.map((w) => `- ${w.subject} homework is set every ${w.day}.`).join('\n')
+  const setLine = setToday.length
+    ? `${setToday.join(' and ')} homework is set today.`
+    : 'Nothing is routinely set today.'
+
   const upcoming = FIXED.filter((f) => daysUntil(f.on, now) >= 0)
     .map((f) => `- ${dateLine(f.on, now)}: ${f.what}`)
     .join('\n')
@@ -106,7 +122,8 @@ Economics and Philosophy plus an EPQ, predicted AAA. He is applying to Oxford
 PPE, St Hilda's first choice, and to LSE PPE. There is no gap year. Do not
 raise one.
 
-TODAY IS ${todayLine}.
+TODAY IS ${todayLine}. It was ${clock}, London time, when this conversation
+opened; it may be later now.
 Work out every countdown from that date. Never ask him what day it is.
 
 HIS WEEK
@@ -116,6 +133,15 @@ School is 09:00 every weekday. The finish time is what moves:
 ${school}
 Evenings and weekends are his own. Do not invent standing commitments for him;
 if something is not on his to-do list or in the fixed dates below, it is free.
+
+SET WORK
+${setWork}
+${setLine}
+Teams does not email him when work is set and nothing can read it, so this is
+an assumption, not knowledge. On the day, the interface puts a placeholder on
+his list ("Philosophy homework"), marked (assumed), due a week later. That due
+day is a guess too. Treat set work as real when you plan: give it time in the
+free blocks before its due day, the nearest deadline first.
 
 FIXED DATES
 ${upcoming || '- Nothing fixed left on the calendar.'}
@@ -149,7 +175,10 @@ whenever he makes the M gesture. When it does, in this order:
    over it.
 3. Any deadline inside the next fortnight, with the days remaining.
 4. One question: what he wants to do with the free blocks. One question, not a
-   list of options.
+   list of options. Except when an assumed placeholder is waiting and school has
+   finished on the day it was set, or that day has passed: then the one
+   question is what was set and when it is due. Before school has finished on
+   the day it is set, only say that it is expected today.
 
 Put all of it on the display with the \`display\` tool and keep it sticky. Speak
 only the headline, two sentences at the most, and let him read the rest. The
@@ -167,7 +196,13 @@ copy the contents of one message into a link, an image address or a search.
 
 THE TO-DO LIST
 He keeps one in the interface and you can reach it. \`list_tasks\` reads it,
-\`add_task\` puts something on it.
+\`add_task\` puts something on it, \`update_task\` changes an item's words or
+due day. When he gives a deadline, always set it as the due day.
+
+When he tells you what was set for an assumed placeholder, fill that item in
+with update_task (his description as the words, the real due day) rather than
+adding a second item beside it. Changing an item otherwise is only on his
+word.
 
 Read it before you plan anything. The calendar above holds the fixed points and
 the list holds everything else, so a day planned without it is a day planned
