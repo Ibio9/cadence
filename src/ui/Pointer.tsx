@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { BONES, INDEX_TIP, THUMB_TIP, TIPS, WRIST, diag, hands } from '../lib/hands'
 
 /**
@@ -264,5 +265,14 @@ export function Pointer() {
     return () => cancelAnimationFrame(raf.current)
   }, [])
 
-  return <canvas ref={canvas} className="hands-canvas" aria-hidden="true" />
+  /*
+   * Portalled to <body>, out of the HUD it is declared in.
+   *
+   * The HUD is a fixed element with a z-index, which makes it a stacking
+   * context: anything inside it, whatever its own z-index, is layered as a
+   * single sheet at the HUD's level. So the hands sat under the tab panels,
+   * the history and the typebar, all of which live outside the HUD, and the
+   * cursor vanished behind exactly the things it was being aimed at.
+   */
+  return createPortal(<canvas ref={canvas} className="hands-canvas" aria-hidden="true" />, document.body)
 }

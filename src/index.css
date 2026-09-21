@@ -1801,10 +1801,12 @@ kbd {
    is none throughout — this is a picture of a pointer, not a pointer; the real
    events are synthesised and dispatched at whatever is underneath (hands.ts).
 */
+/* Above every panel, so the cursor is never hidden by the thing it is aimed
+   at; below only the boot overlay (120). Rendered on <body>, see Pointer.tsx. */
 .hands-canvas {
   position: fixed;
   inset: 0;
-  z-index: 95;
+  z-index: 110;
   pointer-events: none;
 }
 
