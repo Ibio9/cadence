@@ -134,7 +134,26 @@ const SKELETON_BETA = 0.03
  * pinch simply never registered. The hysteresis band keeps its width.
  */
 const PINCH_ON = 0.45
-const PINCH_OFF = 0.65
+/*
+ * Loosened from 0.65. A hand dragging something is a hand moving, and moving
+ * it relaxes the grip without meaning to: at 0.65 an ordinary drag drifted over
+ * the line partway across and dropped what it was carrying.
+ */
+const PINCH_OFF = 0.72
+
+/**
+ * A held pinch lets go only once the fingers have stayed apart this long.
+ *
+ * Closing has its confirm window; opening had nothing, so a single frame that
+ * read the fingers apart ended the press. That frame turns up constantly while
+ * the hand is moving, because motion blur is exactly what makes a fingertip
+ * landmark jump, and it is why dragging a blade by hand did not work at all:
+ * the blade was dropped within a few frames of being picked up, and picking it
+ * up again needed the tighter PINCH_ON the moving hand was not managing. About
+ * four frames, which is more than a blurred frame or two and still well under
+ * the point where letting go would feel late.
+ */
+const RELEASE_MS = 140
 
 /**
  * The part of the camera's view that maps onto the whole screen.
@@ -380,6 +399,8 @@ const filters = new Map<number, Filters>()
 const trails = new Map<number, { x: number; y: number; at: number }[]>()
 /** When the fingers first closed, per hand — see PINCH_CONFIRM_MS. */
 const pinchSince = new Map<number, number>()
+/** When a held pinch's fingers first read apart, per hand — see RELEASE_MS. */
+const openSince = new Map<number, number>()
 /** When the finger pose last changed, per hand — see POSE_SETTLE_MS. */
 const poseChangedAt = new Map<number, number>()
 
@@ -889,6 +910,7 @@ function dropHand(i: number) {
   sideVote.delete(i)
   trails.delete(i)
   pinchSince.delete(i)
+  openSince.delete(i)
   poseChangedAt.delete(i)
 }
 
@@ -1019,11 +1041,18 @@ function loop(mine: number) {
     } else if (!wantsPinch) {
       pinchSince.delete(i)
     }
+    if (hand.pinched && !wantsPinch) {
+      openSince.set(i, openSince.get(i) ?? now)
+    } else {
+      openSince.delete(i)
+    }
     const held = pinchSince.get(i)
+    const opened = openSince.get(i)
     const settledLongEnough = now - (poseChangedAt.get(i) ?? 0) > POSE_SETTLE_MS
     const pinched = hand.pinched
-      ? wantsPinch
+      ? wantsPinch || (opened !== undefined && now - opened < RELEASE_MS)
       : wantsPinch && held !== undefined && now - held >= PINCH_CONFIRM_MS && settledLongEnough
+    if (!pinched) openSince.delete(i)
     hand.closeness = Math.max(0, Math.min(1, 1 - (gap - PINCH_ON) / (PINCH_OFF - PINCH_ON)))
 
     /**
@@ -1189,6 +1218,7 @@ export function disableHands(): void {
   sideVote.clear()
   trails.clear()
   pinchSince.clear()
+  openSince.clear()
   poseChangedAt.clear()
   // Give the hold back rather than tearing the stream down: the camera blade
   // may still be showing it, and stopping the tracks would blank it.

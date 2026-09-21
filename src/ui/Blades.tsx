@@ -4,7 +4,7 @@ import { useStore, type Blade } from '../store'
 import { BRIDGE_HTTP_URL } from '../config'
 import { withMedia } from '../lib/auth'
 import { sanitisePanelHtml } from './sanitise'
-import { frameSpan, peaceScroll, pointScroll, pinchCount } from '../lib/hands'
+import { frameSpan, peaceScroll, pointScroll } from '../lib/hands'
 import * as camera from '../lib/camera'
 
 /**
@@ -306,36 +306,25 @@ function Card({
     e.stopPropagation()
     const sx = e.clientX
     const sy = e.clientY
-    let baseX = sx
-    let baseY = sy
-    let dx = 0
-    let dy = 0
+    /**
+     * Only the pointer that picked it up can move it or put it down.
+     *
+     * These listeners are on window, and with hands in view window hears every
+     * hand's moves every frame, pinched or not. Taking all of them meant a
+     * second hand anywhere in the picture yanked the blade to its own position
+     * on alternate frames. The guard that replaced that froze the drag
+     * whenever both hands read as pinched, and a resting fist often does, so
+     * the blade would not move at all. Each hand has its own pointerId, so
+     * following one of them removes the need for either.
+     */
+    const id = e.pointerId
 
     const move = (ev: PointerEvent) => {
-      /**
-       * Both hands pinching means this is not a drag.
-       *
-       * One pinch is a grab. Two is somebody doing something two-handed, and
-       * whichever hand happened to press first should not be hauling the blade
-       * around underneath it — the result is a blade that lurches away while
-       * you are trying to do something else with both hands.
-       *
-       * Suppressed by re-anchoring rather than by returning early. A plain
-       * return would leave the origin where the press began, so the moment one
-       * hand released, the blade would leap by however far the other hand had
-       * travelled in the meantime. Moving the origin with the hand keeps the
-       * offset constant, so letting go of one hand simply resumes from here.
-       */
-      if (ev.pointerType === 'touch' && pinchCount() > 1) {
-        baseX = ev.clientX - dx
-        baseY = ev.clientY - dy
-        return
-      }
-      dx = ev.clientX - baseX
-      dy = ev.clientY - baseY
-      onMove(dx, dy)
+      if (ev.pointerId !== id) return
+      onMove(ev.clientX - sx, ev.clientY - sy)
     }
-    const done = () => {
+    const done = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', done)
       window.removeEventListener('pointercancel', done)

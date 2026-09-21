@@ -18,7 +18,7 @@ import { diag } from '../lib/hands'
 
 const MOVES: { gesture: string; hand: string; does: string }[] = [
   { gesture: 'point', hand: '☝', does: 'move the cursor' },
-  { gesture: 'pinch', hand: '🤏', does: 'click · or hold on a bar to drag' },
+  { gesture: 'pinch', hand: '🤏', does: 'click · or hold on a blade to move it' },
   { gesture: 'open', hand: '🖐', does: 'let go' },
   { gesture: 'peace', hand: '✌', does: 'two fingers up-down to scroll' },
   { gesture: 'frame', hand: '📐', does: 'two L-corners to resize' },
@@ -76,7 +76,7 @@ export function GestureGuide({ live }: { live: boolean }) {
             </div>
           ))}
           <div className="gguide-foot">
-            grab a blade by its bar · <kbd>G</kbd> to stop
+            pinch a blade anywhere to move it · <kbd>G</kbd> to stop
           </div>
         </motion.div>
       )}
