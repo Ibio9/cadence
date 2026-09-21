@@ -127,8 +127,37 @@ const SKELETON_BETA = 0.03
  * Two thresholds, not one: it takes a tighter pinch to start a press than to
  * keep one, so the press cannot flicker on the boundary.
  */
-const PINCH_ON = 0.40
-const PINCH_OFF = 0.60
+/*
+ * Loosened from 0.40 / 0.60. The fingertip landmarks sit at the centre of each
+ * fingertip, so even thumb and finger pressed together leave a gap the width
+ * of a finger, and on some hands and angles that gap never got under 0.40: the
+ * pinch simply never registered. The hysteresis band keeps its width.
+ */
+const PINCH_ON = 0.45
+const PINCH_OFF = 0.65
+
+/**
+ * The part of the camera's view that maps onto the whole screen.
+ *
+ * It used to be all of it, edge to edge. That made the edges of the screen
+ * unreachable in practice: to put a fingertip on the tab strip, the top few
+ * percent of a 720px screen, the fingertip had to be in the top few percent
+ * of the camera's view, where most of the hand is out of frame and the
+ * tracker loses it. The tabs could be seen and not touched.
+ *
+ * Mapping the comfortable middle of the view to the full screen fixes that:
+ * the screen's edges now sit where a hand can reach while still wholly in
+ * frame. The box is taller at the bottom because a raised hand sits in the
+ * upper part of a webcam's view, and the resulting gain (about 1.4x) is also
+ * why the cursor now covers the screen with less arm movement.
+ */
+const REACH = { left: 0.15, right: 0.85, top: 0.12, bottom: 0.78 }
+
+/** A landmark (normalised, unmirrored) to viewport pixels, mirrored and through REACH. */
+const toScreen = (m: { x: number; y: number }, w: number, h: number) => ({
+  x: ((1 - m.x - REACH.left) / (REACH.right - REACH.left)) * w,
+  y: ((m.y - REACH.top) / (REACH.bottom - REACH.top)) * h,
+})
 
 /** A finger counts as extended when its tip is this much further from the
  *  wrist than its middle joint. Ratio rather than a y-comparison, so it still
@@ -860,7 +889,7 @@ function loop(mine: number) {
      * smooth each hand start smoothing the other one. Keying on handedness
      * makes your left hand slot 0 for as long as it is your left hand.
      */
-    const wristPx = { x: (1 - marks[WRIST].x) * w, y: marks[WRIST].y * h }
+    const wristPx = toScreen(marks[WRIST], w, h)
     const reach = Math.hypot(w, h)
     const i = slotFor(side, wristPx, seen, reach)
     seen.add(i)
@@ -868,13 +897,26 @@ function loop(mine: number) {
     const f = filtersFor(i)
 
     // Mirrored, because the camera faces you: moving your hand right should
-    // move the cursor right, not left.
-    const points = marks.map((m, j) =>
-      f.joints[j].filter((1 - m.x) * w, m.y * h, at),
-    )
+    // move the cursor right, not left. Through REACH, so the edges are reachable.
+    const points = marks.map((m, j) => {
+      const s = toScreen(m, w, h)
+      return f.joints[j].filter(s.x, s.y, at)
+    })
 
     const span = dist(points[WRIST], points[MIDDLE_MCP]) || 1
-    const gap = dist(points[THUMB_TIP], points[INDEX_TIP]) / span
+
+    /*
+     * The pinch is measured in the camera's own geometry, not on screen.
+     *
+     * On screen, the gap-to-span ratio picked up the REACH gain (slightly
+     * different across and down) and the window's shape, so the same pinch
+     * read differently in a narrow window and a wide one. In the camera frame,
+     * corrected for its aspect, it is a property of the hand alone.
+     */
+    const aspect = (video.videoWidth || 16) / (video.videoHeight || 9)
+    const rawDist = (a: number, b: number) =>
+      Math.hypot((marks[a].x - marks[b].x) * aspect, marks[a].y - marks[b].y)
+    const gap = rawDist(THUMB_TIP, INDEX_TIP) / (rawDist(WRIST, MIDDLE_MCP) || 1)
 
     let hand = hands.find((q) => q.id === i)
     if (!hand) {
@@ -926,7 +968,15 @@ function loop(mine: number) {
      * while you click, which no pointer may do.
      */
     const tip = points[INDEX_TIP]
-    const aimed = f.cursor.filter(tip.x, tip.y, at)
+    const filtered = f.cursor.filter(tip.x, tip.y, at)
+    // Clamped to the screen, after the filter so the filter still tracks the
+    // true position. Pushing past an edge now pins the cursor to it rather than
+    // losing it, which is what makes a row of tabs along the top edge a target
+    // you can hit by overshooting instead of one you have to land on exactly.
+    const aimed = {
+      x: Math.max(1, Math.min(w - 1, filtered.x)),
+      y: Math.max(1, Math.min(h - 1, filtered.y)),
+    }
     hand.x = aimed.x
     hand.y = aimed.y
 
@@ -973,9 +1023,24 @@ function loop(mine: number) {
     }
     const wasGesture = hand.gesture
     hand.gesture = stableGesture(i, classify(hand.fingers, pinched), now)
-    // A change of pose starts the settling window. Pinch is not counted: it is
-    // the thing being protected, not a transition to recover from.
-    if (hand.gesture !== wasGesture && hand.gesture !== 'pinch' && wasGesture !== 'pinch') {
+    /*
+     * A change of pose starts the settling window, EXCEPT while thumb and
+     * finger are already within pinch range.
+     *
+     * Closing a thumb onto a finger is itself a change of pose: a point reads
+     * as a framing L as the thumb comes out, then as nothing in particular,
+     * and only then as a pinch. Every one of those restarted the 220ms window,
+     * so an ordinary quick pinch kept pushing its own deadline back and never
+     * registered. Only a slow, held pinch got through, which is exactly the
+     * report: pinching did nothing. A pose change inside pinch range is the
+     * pinch forming, not a separate transition to be suspicious of.
+     */
+    if (
+      hand.gesture !== wasGesture &&
+      hand.gesture !== 'pinch' &&
+      wasGesture !== 'pinch' &&
+      gap >= PINCH_OFF
+    ) {
       poseChangedAt.set(i, now)
     }
     hand.handedness = votedSide(i, side)

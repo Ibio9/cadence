@@ -176,6 +176,26 @@ export function Hud() {
     else root.style.removeProperty('--bg')
   }, [ui.background])
 
+  /**
+   * Keep the conversation on its newest line, unless he has scrolled up.
+   *
+   * Following the bottom unconditionally is what makes a chat log unreadable:
+   * every streamed token yanks you back down mid-sentence. So it only follows
+   * while he is already at the bottom, and stops the moment he scrolls up to
+   * read something, resuming when he scrolls back down.
+   */
+  const logRef = useRef<HTMLDivElement>(null)
+  const following = useRef(true)
+  const onLogScroll = () => {
+    const el = logRef.current
+    if (el) following.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+  }
+  const lastText = turns[turns.length - 1]?.text.length ?? 0
+  useEffect(() => {
+    const el = logRef.current
+    if (el && following.current) el.scrollTop = el.scrollHeight
+  }, [turns.length, lastText])
+
   return (
     <div className="hud" style={{ ['--accent' as string]: colour }}>
       {/* First in the tree on purpose. Everything after it is positioned with
@@ -261,11 +281,16 @@ export function Hud() {
         )}
       </AnimatePresence>
 
-      {/* Conversation log — last few turns, fading upward */}
+      {/* The conversation, as a column down the left: the whole of it that the
+          store keeps, scrollable, where it used to be the last four lines
+          fading up the middle of the screen. The middle now belongs to the
+          reactor and the right to whatever JARVIS puts on the display, which
+          is the same split a chat app with artefacts uses. */}
       {ui.chrome.transcript && (
-        <div className="log">
+        <div className="log" ref={logRef} onScroll={onLogScroll}>
+          <div className="log-title">CONVERSATION</div>
           <AnimatePresence initial={false}>
-            {turns.slice(-4).map((t) => (
+            {turns.slice(-40).map((t) => (
               <motion.div
                 key={t.id}
                 className={`log-line log-${t.role}`}

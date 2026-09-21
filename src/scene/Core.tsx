@@ -240,12 +240,15 @@ const RING_R = 0.74
  * out additive highlight have no contrast left to find. At 0.40 it was legible
  * but still the subject of the picture.
  *
- * At 0.17 it stops being a backdrop and becomes an indicator, closer to the
- * small fluid orb Siri uses than to a reactor filling the frame. That is also
+ * At 0.17 it stopped being a backdrop and became an indicator, closer to the
+ * small fluid orb Siri uses than to a reactor filling the frame. 0.11 is
+ * smaller again, at Ibrahim's request, now that the conversation has its own
+ * column on the left and the artefacts the right: the middle is a status
+ * light, not a stage. That is also
  * why the breathing in Scene.tsx matters more now: a small object that does
  * not move reads as an icon, and the movement is what keeps it alive.
  */
-const FIT = 0.17
+const FIT = 0.11
 
 export function Core({ drive }: { drive: Drive }) {
   const mat = useRef<THREE.ShaderMaterial>(null)

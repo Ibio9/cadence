@@ -2665,3 +2665,179 @@ kbd {
   text-transform: none;
   color: color-mix(in srgb, var(--accent) 70%, #fff);
 }
+
+/* -- layout: conversation left, artefacts right -----------------------------
+
+   The same split a chat app with artefacts uses. The conversation is a column
+   down the left, the reactor stays in the middle, and whatever JARVIS puts on
+   the display opens in the space to the right of the conversation and is
+   capped so it can never cover it.
+
+   One width, --chat-w, decides all three. The column is that wide, the blade
+   area starts that far in, and the blade cap is measured against it, so they
+   cannot drift out of step with each other.
+*/
+:root {
+  --chat-w: min(380px, 30vw);
+}
+
+.log {
+  left: 28px;
+  top: 118px;
+  bottom: 108px;
+  transform: none;
+  width: var(--chat-w);
+  gap: 14px;
+  padding: 26px 10px 8px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  /* The HUD layer is click-through; this column has to scroll. */
+  pointer-events: auto;
+  /* Older lines fade out under the top edge rather than being cut by it. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 34px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 34px);
+}
+
+.log-title {
+  font-size: 8px;
+  letter-spacing: 0.34em;
+  opacity: 0.4;
+  text-transform: uppercase;
+}
+
+.log-line {
+  gap: 10px;
+  font-size: 13.5px;
+}
+
+.log-who {
+  flex: 0 0 46px;
+}
+
+/* SYSTEMS moves right to make room, above SIGNAL, which drops lower. */
+.rail-left {
+  left: auto;
+  right: 92px;
+  top: 118px;
+  transform: none;
+  align-items: flex-end;
+}
+
+.rail-right {
+  top: auto;
+  bottom: 120px;
+  transform: none;
+}
+
+/* Artefacts centre in the space to the right of the conversation.
+
+   The container's EDGES move, not its padding, and the difference is the whole
+   of this rule. The blades are absolutely positioned inside a grid, and an
+   absolute child of a grid is laid out against the container's padding box,
+   so padding here is simply ignored: the first version padded the left and
+   the blades stayed dead centre on the screen, 150px over the conversation.
+   Moving the edges moves the box they are centred in. */
+.blades-stack {
+  inset: 96px 32px 96px calc(var(--chat-w) + 56px);
+}
+
+/* Capped rather than resized: a blade the model asked to be wide still gets
+   as wide as it can, it just stops short of the conversation. Inline sizes
+   from dragging a corner are capped too, since max-width wins over width. */
+.blades-stack:not(.blades-stack-full) .bl {
+  max-width: calc(100vw - var(--chat-w) - 104px);
+  max-height: calc(100vh - 200px);
+}
+
+/* Full screen means full screen: the conversation steps aside. */
+.blades-stack-full {
+  inset: 0;
+}
+
+/* A phone has no room for a column beside the artefacts, so there the
+   conversation goes back to a strip along the bottom and artefacts take the
+   width. The rails are the first thing to give way. */
+@media (max-width: 760px) {
+  .log {
+    left: 16px;
+    right: 16px;
+    top: auto;
+    bottom: 104px;
+    width: auto;
+    max-height: 30vh;
+  }
+  .rail-left,
+  .rail-right {
+    display: none;
+  }
+  .blades-stack {
+    inset: 64px 12px 200px 12px;
+  }
+  .blades-stack:not(.blades-stack-full) .bl {
+    max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 280px);
+  }
+}
+
+/* -- the left column holds all the text -------------------------------------
+
+   Conversation at the top, what he is saying right now under it, and the box
+   to type into at the foot, the way a chat app stacks them. Everything that
+   is words lives on the left; the middle is the reactor, the right is
+   artefacts.
+
+   Stacked from the bottom up: type box, then the live caption, then the log,
+   with the log's bottom edge raised to clear both.
+*/
+.log {
+  bottom: 142px;
+}
+
+.caption {
+  left: 28px;
+  right: auto;
+  bottom: 96px;
+  transform: none;
+  width: var(--chat-w);
+  max-width: none;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.45;
+  /* Two lines at most: a long utterance shows its end, which is the part
+     being spoken, rather than pushing up into the conversation. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.typebar {
+  left: 28px;
+  bottom: 48px;
+  transform: none;
+  width: var(--chat-w);
+}
+
+/* Left-aligned always, now that it sits under a left-aligned column. */
+.typebar-field,
+.typebar:focus-within .typebar-field {
+  text-align: left;
+}
+
+@media (max-width: 760px) {
+  .log {
+    bottom: 132px;
+  }
+  .caption {
+    left: 16px;
+    right: 16px;
+    width: auto;
+    bottom: 92px;
+  }
+  .typebar {
+    left: 16px;
+    right: 16px;
+    width: auto;
+  }
+}
