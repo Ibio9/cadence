@@ -3168,11 +3168,13 @@ kbd { font-size: 10px; }
    sections above only laid out.
 */
 :root {
-  /* Mostly solid. The blur behind a panel only works where nothing above it
-     animates a filter, and blades sit inside one that does, so at half
-     opacity the conversation behind showed straight through their text. The
-     sheen and edge carry the glass; the fill keeps the words readable. */
-  --glass-fill: rgba(10, 17, 24, 0.88);
+  /* Solid, in effect. The blur behind a panel only works where nothing above
+     it animates a filter, and blades sit inside one that does; at half
+     opacity the conversation behind showed straight through their text, and
+     even at 88% bright, glowing lines behind still read as a second layer of
+     text tangled into the first. The glass is carried by the edge, the light
+     along the top and the rounded corners; the fill's job is to be a page. */
+  --glass-fill: rgba(9, 15, 21, 0.97);
   --glass-edge: rgba(255, 255, 255, 0.13);
   --glass-shine: rgba(255, 255, 255, 0.22);
   --glass-blur: blur(26px) saturate(170%);
