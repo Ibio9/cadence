@@ -2654,3 +2654,14 @@ kbd {
   letter-spacing: 0.04em;
   color: #ff8a8a;
 }
+
+/* The line under the title on the sign-in screen. */
+.gate-note {
+  margin: 0;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: color-mix(in srgb, var(--accent) 70%, #fff);
+}

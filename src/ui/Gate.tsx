@@ -1,88 +1,79 @@
-import { useEffect, useRef, useState } from 'react'
-import { login } from '../lib/auth'
+import { useEffect, useState } from 'react'
+import { STORAGE_KEY, adoptStored, linkError, requestLink } from '../lib/auth'
 
 /**
- * The passphrase, asked once, before a hosted bridge will talk.
+ * Signing in to a hosted bridge: one button, nothing to type.
  *
- * Shown in place of INITIALISE, and only when the bridge has said it needs a
- * login; against a bridge on the owner's own PC it never appears. After one
- * success the session lasts thirty days, so this is a screen seen roughly once
- * a month per browser, not once a visit.
+ * Pressing it has the bridge email a single-use link to the owner's own
+ * inbox. Opening that link signs the device in for a year. Shown in place of
+ * INITIALISE, and only when the bridge has said it needs a sign-in; against a
+ * bridge on the owner's own PC it never appears.
+ *
+ * The link usually opens in a new tab. That tab signs in by itself; this one
+ * hears about it through the storage event and moves on, so there is nothing
+ * to reload.
  *
  * A plain conditional in App, never AnimatePresence. This is a full-screen
- * fixed element that has to take pointer events for its input, which is
- * exactly the shape that has already stranded itself over the interface twice
- * in this codebase (see Ignition.tsx and Boot.tsx) and silently swallowed
- * every click and pinch.
+ * fixed element that takes pointer events, which is exactly the shape that
+ * has already stranded itself over the interface twice in this codebase (see
+ * Ignition.tsx and Boot.tsx) and silently swallowed every click and pinch.
  */
 export function Gate({ onDone }: { onDone: () => void }) {
-  const [pass, pass_] = useState('')
-  const [error, error_] = useState<string | null>(null)
-  const [busy, busy_] = useState(false)
-  const box = useRef<HTMLInputElement>(null)
+  const [state, state_] = useState<'idle' | 'sending' | 'sent'>('idle')
+  const [error, error_] = useState<string | null>(linkError())
 
-  useEffect(() => box.current?.focus(), [])
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY && adoptStored()) onDone()
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [onDone])
 
-  const submit = async () => {
-    if (!pass || busy) return
-    busy_(true)
+  const send = async () => {
+    if (state === 'sending') return
+    state_('sending')
     error_(null)
-    const err = await login(pass)
-    busy_(false)
+    const err = await requestLink()
     if (err) {
       error_(err)
-      pass_('')
-      box.current?.focus()
+      state_('idle')
       return
     }
-    onDone()
+    state_('sent')
   }
 
   return (
     <div className="gate">
-      <form
-        className="gate-card"
-        onSubmit={(e) => {
-          e.preventDefault()
-          void submit()
-        }}
-      >
+      <div className="gate-card">
         <span className="pk pk-tl" />
         <span className="pk pk-tr" />
         <span className="pk pk-bl" />
         <span className="pk pk-br" />
 
         <div className="gate-title">J.A.R.V.I.S.</div>
-        <div className="gate-sub">passphrase</div>
 
-        <input
-          ref={box}
-          className="gate-field"
-          type="password"
-          value={pass}
-          onChange={(e) => pass_(e.target.value)}
-          // Enter is handled explicitly: implicit form submission was seen not
-          // to fire elsewhere in this interface, and a login box that ignores
-          // Enter feels broken.
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              void submit()
-            }
-          }}
-          autoComplete="current-password"
-          aria-label="Passphrase"
-          disabled={busy}
-        />
+        {state === 'sent' ? (
+          <p className="gate-note">
+            Sent. Open the email on this device and tap the link. It works once and lasts fifteen
+            minutes.
+          </p>
+        ) : (
+          <p className="gate-note">Sign in with a link sent to your Gmail. Nothing to type.</p>
+        )}
 
-        <button className="gate-go" type="submit" disabled={!pass || busy}>
-          {busy ? 'CHECKING' : 'UNLOCK'}
+        <button className="gate-go" onClick={() => void send()} disabled={state === 'sending'}>
+          {state === 'sending'
+            ? 'SENDING'
+            : state === 'sent'
+              ? 'SEND ANOTHER'
+              : 'EMAIL ME A SIGN-IN LINK'}
         </button>
 
         <div className="gate-error" role="alert">
           {error ?? ''}
         </div>
-      </form>
+      </div>
     </div>
   )
 }

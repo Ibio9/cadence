@@ -1,6 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod'
 import { ImapFlow } from 'imapflow'
+import nodemailer from 'nodemailer'
 import process from 'node:process'
 
 /**
@@ -28,6 +29,46 @@ const ADDRESS = (process.env.JARVIS_GMAIL_ADDRESS ?? '').trim()
 const APP_PASSWORD = (process.env.JARVIS_GMAIL_APP_PASSWORD ?? '').replace(/\s+/g, '')
 
 export const MAIL_CONFIGURED = Boolean(ADDRESS && APP_PASSWORD)
+
+/**
+ * The one email this bridge will ever send: a sign-in link, to its owner.
+ *
+ * Deliberately not a tool. The model cannot call it, cannot choose the
+ * recipient, and cannot change a word of it. The address is fixed by the
+ * owner's own configuration, so pressing "email me a sign-in link" from
+ * anywhere in the world only ever puts a link in his inbox, which is exactly
+ * why the button can be public.
+ *
+ * Sent through Gmail's own SMTP with the same app password, so it arrives from
+ * him, to him. Gmail may not notify for mail you send yourself; the message is
+ * still at the top of the inbox.
+ */
+export async function sendSignInLink(link) {
+  const transport = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: { user: ADDRESS, pass: APP_PASSWORD },
+    connectionTimeout: 20_000,
+    socketTimeout: 20_000,
+  })
+  const when = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  await transport.sendMail({
+    from: `J.A.R.V.I.S. <${ADDRESS}>`,
+    to: ADDRESS,
+    subject: `Sign in to JARVIS (${when})`,
+    text:
+      `Open this on the device you want to sign in:\n\n${link}\n\n` +
+      `It works once and expires in fifteen minutes. If you did not ask for it, ignore it: ` +
+      `nobody can use it but you, and it cannot be used from anyone else's inbox.`,
+    html:
+      `<p>Open this on the device you want to sign in.</p>` +
+      `<p><a href="${link}" style="display:inline-block;padding:12px 20px;background:#0b2a33;color:#9ff0ff;` +
+      `text-decoration:none;letter-spacing:.2em;font-family:sans-serif">SIGN IN TO JARVIS</a></p>` +
+      `<p style="color:#666;font-size:13px">It works once and expires in fifteen minutes. ` +
+      `If you did not ask for it, ignore it: nobody can use it but you.</p>`,
+  })
+}
 
 /** Under the interface's 120s silence timeout, with room for the model to answer. */
 const TIMEOUT_MS = 45_000

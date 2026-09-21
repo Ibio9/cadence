@@ -23,19 +23,21 @@ import { chromeAvailable, chromeServer } from './chrome.mjs'
 import { visionServer } from './vision.mjs'
 import { personalContext } from './personal.mjs'
 import { tasksServer } from './tasks.mjs'
-import { MAIL_CONFIGURED, mailServer } from './mail.mjs'
+import { MAIL_CONFIGURED, mailServer, sendSignInLink } from './mail.mjs'
 import {
   HOSTED,
   MEDIA_TTL,
   SESSION_TTL,
   addressOf,
-  allowAttempt,
+  allowLinkRequest,
+  allowRedeem,
   assertLocked,
   bearerOf,
   mediaAllowed,
-  passphraseMatches,
   protocolTokenOf,
+  redeemLink,
   sign,
+  signLink,
   verify,
 } from './auth.mjs'
 import { homedir, tmpdir } from 'node:os'
@@ -45,7 +47,7 @@ import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
 import { openRemote, proxyError, vetTarget, PROXY_UA } from './net.mjs'
 import { probeUrl, renderPage } from './page.mjs'
 
-// Before anything else: a hosted bridge with no passphrase does not start.
+// Before anything else: a hosted bridge that cannot lock itself does not start.
 assertLocked()
 
 /**
@@ -763,32 +765,72 @@ const jsonNoStore = (cors) => ({
 })
 
 /**
- * POST /auth — trade the passphrase for tokens.
+ * Where an emailed link sends him back to.
  *
- * The rate limit is checked before the body is even read, so a flood of
- * guesses costs this process as little as possible. Both failure messages are
- * the same length of useful information: a wrong passphrase says only that it
- * was wrong, never how close it came.
+ * The page that asked, if it is one of the deployed origins; otherwise the
+ * main site. Never an arbitrary Origin: that would let anyone press the
+ * button from their own page and have the owner's inbox receive a link
+ * pointing at it.
  */
-async function handleLogin(req, res, cors) {
-  if (!allowAttempt(addressOf(req))) {
-    res.writeHead(429, jsonNoStore(cors))
-    return res.end(JSON.stringify({ error: 'Too many attempts. Wait ten minutes and try again.' }))
-  }
+const SITE_URL = (process.env.JARVIS_SITE_URL ?? 'https://www.mycadenceos.com').replace(/\/+$/, '')
+const linkHome = (origin) => (origin && DEPLOYED_ORIGINS.has(origin.replace(/\/+$/, '')) ? origin.replace(/\/+$/, '') : SITE_URL)
+
+async function readJson(req, limit = 4096) {
   let body = ''
   for await (const chunk of req) {
     body += chunk
-    if (body.length > 4096) break
+    if (body.length > limit) break
   }
-  let given = ''
   try {
-    given = String(JSON.parse(body).passphrase ?? '')
+    return JSON.parse(body)
   } catch {
-    /* treated as an empty passphrase, which fails below */
+    return {}
   }
-  if (!passphraseMatches(given)) {
+}
+
+/**
+ * POST /auth/email — send the owner a sign-in link.
+ *
+ * Public on purpose: the link can only ever go to his own inbox, so pressing
+ * this from anywhere achieves nothing but an email he can ignore. Scarce on
+ * purpose too, so that nobody can use it to fill that inbox. The answer is the
+ * same whether or not it was sent, apart from the rate limit, so it tells a
+ * stranger nothing.
+ */
+async function handleSendLink(req, res, cors) {
+  if (!allowLinkRequest(addressOf(req))) {
+    res.writeHead(429, jsonNoStore(cors))
+    return res.end(JSON.stringify({ error: 'Too many sign-in emails. Wait an hour and try again.' }))
+  }
+  const link = `${linkHome(req.headers.origin)}/#login=${signLink()}`
+  try {
+    await sendSignInLink(link)
+  } catch (err) {
+    console.error('[jarvis] could not send the sign-in email:', err?.message ?? err)
+    res.writeHead(502, jsonNoStore(cors))
+    return res.end(JSON.stringify({ error: 'The sign-in email could not be sent. Check the Gmail app password.' }))
+  }
+  res.writeHead(200, jsonNoStore(cors))
+  return res.end(JSON.stringify({ ok: true }))
+}
+
+/**
+ * POST /auth/magic — trade a sign-in link for tokens.
+ *
+ * Each link works once. The same message for every failure, so a stranger
+ * probing this learns nothing about why.
+ */
+async function handleRedeem(req, res, cors) {
+  if (!allowRedeem(addressOf(req))) {
+    res.writeHead(429, jsonNoStore(cors))
+    return res.end(JSON.stringify({ error: 'Too many attempts. Wait ten minutes.' }))
+  }
+  const { token } = await readJson(req)
+  if (!redeemLink(String(token ?? ''))) {
     res.writeHead(401, jsonNoStore(cors))
-    return res.end(JSON.stringify({ error: 'That passphrase is not right.' }))
+    return res.end(
+      JSON.stringify({ error: 'That link has expired or was already used. Send yourself a new one.' }),
+    )
   }
   res.writeHead(200, jsonNoStore(cors))
   return res.end(
@@ -842,10 +884,10 @@ const handleRequest = async (req, res) => {
   /*
    * The hosted gate.
    *
-   * Everything past this point needs a caller who has proved they hold the
-   * passphrase, apart from the things that must be reachable BEFORE they can:
-   * the health probe the interface uses to discover it has to log in at all,
-   * and the login itself. CORS preflight is answered above and carries no data.
+   * Everything past this point needs a signed-in caller, apart from the things
+   * that must be reachable BEFORE they can be: the health probe the interface
+   * uses to discover it has to sign in at all, and the sign-in steps
+   * themselves. CORS preflight is answered above and carries no data.
    *
    * /file is closed outright rather than gated. It serves the machine's own
    * disk, which on a server means its environment — and that is where the
@@ -853,7 +895,8 @@ const handleRequest = async (req, res) => {
    */
   if (HOSTED) {
     const path = (req.url ?? '/').split('?')[0]
-    if (req.method === 'POST' && path === '/auth') return handleLogin(req, res, cors)
+    if (req.method === 'POST' && path === '/auth/email') return handleSendLink(req, res, cors)
+    if (req.method === 'POST' && path === '/auth/magic') return handleRedeem(req, res, cors)
     if (req.method === 'GET' && path === '/auth/check') return handleCheck(req, res, cors)
     if (path === '/file') {
       res.writeHead(404, cors)
@@ -1207,7 +1250,7 @@ const wss = new WebSocketServer({
 server.listen(PORT, () => {
   console.log(
     `[jarvis] bridge listening on :${PORT}` +
-      (HOSTED ? ' (hosted: passphrase required, writes and file access off)' : ''),
+      (HOSTED ? ' (hosted: sign-in by emailed link, writes and file access off)' : ''),
   )
   if (HOSTED) {
     console.log(

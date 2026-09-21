@@ -5,8 +5,9 @@ import { BRIDGE_HTTP_URL } from '../config'
  *
  * A bridge on the owner's PC needs nothing from here: it reports that it is
  * open and every helper below becomes a no-op. A hosted one reports that it
- * wants a passphrase, which is traded once for two tokens (see bridge/auth.mjs
- * for why there are two and where each is allowed to travel).
+ * wants a sign-in, which is an emailed link rather than anything typed: the
+ * link lands back here as #login=..., and is traded once for two tokens (see
+ * bridge/auth.mjs for why there are two and where each may travel).
  *
  * Whether a login is needed is asked of the bridge rather than configured,
  * so the same build works against either kind without a flag to forget.
@@ -103,6 +104,9 @@ export async function probe(): Promise<'open' | 'ready' | 'login'> {
   }
   probed = true
   if (!required) return 'open'
+  // Arriving from a sign-in email beats anything stored: it is the newest
+  // statement of intent, and a stored session may be the one being replaced.
+  if ((await redeemFromUrl()) === 'ok') return 'ready'
   if (tokens && (await refresh())) {
     keepFresh()
     return 'ready'
@@ -110,23 +114,68 @@ export async function probe(): Promise<'open' | 'ready' | 'login'> {
   return 'login'
 }
 
-/** Returns null on success, or a sentence to show him. */
-export async function login(passphrase: string): Promise<string | null> {
+/** Why the last sign-in link failed, for the sign-in screen to show. */
+let linkProblem: string | null = null
+export const linkError = () => linkProblem
+
+/**
+ * Spend a sign-in link that arrived in the address bar as #login=<token>.
+ *
+ * The token is scrubbed from the address bar and the history FIRST, before
+ * the bridge is even asked, so that a failure below still leaves nothing
+ * sitting in the URL to be copied, bookmarked or synced to another device.
+ */
+async function redeemFromUrl(): Promise<'ok' | 'bad' | 'none'> {
+  const m = location.hash.match(/(?:^#|&)login=([^&]+)/)
+  if (!m) return 'none'
+  history.replaceState(null, '', location.pathname + location.search)
   try {
-    const r = await fetch(`${BRIDGE_HTTP_URL}/auth`, {
+    const r = await fetch(`${BRIDGE_HTTP_URL}/auth/magic`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ passphrase }),
+      body: JSON.stringify({ token: decodeURIComponent(m[1]) }),
     })
     const j = await r.json().catch(() => ({}))
-    if (!r.ok) return String(j.error ?? 'Could not log in.')
+    if (!r.ok) {
+      linkProblem = String(j.error ?? 'That link did not work. Send yourself a new one.')
+      return 'bad'
+    }
     save({ session: String(j.session), media: String(j.media) })
     keepFresh()
-    return null
+    return 'ok'
+  } catch {
+    linkProblem = 'The bridge could not be reached.'
+    return 'bad'
+  }
+}
+
+/** Ask the bridge to email a sign-in link. Null on success, or a sentence to show. */
+export async function requestLink(): Promise<string | null> {
+  try {
+    // No body and no custom headers: a simple request, so no preflight.
+    const r = await fetch(`${BRIDGE_HTTP_URL}/auth/email`, { method: 'POST' })
+    if (r.ok) return null
+    const j = await r.json().catch(() => ({}))
+    return String(j.error ?? 'The email could not be sent.')
   } catch {
     return 'The bridge could not be reached.'
   }
 }
+
+/**
+ * Pick up a session another tab just stored.
+ *
+ * The link in the email usually opens in a new tab, which signs in and saves
+ * the tokens. The tab still showing the sign-in screen hears about it through
+ * the storage event and calls this, so he does not have to reload it.
+ */
+export function adoptStored(): boolean {
+  tokens = load()
+  if (tokens) keepFresh()
+  return tokens !== null
+}
+
+export const STORAGE_KEY = KEY
 
 export function logout() {
   window.clearInterval(refresher)
