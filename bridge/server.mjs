@@ -1597,6 +1597,18 @@ wss.on('connection', (socket) => {
 
   // Pump the session's output stream to the browser for as long as it lives.
   ;(async () => {
+    /*
+     * Text from separate content blocks has to be joined with a space.
+     *
+     * Each block is a complete stretch of prose, but the one before a tool
+     * call and the one after it arrive back to back with nothing between them,
+     * so the display read "tasks.Fifteen unread". A block that starts where the
+     * last one ended without whitespace gets a single space.
+     */
+    let spoke = false
+    let endsInSpace = true
+    let freshBlock = false
+
     try {
       for await (const msg of session) {
         if (process.env.JARVIS_DEBUG === '1') {
@@ -1611,12 +1623,20 @@ wss.on('connection', (socket) => {
           // JARVIS goes completely mute.
           case 'stream_event': {
             const ev = msg.event
+            if (ev?.type === 'content_block_start' && ev.content_block?.type === 'text') {
+              freshBlock = true
+            }
             if (
               ev?.type === 'content_block_delta' &&
               ev.delta?.type === 'text_delta' &&
               ev.delta.text
             ) {
-              sendTurn({ type: 'text', delta: ev.delta.text })
+              let text = ev.delta.text
+              if (freshBlock && spoke && !endsInSpace && !/^\s/.test(text)) text = ` ${text}`
+              freshBlock = false
+              spoke = true
+              endsInSpace = /\s$/.test(text)
+              sendTurn({ type: 'text', delta: text })
             }
             if (
               ev?.type === 'content_block_start' &&
@@ -1653,6 +1673,11 @@ wss.on('connection', (socket) => {
           }
 
           case 'result':
+            // The session outlives the turn, so the join resets with it; a
+            // new answer never opens with a space.
+            spoke = false
+            endsInSpace = true
+            freshBlock = false
             // A result is not automatically a success. The error subtypes
             // carry no `result` field at all, so reporting them as 'done' with
             // empty text is indistinguishable from a turn that simply had
