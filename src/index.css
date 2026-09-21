@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;600&family=JetBrains+Mono:wght@300;400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;600&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
   /* The interface cyan. `--accent` is re-declared per phase and per panel;
@@ -2859,3 +2859,149 @@ kbd {
   color: #fff !important;
   transition: outline-color 90ms ease, box-shadow 90ms ease;
 }
+
+/* ---------------------------------------------------------------- legibility
+
+   Everything above was styled as atmosphere first: eight-pixel labels, text
+   at forty per cent opacity, tracking wide enough to space letters into dots,
+   and a squared display face used for paragraphs. It looked right and was hard
+   to read, which for something you glance at while it talks is the wrong way
+   round. This section sets floors and wins over the rules above on purpose:
+
+     - reading text is IBM Plex Sans, 13.5px and up, near-white rather than
+       tinted accent;
+     - no label under 10px, nothing meant to be read under ~70% strength;
+     - tracking under 0.2em except on the few titles that are decoration;
+     - Chakra Petch only for the brand and titles, where it is character.
+
+   Done and disabled things stay dimmer than live ones, just not invisible.
+*/
+:root {
+  --ink: #eef8fc;
+  --ink-2: #c2d6de;
+  --read: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --display: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--read);
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.brand-mark, .tool-name, .tab, .bl-title, .history-title, .gate-title,
+.boot-word, .ignition-word, .boot-bar-title {
+  font-family: var(--display);
+}
+.tool-name, .tab, .bl-title, .history-title, .gate-title { font-weight: 600; }
+
+/* The HUD's base: everything uppercase inherits this size and spacing. */
+.hud { font-size: 12px; letter-spacing: 0.12em; }
+.status { font-size: 11px; }
+.rail { font-size: 11.5px; }
+.brand-sub { font-size: 10px; opacity: 0.72; letter-spacing: 0.18em; }
+kbd { font-size: 10px; }
+.error { font-size: 12px; }
+
+/* Small uppercase labels. Lifted towards white as well as made larger: the
+   accent is a dark teal at rest, and dark teal at ten pixels is a smudge. */
+.rail-title, .log-title, .log-who, .tool-kicker, .p-title, .suggest-lead {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  opacity: 0.85;
+  color: color-mix(in srgb, var(--accent) 65%, #fff);
+}
+.hud-idx, .hud-tag, .hud-unit, .hud-caption, .bl-kind, .bl-hint, .hud-bottom, .brand-sub {
+  color: color-mix(in srgb, var(--accent) 70%, #fff);
+}
+.hud-bottom { font-size: 10.5px; opacity: 0.72; letter-spacing: 0.14em; }
+.ignition-sub { font-size: 10.5px; opacity: 0.72; }
+.boot-log { font-size: 11px; opacity: 0.82; }
+.boot-tag { font-size: 10.5px; opacity: 0.78; }
+
+/* The conversation. */
+.log-line { font-size: 15px; line-height: 1.6; }
+.log-jarvis .log-text {
+  color: var(--ink);
+  /* A glow behind body text blurs its edges; kept faint. */
+  text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+/* Your own words stay a step behind JARVIS's, by colour rather than by
+   fading them to half strength. */
+.log-user .log-text { color: color-mix(in srgb, var(--accent) 40%, var(--ink-2)); opacity: 0.9; }
+.caption { font-size: 15px; color: var(--ink); opacity: 1; }
+
+/* Panels and blades: the markup JARVIS writes. */
+.hud-idx { font-size: 10.5px; opacity: 0.72; }
+.hud-label { font-size: 14px; font-weight: 500; color: var(--ink); }
+.hud-sub { font-size: 12.5px; color: var(--ink-2); opacity: 1; line-height: 1.45; }
+.hud-tag { font-size: 10px; opacity: 0.8; letter-spacing: 0.12em; }
+.hud-caption { font-size: 11.5px; opacity: 0.78; }
+.hud-unit { font-size: 10.5px; opacity: 0.75; }
+.hud-note { font-size: 13.5px; color: var(--ink-2); opacity: 1; line-height: 1.6; }
+.p-empty { font-size: 11.5px; opacity: 0.65; }
+.suggest-text { font-size: 14px; opacity: 0.78; }
+/* A blade has room, so a secondary line wraps instead of being cut off. */
+.bl-markup .hud-sub { white-space: normal; }
+.bl-markup .hud-rows { gap: 12px; }
+/* Still a step down from normal text, but a readable one, and restated here
+   because the floors above come later than it. */
+.hud-dim { opacity: 0.66; }
+.hud-hot { color: color-mix(in srgb, var(--accent) 88%, #fff); }
+.hud-tag.hud-hot { opacity: 1; }
+
+.bl-title { font-size: 11.5px; letter-spacing: 0.16em; color: color-mix(in srgb, var(--accent) 70%, #fff); }
+.bl-kind { font-size: 10px; opacity: 0.7; }
+.bl-note { font-size: 13.5px; opacity: 0.88; }
+.bl-hint { font-size: 10px; opacity: 0.72; }
+
+/* Hand guide. */
+.hands-live { font-size: 10px; }
+.gguide-head { font-size: 10px; opacity: 0.82; }
+.gguide-name { font-size: 10px; }
+.gguide-does { font-size: 12px; opacity: 0.9; }
+.gguide-foot { font-size: 10px; opacity: 0.72; }
+
+/* History. */
+.history-title { font-size: 11px; }
+.history-kind { font-size: 10px; color: color-mix(in srgb, var(--accent) 78%, transparent); }
+.history-name { font-size: 13.5px; color: var(--ink); }
+.history-when { font-size: 10px; color: color-mix(in srgb, var(--accent) 70%, transparent); }
+.history-empty, .history-foot { font-size: 11px; color: color-mix(in srgb, var(--accent) 72%, transparent); }
+
+/* Tabs, timetable, to-do. */
+.tab { font-size: 11.5px; letter-spacing: 0.16em; color: color-mix(in srgb, var(--accent) 82%, #fff); }
+/* Restated: the rule above has the same specificity and comes later. */
+.tab-on { color: #fff; }
+.tt-label { font-size: 12px; }
+.tt-school { font-size: 10.5px; color: color-mix(in srgb, var(--accent) 75%, transparent); }
+.tt-slot { font-size: 14px; color: var(--ink); }
+.tt-fixed { font-size: 12px; color: color-mix(in srgb, var(--accent) 78%, transparent); }
+.tt-done { color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.tt-empty { font-size: 12.5px; color: color-mix(in srgb, var(--accent) 70%, transparent); }
+.todo-field { font-size: 14px; color: var(--ink); }
+.todo-field::placeholder {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: color-mix(in srgb, var(--accent) 58%, transparent);
+}
+.todo-text { font-size: 14.5px; color: var(--ink); }
+.todo-is-done .todo-text { color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.todo-due { font-size: 10.5px; color: color-mix(in srgb, var(--accent) 75%, transparent); }
+.todo-row:hover .todo-x { color: color-mix(in srgb, var(--accent) 72%, transparent); }
+.todo-plus:disabled { color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.tab-action { font-size: 10.5px; }
+.tab-action-dim { color: color-mix(in srgb, var(--accent) 72%, transparent); }
+
+/* Typing. */
+.typebar-field { font-size: 14.5px; color: var(--ink); letter-spacing: 0.02em; }
+.typebar-field::placeholder {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: color-mix(in srgb, var(--accent) 58%, transparent);
+}
+
+/* The lock screen. */
+.gate-sub { font-size: 10.5px; color: color-mix(in srgb, var(--accent) 72%, transparent); }
+.gate-go { font-size: 11px; }
+.gate-note { font-size: 13.5px; color: color-mix(in srgb, var(--accent) 88%, #fff); }
