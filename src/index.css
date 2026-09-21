@@ -3550,3 +3550,30 @@ kbd { font-size: 10px; }
   .dev-name { font-size: 11.5px; }
   .hist-filters { margin-left: 0; }
 }
+
+/* The hand-signal list opens with I now, so it takes clicks: its close button
+   has to be pressable by mouse or pinch. Centred above the hint bar rather
+   than in the corner, where the conversation and the typebar now live;
+   centred by margins, because framer owns this element's transform. */
+.gguide {
+  pointer-events: auto;
+  left: 0;
+  right: 0;
+  bottom: 64px;
+  margin-inline: auto;
+  width: min(460px, calc(100vw - 32px));
+  z-index: 97;
+}
+.gguide-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.gguide-close {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
+  color: var(--ink);
+  font-family: inherit;
+  cursor: pointer;
+}
+.gguide-close:hover { border-color: rgba(255, 255, 255, 0.3); color: #fff; }

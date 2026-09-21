@@ -348,7 +348,7 @@ export function Hud() {
             </>
           )}
           {' · '}
-          <kbd>G</kbd> hands
+          <kbd>G</kbd> hands · <kbd>I</kbd> signals
           {voice && (
             <>
               {' · '}
@@ -371,7 +371,7 @@ export function Hud() {
           {looking ? `LOOKING — ${looking.toUpperCase()}` : 'CAMERA ON · G TO STOP'}
         </div>
       )}
-      <GestureGuide live={gestures} />
+      <GestureGuide />
     </div>
   )
 }

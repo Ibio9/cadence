@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { diag } from '../lib/hands'
+import { useStore } from '../store'
 
 /**
  * What your hands can do.
@@ -10,10 +9,10 @@ import { diag } from '../lib/hands'
  * suggestions strip solves that for speech, and this is its equivalent for
  * hands — shown when the camera comes on, when you would actually be wondering.
  *
- * It fades once you have used it. A legend that stays up forever is clutter,
- * and the moment you have successfully pinched something you no longer need to
- * be told how; but it comes back whenever the camera is turned on again,
- * because that is when you have forgotten.
+ * It used to appear whenever the camera came on and fade after the first
+ * pinch. Now it is his to call up: I opens it and closes it (Escape or the
+ * button closes it too), and G only turns the camera on. A legend that
+ * arrives uninvited sits on top of whatever he was about to look at.
  */
 
 const MOVES: { gesture: string; hand: string; does: string }[] = [
@@ -29,34 +28,9 @@ const MOVES: { gesture: string; hand: string; does: string }[] = [
   { gesture: '4', hand: '✋', does: 'left · four fingers · history' },
 ]
 
-/** How long the legend stays after the first successful press. */
-const DISMISS_MS = 1400
-
-export function GestureGuide({ live }: { live: boolean }) {
-  const [show, show_] = useState(false)
-  const used = useRef(false)
-  const poll = useRef(0)
-
-  useEffect(() => {
-    if (!live) {
-      show_(false)
-      used.current = false
-      return
-    }
-    show_(true)
-
-    // Polled rather than subscribed: the tracker publishes a plain mutable
-    // object on purpose, so that the loop's timing is not at the mercy of
-    // React. Four times a second is plenty to notice a first pinch.
-    poll.current = window.setInterval(() => {
-      if (used.current) return
-      if (diag.gesture.includes('pinch')) {
-        used.current = true
-        window.setTimeout(() => show_(false), DISMISS_MS)
-      }
-    }, 250)
-    return () => window.clearInterval(poll.current)
-  }, [live])
+export function GestureGuide() {
+  const show = useStore((s) => s.guideOpen)
+  const close = useStore((s) => s.toggleGuide)
 
   return (
     <AnimatePresence>
@@ -77,7 +51,10 @@ export function GestureGuide({ live }: { live: boolean }) {
             </div>
           ))}
           <div className="gguide-foot">
-            pinch a blade anywhere to move it · <kbd>G</kbd> to stop
+            <kbd>I</kbd> closes this · <kbd>G</kbd> turns the camera on or off
+            <button className="gguide-close" onClick={() => close(false)} aria-label="Close">
+              ✕
+            </button>
           </div>
         </motion.div>
       )}

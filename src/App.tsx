@@ -777,9 +777,22 @@ export default function App() {
         return
       }
 
-      // G puts the camera on and starts tracking hands. Off by default and
-      // never implicit: a webcam that turns itself on because an interface
-      // thought it might be useful is not a trade anyone agreed to.
+      // I opens and closes the list of hand signals. Its own key, so turning
+      // the camera on with G no longer puts a legend over everything.
+      if ((e.key === 'i' || e.key === 'I') && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault()
+        store.getState().toggleGuide()
+        return
+      }
+      if (e.key === 'Escape' && store.getState().guideOpen) {
+        store.getState().toggleGuide(false)
+        return
+      }
+
+      // G puts the camera on and starts tracking hands, and does only that.
+      // Off by default and never implicit: a webcam that turns itself on
+      // because an interface thought it might be useful is not a trade anyone
+      // agreed to.
       if (e.key === 'g' && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault()
         const on = store.getState().gestures
