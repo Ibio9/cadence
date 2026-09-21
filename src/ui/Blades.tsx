@@ -6,7 +6,7 @@ import { withMedia } from '../lib/auth'
 import { sanitisePanelHtml } from './sanitise'
 import { frameSpan, peaceScroll, pointScroll, throwOf } from '../lib/hands'
 import { isConnected } from '../lib/bridge'
-import { nearestTo, targetFor, thisDevice, throwBlade, way } from '../lib/sync'
+import { nearestTo, targetFor, throwBlade, way } from '../lib/sync'
 import * as camera from '../lib/camera'
 
 /**
@@ -244,30 +244,40 @@ const Body = memo(function Body({ blade }: { blade: Blade }) {
 /**
  * Throwing a blade to another device.
  *
- * By hand, a throw is a pinch snapped open. Pinch the blade, carry it towards
- * the device you mean (the edge of the screen facing it lights up and names
- * it), then flick your fingers open fast. Letting go normally, fingers
- * drifting apart, puts it down as it always has. The snap is measured by the
- * tracker as the gap between thumb and finger jumps wide (throwOf in
- * hands.ts). Where it goes: the way the blade was carried, or failing that
- * the way the hand was moving, or, with only one other device open, there.
+ * Two ways by hand, both reliable at webcam frame rates:
  *
- * With a mouse or a finger, a throw is a flick: let go while moving fast.
- * Nothing is thrown unless another device is open.
+ *   - Flick it: make the OK sign on a blade (thumb and index pinched, the
+ *     other three fingers up), then flick the index out. It goes the way the
+ *     index points once it is out; the tracker reads that pose (throwOf in
+ *     hands.ts), which a camera sees sharply where it would blur a fast swing.
+ *   - Carry it: carry the blade towards a device until that device's edge
+ *     lights up, and let go.
+ *
+ * An ordinary pinch, fingers curled, is never a throw, so dragging blades
+ * about behaves as it always has. With a mouse or a finger on glass, a flick
+ * throws. Nothing is thrown unless another device is open.
  */
 
 /** A mouse or touch movement this fast, in px per ms, is a flick. */
 const FLICK = 1.1
 /**
- * A pinch opening this fast (gap per ms, as a fraction of the hand) and this
- * wide is a snap. Letting go normally opens at a small fraction of this rate.
+ * An index flicking out of the OK sign opens the pinch at least this fast
+ * (gap per ms, as a fraction of the hand) and this wide.
  */
-const SNAP_RATE = 0.008
-const SNAP_WIDE = 1.1
-/** How far a blade must be carried towards a device for that to be the aim. */
+const OK_FLICK_RATE = 0.004
+const OK_FLICK_WIDE = 0.9
+/** How far a blade must be carried for a mouse flick to aim by the carry. */
 const AIM_PX = 80
-/** A hand moving this fast as it snaps aims by its movement, if not carried. */
-const HAND_AIM_SPEED = 0.8
+/**
+ * Carrying a blade this far towards a device (a fifth of the screen, at least
+ * 150px) lights that device's edge, and letting go while it is lit sends it.
+ * Far enough that tidying a blade across the screen does not light anything;
+ * the cone is tight for the same reason, so moving a blade up or down never
+ * arms a device off to the side.
+ */
+const ARM_FRACTION = 0.2
+const ARM_MIN_PX = 150
+const ARM_CONE = (45 * Math.PI) / 180
 /** Without the tracker's measurement, how far back from the release to look. */
 const HAND_LOOKBACK_MS = 300
 const FLICK_LOOKBACK_MS = 150
@@ -281,6 +291,9 @@ type Release = {
   pointerId: number
   snap?: number
   wide?: number
+  ok?: boolean
+  px?: number
+  py?: number
 }
 type Sample = { t: number; x: number; y: number }
 
@@ -434,64 +447,51 @@ function Card({
 
   const setAim = useStore((s) => s.setAim)
   const showNote = useStore((s) => s.showNote)
+  const showFlash = useStore((s) => s.showFlash)
   /** Set while the blade is on its way to another device. */
-  const [flying, flying_] = useState<{ x: number; y: number } | null>(null)
+  const [flying, flying_] = useState<{ x: number; y: number; spin: number } | null>(null)
   const throwable = blade.kind !== 'camera'
 
-  /** While carrying: name the device it would go to, if there is one that way. */
+  /**
+   * While carrying: light the edge of the device it is being carried towards,
+   * once it has been carried far enough. Letting go while lit sends it.
+   */
   const aimAt = (dx: number, dy: number) => {
-    if (!throwable || !othersOnline()) return
-    if (Math.hypot(dx, dy) < AIM_PX) {
-      if (useStore.getState().aim) setAim(null)
+    if (!throwable || expanded || !othersOnline()) return
+    const reach = Math.max(ARM_MIN_PX, window.innerWidth * ARM_FRACTION)
+    const dist = Math.hypot(dx, dy)
+    const angle = Math.atan2(dy, dx)
+    const lit = useStore.getState().aim
+    /*
+     * Once lit, it stays lit unless he clearly takes it back.
+     *
+     * Opening the fingers to let go moves the index fingertip, which is where
+     * the cursor sits, in the beat before the release is known. Judged afresh
+     * each frame, that movement could put the edge out just before the
+     * release, and the blade was put down instead of sent: exactly "the edge
+     * comes up, then it just moves". Hysteresis: lighting needs the full
+     * carry and the tight cone; going out needs a real retreat.
+     */
+    if (lit) {
+      const still = dist >= reach * 0.6 ? targetFor(angle, ARM_CONE * 1.6) : null
+      if (still?.name === lit.name) setAim({ name: lit.name, angle })
+      else setAim(null)
       return
     }
-    const angle = Math.atan2(dy, dx)
-    const to = targetFor(angle)
-    setAim(to ? { name: to.name, angle } : null)
+    if (dist < reach) return
+    const to = targetFor(angle, ARM_CONE)
+    if (to) setAim({ name: to.name, angle })
   }
 
-  /** On letting go: put it down, or throw it. `from` is where it was picked up. */
-  const release = (from: { x: number; y: number }) => (r: Release) => {
-    setAim(null)
-    if (!throwable || expanded) return
-    const hand = r.pointerId >= 9000
-    const snap = r.snap ?? 0
-    const wide = r.wide ?? 0
-    const thrown = hand ? snap >= SNAP_RATE && wide >= SNAP_WIDE : r.speed >= FLICK
-    if (!thrown) {
-      // A snap that nearly made it: say how near, so it can be learnt.
-      if (hand && othersOnline() && snap >= SNAP_RATE * 0.5 && wide >= SNAP_WIDE * 0.8) {
-        showNote(`Nearly: that opened ${Math.round((snap / SNAP_RATE) * 100)}% as fast as a throw. Snap them open quicker.`)
-      }
-      return
-    }
-    if (!othersOnline()) {
-      showNote('No other device is open. Power JARVIS up on the other one first.')
-      return
-    }
-
-    // Where to: the way it was carried, else the way the hand or pointer was
-    // going, else the one other device if there is only one.
-    const carried = Math.hypot(r.dx, r.dy) >= AIM_PX
-    let angle: number | null = carried
-      ? Math.atan2(r.dy, r.dx)
-      : r.speed >= (hand ? HAND_AIM_SPEED : FLICK)
-        ? Math.atan2(r.vy, r.vx)
-        : null
-    if (angle === null) {
-      const { devices } = useStore.getState()
-      const others = devices.filter((d) => d.online && d.id !== thisDevice().id)
-      if (others.length === 1) angle = nearestTo(0)?.angle ?? null
-    }
-    if (angle === null) {
-      showNote('Carry it towards a device first, then snap your fingers open.')
-      return
-    }
+  /**
+   * Off it goes: accelerating away towards that device's edge, shrinking,
+   * tilting and fading into it, while the edge bursts with where it went.
+   */
+  const launch = (angle: number, from: { x: number; y: number }) => {
     const to = throwBlade(blade, angle)
     if (!to) {
-      // Say what it was read as and where the device actually is: a camera
-      // that flips left and right shows up here at once, as does a map laid
-      // out differently from the desk.
+      // Say what it was read as and where the device actually is: a map laid
+      // out differently from the desk shows up here at once.
       const near = nearestTo(angle)
       showNote(
         !isConnected()
@@ -503,9 +503,54 @@ function Card({
       setPos(from)
       return
     }
-    showNote(`Sent to ${to.name}.`)
-    flying_({ x: Math.cos(angle) * 1800, y: Math.sin(angle) * 1800 })
-    window.setTimeout(onClose, 320)
+    showFlash({ kind: 'sent', text: `Sent to ${to.name}`, angle })
+    flying_({ x: Math.cos(angle) * 1500, y: Math.sin(angle) * 1500, spin: Math.cos(angle) >= 0 ? 9 : -9 })
+    window.setTimeout(onClose, 600)
+  }
+
+  /** On letting go: put it down, or throw it. `from` is where it was picked up. */
+  const release = (from: { x: number; y: number }) => (r: Release) => {
+    // Let go while a device's edge was lit: that is the send. Nothing about
+    // how the fingers opened matters; the carry already said where.
+    const armed = useStore.getState().aim
+    setAim(null)
+    if (!throwable || expanded) return
+    if (armed) {
+      launch(armed.angle, from)
+      return
+    }
+    const hand = r.pointerId >= 9000
+    if (hand) {
+      // The OK sign, held, then the index flicked out: thrown the way the
+      // index points. Any other release is putting it down.
+      if (!r.ok) return
+      const snap = r.snap ?? 0
+      const flicked = snap >= OK_FLICK_RATE && (r.wide ?? 0) >= OK_FLICK_WIDE
+      if (!othersOnline()) {
+        if (flicked) showNote('No other device is open. Power JARVIS up on the other one first.')
+        return
+      }
+      if (!flicked) {
+        if (snap >= OK_FLICK_RATE * 0.4) {
+          showNote(`Nearly: that flick was ${Math.round((snap / OK_FLICK_RATE) * 100)}% as quick as a throw. Flick the index out sharper.`)
+        }
+        return
+      }
+      const px = r.px ?? 0
+      const py = r.py ?? 0
+      if (Math.hypot(px, py) < 1) return
+      launch(Math.atan2(py, px), from)
+      return
+    }
+
+    // A mouse or a finger on glass: a flick, aimed the way it was carried or
+    // failing that the way it was moving.
+    if (r.speed < FLICK) return
+    if (!othersOnline()) {
+      showNote('No other device is open. Power JARVIS up on the other one first.')
+      return
+    }
+    launch(Math.hypot(r.dx, r.dy) >= AIM_PX ? Math.atan2(r.dy, r.dx) : Math.atan2(r.vy, r.vx), from)
   }
 
   const onHeadDown = (e: React.PointerEvent) => {
@@ -716,19 +761,21 @@ function Card({
         blade.arrive
           ? {
               opacity: 0,
-              scale: 0.9,
-              filter: 'blur(4px)',
+              scale: 0.45,
+              rotate: blade.arrive === 'left' ? -9 : 9,
+              filter: 'blur(6px) brightness(1.4)',
               ...(blade.arrive === 'left'
-                ? { x: -900 }
+                ? { x: -1100 }
                 : blade.arrive === 'right'
-                  ? { x: 900 }
+                  ? { x: 1100 }
                   : blade.arrive === 'top'
-                    ? { y: -700 }
-                    : { y: 700 }),
+                    ? { y: -800 }
+                    : { y: 800 }),
             }
           : { opacity: 0, y: 26, scale: 0.96, filter: 'blur(6px)' }
       }
       animate={{
+        rotate: 0,
         opacity: expanded || depth === 0 ? 1 : Math.max(0.3, 1 - depth * 0.24),
         y: expanded ? 0 : depth * -13,
         x: expanded ? 0 : depth * 15,
@@ -754,7 +801,8 @@ function Card({
           ...(size && !expanded ? { width: size.w, height: size.h } : null),
           transform: expanded
             ? undefined
-            : `translate(${pos.x + (flying?.x ?? 0)}px, ${pos.y + (flying?.y ?? 0)}px)`,
+            : `translate(${pos.x + (flying?.x ?? 0)}px, ${pos.y + (flying?.y ?? 0)}px)` +
+            (flying ? ` scale(0.45) rotate(${flying.spin}deg)` : ''),
         }}
         // pointerdown, not mousedown: a hand dispatches PointerEvents, and a
         // mousedown handler simply never hears them. Focusing a blade by pinch
@@ -932,34 +980,46 @@ export function Blades() {
 export function ThrowAim() {
   const aim = useStore((s) => s.aim)
   const note = useStore((s) => s.note)
+  const flash = useStore((s) => s.flash)
 
-  let label: { left: number; top: number; edge: string } | null = null
-  if (aim) {
+  /** The point near the screen's edge in a direction, and which edge that is. */
+  const edgePoint = (angle: number, margin: number) => {
     const w = window.innerWidth
     const h = window.innerHeight
-    const cx = Math.cos(aim.angle)
-    const cy = Math.sin(aim.angle)
-    const margin = 70
+    const cx = Math.cos(angle)
+    const cy = Math.sin(angle)
     const t = Math.min(
       Math.abs(cx) > 1e-3 ? (w / 2 - margin) / Math.abs(cx) : Infinity,
       Math.abs(cy) > 1e-3 ? (h / 2 - margin) / Math.abs(cy) : Infinity,
     )
     const edge = Math.abs(cx) * h >= Math.abs(cy) * w ? (cx < 0 ? 'left' : 'right') : cy < 0 ? 'top' : 'bottom'
-    label = { left: w / 2 + cx * t, top: h / 2 + cy * t, edge }
+    return { left: w / 2 + cx * t, top: h / 2 + cy * t, edge }
   }
+
+  const armed = aim ? edgePoint(aim.angle, 90) : null
+  const burst = flash ? edgePoint(flash.angle, 110) : null
 
   return (
     <>
-      {label && aim && (
+      {armed && aim && (
         <>
-          <div className={`throw-edge throw-edge-${label.edge}`} />
-          <div className="throw-aim" style={{ left: label.left, top: label.top }}>
+          <div className={`throw-edge throw-edge-${armed.edge}`} />
+          <div className="throw-aim" style={{ left: armed.left, top: armed.top }}>
             <span className="throw-arrow" style={{ transform: `rotate(${aim.angle}rad)` }}>
               →
             </span>
-            {aim.name}
+            Let go to send to {aim.name}
           </div>
         </>
+      )}
+      {burst && flash && (
+        <div key={flash.at}>
+          <div className={`throw-burst throw-burst-${burst.edge} throw-burst-${flash.kind}`} />
+          <div className="throw-flash" style={{ left: burst.left, top: burst.top }}>
+            <span className="throw-flash-mark">{flash.kind === 'sent' ? '✓' : '⇤'}</span>
+            {flash.text}
+          </div>
+        </div>
       )}
       <AnimatePresence>
         {note && (

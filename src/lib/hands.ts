@@ -402,6 +402,17 @@ const filters = new Map<number, Filters>()
 const trails = new Map<number, { x: number; y: number; at: number }[]>()
 /** Recent thumb-to-finger gaps per hand, for how fast a pinch opened; see throwOf. */
 const gaps = new Map<number, { t: number; g: number }[]>()
+/**
+ * Recent frames of each hand, marked for whether it was making the OK sign:
+ * thumb and index pinched, middle, ring and little finger up. See throwOf.
+ */
+const okPoses = new Map<number, { t: number; ok: boolean }[]>()
+
+/** Whether the OK sign was held through most of a stretch of time. */
+function okHeld(id: number, from: number, to: number) {
+  const frames = (okPoses.get(id) ?? []).filter((p) => p.t >= from && p.t <= to)
+  return frames.length >= 3 && frames.filter((p) => p.ok).length / frames.length >= 0.6
+}
 /** When the fingers first closed, per hand — see PINCH_CONFIRM_MS. */
 const pinchSince = new Map<number, number>()
 /** When a held pinch's fingers first read apart, per hand — see RELEASE_MS. */
@@ -421,6 +432,11 @@ export type LetGo = {
   snap: number
   /** How wide it opened, as a fraction of the hand's size. */
   wide: number
+  /** Whether the OK sign was held while it was pinched. */
+  ok: boolean
+  /** Which way the index pointed once it had opened, on screen. */
+  px: number
+  py: number
 }
 const throws = new Map<number, LetGo>()
 
@@ -967,7 +983,7 @@ function dropHand(i: number) {
   // throw with a wind-up is as likely to be the wind-up.
   if (hands[at].pinched) {
     const now = performance.now()
-    throws.set(i, { at: now, ...palmPeak(i, now - 110, now), snap: 0, wide: 0 })
+    throws.set(i, { at: now, ...palmPeak(i, now - 110, now), snap: 0, wide: 0, ok: false, px: 0, py: 0 })
   }
   palms.delete(i)
   releasePress(i, hands[at])
@@ -978,6 +994,7 @@ function dropHand(i: number) {
   sideVote.delete(i)
   trails.delete(i)
   gaps.delete(i)
+  okPoses.delete(i)
   pinchSince.delete(i)
   openSince.delete(i)
   poseChangedAt.delete(i)
@@ -1098,6 +1115,16 @@ function loop(mine: number) {
     gapTrail.push({ t: now, g: gap })
     while (gapTrail.length > 2 && now - gapTrail[0].t > 600) gapTrail.shift()
     gaps.set(i, gapTrail)
+    const okTrail = okPoses.get(i) ?? []
+    okTrail.push({
+      t: now,
+      ok:
+        isExtended(points, MIDDLE_TIP, MIDDLE_PIP) &&
+        isExtended(points, RING_TIP, RING_PIP) &&
+        isExtended(points, PINKY_TIP, PINKY_PIP),
+    })
+    while (okTrail.length > 2 && now - okTrail[0].t > 800) okTrail.shift()
+    okPoses.set(i, okTrail)
 
     let hand = hands.find((q) => q.id === i)
     if (!hand) {
@@ -1145,7 +1172,18 @@ function loop(mine: number) {
     // moment they opened is what a throw is measured around.
     if (hand.pinched && !pinched) {
       const at = opened ?? now
-      throws.set(i, { at, ...palmPeak(i, at - THROW_BEFORE_MS, at + THROW_AFTER_MS), ...snapOf(i, at) })
+      // Which way the index points now it is out: the raw knuckle-to-tip line,
+      // a beat after it flicked, when it has stopped moving and is sharp.
+      const tipAt = toScreen(marks[INDEX_TIP], w, h)
+      const baseAt = toScreen(marks[INDEX_MCP], w, h)
+      throws.set(i, {
+        at,
+        ...palmPeak(i, at - THROW_BEFORE_MS, at + THROW_AFTER_MS),
+        ...snapOf(i, at),
+        ok: okHeld(i, at - 450, at - 30),
+        px: tipAt.x - baseAt.x,
+        py: tipAt.y - baseAt.y,
+      })
     }
     if (!pinched) openSince.delete(i)
     hand.closeness = Math.max(0, Math.min(1, 1 - (gap - PINCH_ON) / (PINCH_OFF - PINCH_ON)))
@@ -1313,6 +1351,7 @@ export function disableHands(): void {
   sideVote.clear()
   trails.clear()
   gaps.clear()
+  okPoses.clear()
   pinchSince.clear()
   openSince.clear()
   palms.clear()
@@ -1349,11 +1388,14 @@ export function disableHands(): void {
  * How a hand last let go, with when (performance.now()), or null: how its raw
  * palm was moving, in screen pixels per ms, and how its pinch opened.
  *
- * A throw is a pinch snapped open: the gap between thumb and finger jumping
- * wide in a frame or two, where putting something down lets it drift open.
- * Measured from just before the fingers first read apart, because the release
- * event arrives a beat later (see RELEASE_MS). The palm is measured raw, since
- * the smoothed cursor lags any sudden movement by most of its length.
+ * A throw is the OK sign, held, then the index flicked out: thumb and index
+ * pinched with the other three fingers up, then the gap between thumb and
+ * index jumping open. `ok` says the sign was held through the pinch; `snap`
+ * and `wide` say how fast and how far it opened; `px`, `py` say which way the
+ * index points once it is out, which is where the throw goes. A pointing
+ * finger is a pose the camera sees sharply even at 30 frames a second, where
+ * the speed of a fast movement is exactly what it blurs. The palm's movement
+ * is kept too, measured raw.
  */
 export function throwOf(id: number): LetGo | null {
   return throws.get(id) ?? null

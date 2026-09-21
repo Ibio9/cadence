@@ -18,7 +18,8 @@ import { useStore } from '../store'
 const MOVES: { gesture: string; hand: string; does: string }[] = [
   { gesture: 'point', hand: '☝', does: 'move the cursor' },
   { gesture: 'pinch', hand: '🤏', does: 'click · or hold on a blade to move it' },
-  { gesture: 'throw', hand: '🎯', does: 'pinch a blade, carry it towards a device, push and let go' },
+  { gesture: 'send', hand: '👌', does: 'OK sign on a blade, flick your index at a device' },
+  { gesture: 'send', hand: '➡', does: 'or carry it till that edge lights, then let go' },
   { gesture: 'open', hand: '🖐', does: 'let go' },
   { gesture: 'peace', hand: '✌', does: 'two fingers up-down to scroll' },
   { gesture: 'frame', hand: '📐', does: 'two L-corners to resize' },

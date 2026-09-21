@@ -125,7 +125,7 @@ const between = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), M
  * The open device in the direction of a throw, if one is close enough to it.
  * Angles are screen angles, y downward, which is also how the map is laid out.
  */
-export function targetFor(angle: number): Device | null {
+export function targetFor(angle: number, cone?: number): Device | null {
   const { devices } = useStore.getState()
   const here = devices.find((d) => d.id === thisDevice().id)
   if (!here) return null
@@ -139,7 +139,7 @@ export function targetFor(angle: number): Device | null {
       off = diff
     }
   }
-  return off <= (others.length === 1 ? CONE_ONE : CONE_MANY) ? best : null
+  return off <= (cone ?? (others.length === 1 ? CONE_ONE : CONE_MANY)) ? best : null
 }
 
 /** A direction on screen or on the map, in words: 'to the right', 'up and to the left'. */
@@ -203,8 +203,14 @@ function caught(msg: Record<string, unknown>) {
   const fromId = String(msg.from ?? '')
   const s = useStore.getState()
   const sender = s.devices.find((d) => d.id === fromId)
-  // Sticky: something thrown to him is something he wants to look at.
-  s.pushBlade({ ...blade, hold: 'sticky', arrive: arrivalEdge(fromId), from: sender?.name ?? 'another device' })
+  const edge = arrivalEdge(fromId)
+  const name = sender?.name ?? 'another device'
+  // Sticky and full screen: something sent over is something he means to look
+  // at, on the screen he sent it to.
+  s.pushBlade({ ...blade, hold: 'sticky', arrive: edge, from: name })
+  s.expandBlade(blade.id)
+  const EDGE_ANGLE = { left: Math.PI, right: 0, top: -Math.PI / 2, bottom: Math.PI / 2 }
+  s.showFlash({ kind: 'arrived', text: `From ${name}`, angle: EDGE_ANGLE[edge ?? 'top'] })
 }
 
 /* ------------------------------------------------------------------ the map */

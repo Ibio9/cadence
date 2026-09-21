@@ -3406,9 +3406,19 @@ kbd { font-size: 10px; }
 /* -- throwing to another device -- */
 
 /* On its way out: the transform the drag set, carried on off the screen. */
+/* Sent: it gathers speed away from the hand, shrinking and tilting as it goes,
+   a glow trailing it, and fades into the edge it was sent through. Ease-in on
+   the movement is what makes it read as thrown rather than slid. */
 .bl-flying {
-  transition: transform 300ms cubic-bezier(0.5, 0, 0.9, 0.4), opacity 300ms ease-in;
+  transition:
+    transform 600ms cubic-bezier(0.5, 0.02, 0.75, 0.2),
+    opacity 600ms cubic-bezier(0.6, 0, 0.9, 0.5),
+    filter 600ms ease-in;
   opacity: 0;
+  filter: blur(3px) brightness(1.5);
+  box-shadow:
+    0 0 70px 12px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 70%, #fff) !important;
   pointer-events: none;
 }
 
@@ -3577,3 +3587,69 @@ kbd { font-size: 10px; }
   cursor: pointer;
 }
 .gguide-close:hover { border-color: rgba(255, 255, 255, 0.3); color: #fff; }
+
+/* -- sending and arriving -- */
+
+/* The edge a blade has just gone through, or come in through: a bright wash
+   that swells and fades, wider and brighter than the aiming glow. */
+.throw-burst {
+  position: fixed;
+  z-index: 93;
+  pointer-events: none;
+  background: linear-gradient(
+    var(--edge-dir, to right),
+    color-mix(in srgb, var(--accent) 80%, #fff) 0%,
+    color-mix(in srgb, var(--accent) 45%, transparent) 30%,
+    transparent 100%
+  );
+  animation: throwBurst 1.3s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+.throw-burst-left { left: 0; top: 0; bottom: 0; width: 240px; --edge-dir: to right; }
+.throw-burst-right { right: 0; top: 0; bottom: 0; width: 240px; --edge-dir: to left; }
+.throw-burst-top { top: 0; left: 0; right: 0; height: 200px; --edge-dir: to bottom; }
+.throw-burst-bottom { bottom: 0; left: 0; right: 0; height: 200px; --edge-dir: to top; }
+@keyframes throwBurst {
+  0% { opacity: 0; }
+  14% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.throw-flash {
+  position: fixed;
+  z-index: 94;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 20px;
+  border: 1px solid color-mix(in srgb, var(--accent) 70%, rgba(255, 255, 255, 0.3));
+  border-radius: 999px;
+  background: rgba(9, 15, 21, 0.95);
+  box-shadow: 0 0 44px -4px color-mix(in srgb, var(--accent) 75%, transparent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: throwFlash 1.5s ease-out forwards;
+}
+.throw-flash-mark { color: var(--accent); font-size: 17px; }
+@keyframes throwFlash {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  14% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
+  26% { transform: translate(-50%, -50%) scale(1); }
+  78% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.97); }
+}
+
+/* Armed: the edge glows steadily brighter than a hint, so "let go now" is
+   unmistakable. */
+.throw-edge { width: 120px; }
+.throw-edge-top, .throw-edge-bottom { width: auto; height: 110px; }
+
+/* Full screen, but clear of the tab strip above and the typebar below: a
+   blade sent over opens like this, and its title should not sit under the
+   tabs. */
+.blades-stack-full { inset: 62px 0 72px 0; }
+.bl-expanded { width: 94vw; height: calc(100vh - 150px); }

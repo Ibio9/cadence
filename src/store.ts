@@ -330,6 +330,12 @@ type State = {
   aim: { name: string; angle: number } | null
   /** A line of feedback about a throw, shown briefly. */
   note: string | null
+  /**
+   * The moment a blade leaves for another device or arrives from one: the
+   * edge in that direction bursts, labelled. `angle` is the direction of that
+   * edge from the middle of the screen; `at` restarts the animation.
+   */
+  flash: { kind: 'sent' | 'arrived'; text: string; angle: number; at: number } | null
   /** Which top tab is open, or null for none. */
   tab: Tab
   /** The blade the user has pulled forward, or null for "the newest one". */
@@ -369,6 +375,7 @@ type State = {
   setAim: (aim: { name: string; angle: number } | null) => void
   /** Show a short line for a few seconds. */
   showNote: (note: string) => void
+  showFlash: (flash: { kind: 'sent' | 'arrived'; text: string; angle: number }) => void
   focusBlade: (id: string | null) => void
   expandBlade: (id: string | null) => void
   setPhase: (p: Phase) => void
@@ -527,6 +534,7 @@ function weeklyId(kind: 'setwork' | 'response', subject: string, day: string) {
 }
 
 let noteTimer = 0
+let flashTimer = 0
 
 const GONE_KEY = 'jarvis.todos.gone.v1'
 
@@ -601,6 +609,7 @@ export const useStore = create<State>((set) => ({
   devices: [],
   aim: null,
   note: null,
+  flash: null,
   tab: null,
   focusedBlade: null,
   expandedBlade: null,
@@ -824,6 +833,11 @@ export const useStore = create<State>((set) => ({
     set({ note })
     window.clearTimeout(noteTimer)
     noteTimer = window.setTimeout(() => set({ note: null }), 3200)
+  },
+  showFlash: (flash) => {
+    set({ flash: { ...flash, at: Date.now() } })
+    window.clearTimeout(flashTimer)
+    flashTimer = window.setTimeout(() => set({ flash: null }), 1600)
   },
 
   focusBlade: (focusedBlade) => set({ focusedBlade }),
