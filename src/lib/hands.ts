@@ -130,18 +130,22 @@ const SKELETON_BETA = 0.03
  * keep one, so the press cannot flicker on the boundary.
  */
 /*
- * Loosened from 0.40 / 0.60. The fingertip landmarks sit at the centre of each
- * fingertip, so even thumb and finger pressed together leave a gap the width
- * of a finger, and on some hands and angles that gap never got under 0.40: the
- * pinch simply never registered. The hysteresis band keeps its width.
+ * Tightened to 0.35, on his word: a pinch should only register when thumb and
+ * finger are properly together. It was 0.40, then loosened to 0.45 when
+ * pinches were not registering at all; that turned out to be the settling
+ * window and the unreachable top of the screen (both fixed since), and at 0.45
+ * a loose, half-closed hand was read as a pinch. The fingertip landmarks sit
+ * at the centre of each fingertip, so fingers pressed together still leave a
+ * gap of about a finger's width; 0.35 allows for that and no more.
  */
-const PINCH_ON = 0.45
+const PINCH_ON = 0.35
 /*
- * Loosened from 0.65. A hand dragging something is a hand moving, and moving
- * it relaxes the grip without meaning to: at 0.65 an ordinary drag drifted over
- * the line partway across and dropped what it was carrying.
+ * Letting go takes clearly opening, well past where a pinch starts: a hand
+ * dragging something relaxes its grip without meaning to, and at a tight
+ * release line an ordinary drag drifted over it partway across and dropped
+ * what it was carrying. With RELEASE_MS behind it, 0.65 holds a drag.
  */
-const PINCH_OFF = 0.72
+const PINCH_OFF = 0.65
 
 /**
  * A held pinch lets go only once the fingers have stayed apart this long.

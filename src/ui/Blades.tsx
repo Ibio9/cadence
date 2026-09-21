@@ -348,6 +348,9 @@ function Card({
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const shell = useRef<HTMLDivElement>(null)
   const body = useRef<HTMLDivElement>(null)
+  /** Whether it is full screen right now, for handlers that outlive a render. */
+  const expandedNow = useRef(expanded)
+  expandedNow.current = expanded
 
   /**
    * Scroll whatever this blade is showing.
@@ -454,7 +457,7 @@ function Card({
    * once it has been carried far enough. Letting go while lit sends it.
    */
   const aimAt = (dx: number, dy: number) => {
-    if (!throwable || expanded || !othersOnline()) return
+    if (!throwable || expandedNow.current || !othersOnline()) return
     const reach = Math.max(ARM_MIN_PX, window.innerWidth * ARM_FRACTION)
     const dist = Math.hypot(dx, dy)
     const angle = Math.atan2(dy, dx)
@@ -511,7 +514,7 @@ function Card({
     // how the fingers opened matters; the carry already said where.
     const armed = useStore.getState().aim
     setAim(null)
-    if (!throwable || expanded) return
+    if (!throwable || expandedNow.current) return
     if (armed) {
       launch(armed.angle, from)
       return
@@ -569,7 +572,10 @@ function Card({
     // click never lands.
     if ((e.target as HTMLElement).closest('button')) return
     if (!focused) onFocus()
-    if (expanded) return
+    // Full screen, a grab brings it back out to be moved, instead of doing
+    // nothing: a blade sent over from another device arrives full screen, and
+    // with this returning early it could not be moved, resized or sent back.
+    if (expanded) onExpand()
     const from = { ...pos }
     grab(
       e,
@@ -598,7 +604,7 @@ function Card({
   const onBodyDown = (e: React.PointerEvent) => {
     if (e.pointerType !== 'touch') return
     if (!focused) onFocus()
-    if (expanded) return
+    if (expanded) onExpand()
     const from = { ...pos }
     grab(
       e,
