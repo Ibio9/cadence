@@ -64,7 +64,7 @@ export type Blade = {
 export type Archived = Blade & { at: number }
 
 /** The tabs along the top. null is "none open". */
-export type Tab = 'timetable' | 'todo' | 'briefing' | 'news' | null
+export type Tab = 'timetable' | 'todo' | 'briefing' | 'news' | 'history' | null
 
 /**
  * One thing to do.
@@ -283,7 +283,7 @@ type State = {
   /** Blades currently open, newest last — which is also front-most. */
   blades: Blade[]
   /**
-   * Everything that has ever been on screen this session, newest last.
+   * Everything that has been on screen, newest last, across sessions.
    *
    * Separate from `blades` because that list is a view of the present and is
    * culled from both ends: six at a time, and 'turn' blades swept the moment
@@ -291,12 +291,11 @@ type State = {
    * briefing he glanced at four questions ago is gone, and it was not his
    * choice to close it.
    *
-   * Never cleared by anything the model does. Only the session ending empties
-   * it, which is the one boundary he would expect to lose it at.
+   * Never cleared by anything the model does. It used to empty when the
+   * session ended; it is kept in the browser now (see saveArchive), because
+   * yesterday's briefing is exactly what the HISTORY tab is for.
    */
   archive: Archived[]
-  /** Whether the history list is showing. */
-  historyOpen: boolean
   /** The to-do list. Survives a reload; see `loadTodos`. */
   todos: Todo[]
   /** Which top tab is open, or null for none. */
@@ -319,8 +318,8 @@ type State = {
   clearBlades: () => void
   /** Put an archived blade back on screen, sticky so the next turn keeps it. */
   restoreBlade: (id: string) => void
-  /** Pass nothing to flip it. */
-  toggleHistory: (on?: boolean) => void
+  /** Open or close the HISTORY tab; the left-hand four. */
+  toggleHistory: () => void
   /** Opening the tab that is already open closes it. */
   openTab: (t: Tab) => void
   addTodo: (text: string, due?: string | null) => void
@@ -368,6 +367,62 @@ type State = {
  * the whole interface down before it rendered.
  */
 const TODO_KEY = 'jarvis.todos.v1'
+
+/**
+ * The history, kept in the browser so yesterday's briefing is still there
+ * tomorrow.
+ *
+ * Bounded twice: by count as things are added, and by size as it is written,
+ * because one article's markup can be larger than a week of briefings and
+ * localStorage has a hard ceiling shared with the to-do list. When it is over
+ * budget the oldest go first. Markup is stored as it arrived and sanitised
+ * again every time it is shown, so storage is never trusted to be clean.
+ */
+const ARCHIVE_KEY = 'jarvis.archive.v1'
+const ARCHIVE_MAX = 300
+/** Characters of localStorage the history may use; the to-do list needs little. */
+const ARCHIVE_BUDGET = 3_000_000
+
+function loadArchive(): Archived[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(ARCHIVE_KEY) ?? '[]')
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter(
+        (a) =>
+          a &&
+          typeof a.id === 'string' &&
+          typeof a.title === 'string' &&
+          typeof a.kind === 'string' &&
+          a.kind !== 'camera' &&
+          Number.isFinite(a.at),
+      )
+      .slice(-ARCHIVE_MAX)
+  } catch {
+    return []
+  }
+}
+
+function saveArchive(archive: Archived[]) {
+  let keep = archive
+  let json = JSON.stringify(keep)
+  while (json.length > ARCHIVE_BUDGET && keep.length > 1) {
+    keep = keep.slice(Math.ceil(keep.length / 4))
+    json = JSON.stringify(keep)
+  }
+  // A quota error means the browser's own ceiling is lower than the budget;
+  // halve and try again, a few times, rather than lose the whole history.
+  for (let tries = 0; tries < 4; tries++) {
+    try {
+      localStorage.setItem(ARCHIVE_KEY, json)
+      return
+    } catch {
+      if (keep.length <= 1) return
+      keep = keep.slice(Math.ceil(keep.length / 2))
+      json = JSON.stringify(keep)
+    }
+  }
+}
 
 /**
  * Which pieces of set work have already been put on the list.
@@ -457,8 +512,7 @@ export const useStore = create<State>((set) => ({
   looking: null,
   panels: [],
   blades: [],
-  archive: [],
-  historyOpen: false,
+  archive: loadArchive(),
   todos: loadTodos(),
   tab: null,
   focusedBlade: null,
@@ -503,11 +557,13 @@ export const useStore = create<State>((set) => ({
       // re-enters through this same function, so the entry is replaced rather
       // than duplicated and the record keeps the time it was last seen.
       //
-      // Forty is generous for one session and still bounded: a blade can carry
-      // a whole article's markup, and an unbounded list of those is a leak
-      // dressed up as a feature.
-      const archive = [...s.archive.filter((a) => a.id !== blade.id), { ...blade, at: Date.now() }]
-        .slice(-40)
+      // Kept across sessions now (see saveArchive), so bounded by count here
+      // and by size when it is written. The camera is not kept: a live feed
+      // reopened tomorrow is not what he saw today.
+      const archive =
+        blade.kind === 'camera'
+          ? s.archive
+          : [...s.archive.filter((a) => a.id !== blade.id), { ...blade, at: Date.now() }].slice(-ARCHIVE_MAX)
       // A new blade comes to the front. Leaving the old focus in place would
       // open something the user asked for and then hide it behind what they
       // were looking at before.
@@ -545,14 +601,16 @@ export const useStore = create<State>((set) => ({
       if (!found) return {}
       const { at: _at, ...blade } = found
       const revived: Blade = { ...blade, hold: 'sticky' }
+      // The tab it was chosen from closes, so the thing reopened is not
+      // sitting underneath the list it came from.
       return {
         blades: [...s.blades.filter((b) => b.id !== id), revived].slice(-6),
         focusedBlade: id,
-        historyOpen: false,
+        tab: null,
       }
     }),
 
-  toggleHistory: (on) => set((s) => ({ historyOpen: on ?? !s.historyOpen })),
+  toggleHistory: () => set((s) => ({ tab: s.tab === 'history' ? null : 'history' })),
 
   openTab: (t) => set((s) => ({ tab: s.tab === t ? null : t })),
 
@@ -787,6 +845,13 @@ if (import.meta.env.DEV) {
  * and neither is worth an error on screen over a to-do list that still works
  * perfectly well for this session.
  */
+let lastArchive = useStore.getState().archive
+useStore.subscribe((s) => {
+  if (s.archive === lastArchive) return
+  lastArchive = s.archive
+  saveArchive(s.archive)
+})
+
 let lastTodos = useStore.getState().todos
 useStore.subscribe((s) => {
   if (s.todos === lastTodos) return

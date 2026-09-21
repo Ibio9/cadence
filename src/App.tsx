@@ -5,7 +5,6 @@ import { Boot } from './ui/Boot'
 import { Ignition } from './ui/Ignition'
 import { Diagnostics } from './ui/Diagnostics'
 import { TextInput } from './ui/TextInput'
-import { History } from './ui/History'
 import { Tabs } from './ui/Tabs'
 import { Gate } from './ui/Gate'
 import * as auth from './lib/auth'
@@ -922,7 +921,6 @@ export default function App() {
       <Hud />
       <Boot />
       <Diagnostics />
-      <History />
       <Tabs onAsk={startTurn} />
       <TextInput onSend={startTurn} />
       {/* Plain conditionals, on purpose: both are full-screen overlays, and an

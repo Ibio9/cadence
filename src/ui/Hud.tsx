@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useStore, accentFor, type Phase } from '../store'
 import { Suggestions } from './Suggestions'
 import { PUSH_TO_TALK } from '../config'
-import { BladeSweep, Blades } from './Blades'
+import { Blades } from './Blades'
 import { Effects } from './Effects'
 import { Pointer } from './Pointer'
 import { GestureGuide } from './GestureGuide'
@@ -201,7 +201,6 @@ export function Hud() {
       {/* First in the tree on purpose. Everything after it is positioned with
           `z-index: auto`, so paint order is document order and the sweep stays
           behind the transcript and the panels without a z-index war. */}
-      <BladeSweep />
 
       <Corner at="tl" />
       <Corner at="tr" />

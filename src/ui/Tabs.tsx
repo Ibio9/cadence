@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useStore, type Tab, type Todo } from '../store'
+import { useStore, type Archived, type Tab, type Todo } from '../store'
 import {
   dueLabel,
   isoDay,
@@ -38,6 +38,7 @@ const TABS: { id: Exclude<Tab, null>; label: string }[] = [
   { id: 'todo', label: 'TO-DO' },
   { id: 'briefing', label: 'BRIEFING' },
   { id: 'news', label: 'NEWS' },
+  { id: 'history', label: 'HISTORY' },
 ]
 
 /* ------------------------------------------------------------------ timetable */
@@ -464,6 +465,132 @@ function News({ onAsk }: { onAsk: (prompt: string) => void }) {
 
 /* ----------------------------------------------------------------------- tabs */
 
+/* -------------------------------------------------------------------- history */
+
+type Kind = 'briefing' | 'news' | 'story' | 'other'
+
+/**
+ * What an entry is, from what it is called and what it holds. Titles are the
+ * model's, so this reads them loosely; anything it cannot place still shows
+ * under All.
+ */
+function kindOf(a: Archived): Kind {
+  if (/economist|bloomberg|news|markets|world in brief/i.test(a.title)) return 'news'
+  if (/brief|morning|inbox|mail|your day|today/i.test(a.title)) return 'briefing'
+  if (a.kind === 'article' || a.kind === 'embed' || a.kind === 'video') return 'story'
+  return 'other'
+}
+
+const FILTERS: { id: 'all' | Kind; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'briefing', label: 'Briefings' },
+  { id: 'news', label: 'News' },
+  { id: 'story', label: 'Stories' },
+]
+
+const TAG: Record<Kind, string> = { briefing: 'briefing', news: 'news', story: 'story', other: 'card' }
+
+/** 'Today', 'Yesterday', then 'Mon 21 Sept'. */
+function dayName(iso: string, today: string) {
+  if (iso === today) return 'Today'
+  const d = parseIso(today)
+  d.setDate(d.getDate() - 1)
+  if (iso === isoDay(d)) return 'Yesterday'
+  return parseIso(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+/**
+ * Everything that has been on screen, by day, kept across sessions.
+ *
+ * The day is a dropdown rather than a long scroll because what he wants is
+ * usually "Tuesday's briefing", and the kind filters narrow the rest. Every
+ * control is a real button so a pinch presses it; a native <select> would
+ * open a menu the hand tracker cannot reach.
+ */
+function HistoryPanel() {
+  const archive = useStore((s) => s.archive)
+  const restore = useStore((s) => s.restoreBlade)
+  const [day, day_] = useState<string | null>(null)
+  const [kind, kind_] = useState<'all' | Kind>('all')
+  const [picking, picking_] = useState(false)
+
+  const today = isoDay(new Date())
+  const newest = [...archive].reverse()
+  const dayOf = (a: Archived) => isoDay(new Date(a.at))
+  const days = [...new Set(newest.map(dayOf))]
+  const count = (d: string) => newest.filter((a) => dayOf(a) === d).length
+
+  const shown = newest.filter((a) => (!day || dayOf(a) === day) && (kind === 'all' || kindOf(a) === kind))
+  const groups: [string, Archived[]][] = []
+  for (const a of shown) {
+    const d = dayOf(a)
+    const last = groups[groups.length - 1]
+    if (last && last[0] === d) last[1].push(a)
+    else groups.push([d, [a]])
+  }
+
+  const choose = (d: string | null) => {
+    day_(d)
+    picking_(false)
+  }
+
+  return (
+    <div className="tabpanel-body" data-hit-rescue>
+      <div className="hist-bar">
+        <button className="hist-date" onClick={() => picking_(!picking)} aria-expanded={picking}>
+          {day ? dayName(day, today) : 'All days'}
+          <span className="hist-caret">{picking ? '▴' : '▾'}</span>
+        </button>
+        <div className="hist-filters">
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              className={kind === f.id ? 'hist-pill hist-pill-on' : 'hist-pill'}
+              onClick={() => kind_(f.id)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {picking && (
+        <div className="hist-menu">
+          <button className={day === null ? 'hist-opt hist-opt-on' : 'hist-opt'} onClick={() => choose(null)}>
+            All days <span className="hist-count">{newest.length}</span>
+          </button>
+          {days.map((d) => (
+            <button key={d} className={day === d ? 'hist-opt hist-opt-on' : 'hist-opt'} onClick={() => choose(d)}>
+              {dayName(d, today)} <span className="hist-count">{count(d)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {shown.length === 0 && (
+        <p className="tt-empty">
+          {archive.length ? 'Nothing of that kind on that day.' : 'Nothing yet. Briefings and panels land here as they are shown.'}
+        </p>
+      )}
+
+      {groups.map(([d, list]) => (
+        <div className="hist-day" key={d}>
+          <div className="hist-day-label">{dayName(d, today)}</div>
+          {list.map((a) => (
+            <button className="hist-row" key={`${a.id}${a.at}`} onClick={() => restore(a.id)}>
+              <span className="hist-time">
+                {new Date(a.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+              <span className="hist-title">{a.title}</span>
+              <span className={`hist-tag hist-tag-${kindOf(a)}`}>{TAG[kindOf(a)]}</span>
+            </button>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function Tabs({ onAsk }: { onAsk: (prompt: string) => void }) {
   const phase = useStore((s) => s.phase)
   const tab = useStore((s) => s.tab)
@@ -503,6 +630,7 @@ export function Tabs({ onAsk }: { onAsk: (prompt: string) => void }) {
             {tab === 'todo' && <TodoList />}
             {tab === 'briefing' && <Briefing onAsk={onAsk} />}
             {tab === 'news' && <News onAsk={onAsk} />}
+            {tab === 'history' && <HistoryPanel />}
           </motion.section>
         )}
       </AnimatePresence>
