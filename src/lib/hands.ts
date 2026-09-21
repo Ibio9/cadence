@@ -55,7 +55,9 @@ const THUMB_MCP = 2
 export const THUMB_TIP = 4
 const INDEX_PIP = 6
 export const INDEX_TIP = 8
+const INDEX_MCP = 5
 const MIDDLE_MCP = 9
+const PINKY_MCP = 17
 const MIDDLE_PIP = 10
 const MIDDLE_TIP = 12
 const RING_PIP = 14
@@ -406,10 +408,35 @@ const pinchSince = new Map<number, number>()
 /** When a held pinch's fingers first read apart, per hand — see RELEASE_MS. */
 const openSince = new Map<number, number>()
 /**
- * When each hand last let go: the moment its fingers first came apart at the
- * end of a pinch, or the moment it vanished while pinching. See letGoAt.
+ * Where each palm really was, frame by frame: straight from the camera, with
+ * none of the smoothing the cursor gets. For measuring throws, see throwOf.
  */
-const letGo = new Map<number, number>()
+const palms = new Map<number, { t: number; x: number; y: number }[]>()
+/** Each hand's movement at the moment it last let go; see throwOf. */
+const throws = new Map<number, { at: number; vx: number; vy: number; speed: number }>()
+/** Around the moment of letting go: from this long before to this long after. */
+const THROW_BEFORE_MS = 180
+const THROW_AFTER_MS = 100
+
+/** The fastest stretch of about 70ms of a palm's raw movement between two times. */
+function palmPeak(id: number, from: number, to: number) {
+  const trail = palms.get(id) ?? []
+  let best = { vx: 0, vy: 0, speed: 0 }
+  for (let j = trail.length - 1; j > 0; j--) {
+    if (trail[j].t > to) continue
+    if (trail[j].t < from) break
+    let i = j
+    while (i > 0 && trail[i - 1].t >= from && trail[j].t - trail[i - 1].t <= 70) i--
+    if (i === j) i = j - 1
+    const dt = trail[j].t - trail[i].t
+    if (dt < 10 || trail[i].t < from - 40) continue
+    const vx = (trail[j].x - trail[i].x) / dt
+    const vy = (trail[j].y - trail[i].y) / dt
+    const speed = Math.hypot(vx, vy)
+    if (speed > best.speed) best = { vx, vy, speed }
+  }
+  return best
+}
 /** When the finger pose last changed, per hand — see POSE_SETTLE_MS. */
 const poseChangedAt = new Map<number, number>()
 
@@ -911,8 +938,13 @@ async function ensureModel() {
 function dropHand(i: number) {
   const at = hands.findIndex((h) => h.id === i)
   if (at === -1) return
-  // A hand lost mid-pinch, usually to motion blur in a fast throw, let go now.
-  if (hands[at].pinched) letGo.set(i, performance.now())
+  // A hand lost mid-pinch has usually been lost to motion blur in a fast
+  // throw: the blur is the evidence. It let go now, moving as it last moved.
+  if (hands[at].pinched) {
+    const now = performance.now()
+    throws.set(i, { at: now, ...palmPeak(i, now - THROW_BEFORE_MS - 120, now) })
+  }
+  palms.delete(i)
   releasePress(i, hands[at])
   hands.splice(at, 1)
   filters.get(i)?.cursor.reset()
@@ -1000,6 +1032,22 @@ function loop(mine: number) {
 
     const f = filtersFor(i)
 
+    // The palm's centre, unsmoothed. The cursor's filter is there to stop it
+    // jittering, and it lags most at the start of a sudden movement, which is
+    // all a throw is: measured through it, a real flick read as a slow shove.
+    const palm = toScreen(
+      {
+        x: (marks[WRIST].x + marks[INDEX_MCP].x + marks[PINKY_MCP].x) / 3,
+        y: (marks[WRIST].y + marks[INDEX_MCP].y + marks[PINKY_MCP].y) / 3,
+      },
+      w,
+      h,
+    )
+    const palmTrail = palms.get(i) ?? []
+    palmTrail.push({ t: now, x: palm.x, y: palm.y })
+    while (palmTrail.length > 2 && now - palmTrail[0].t > 800) palmTrail.shift()
+    palms.set(i, palmTrail)
+
     // Mirrored, because the camera faces you: moving your hand right should
     // move the cursor right, not left. Through REACH, so the edges are reachable.
     const points = marks.map((m, j) => {
@@ -1070,7 +1118,10 @@ function loop(mine: number) {
       : wantsPinch && held !== undefined && now - held >= PINCH_CONFIRM_MS && settledLongEnough
     // The release is only reported RELEASE_MS after the fingers opened; the
     // moment they opened is what a throw is measured around.
-    if (hand.pinched && !pinched) letGo.set(i, opened ?? now)
+    if (hand.pinched && !pinched) {
+      const at = opened ?? now
+      throws.set(i, { at, ...palmPeak(i, at - THROW_BEFORE_MS, at + THROW_AFTER_MS) })
+    }
     if (!pinched) openSince.delete(i)
     hand.closeness = Math.max(0, Math.min(1, 1 - (gap - PINCH_ON) / (PINCH_OFF - PINCH_ON)))
 
@@ -1239,7 +1290,8 @@ export function disableHands(): void {
   spans.clear()
   pinchSince.clear()
   openSince.clear()
-  letGo.clear()
+  palms.clear()
+  throws.clear()
   poseChangedAt.clear()
   // Give the hold back rather than tearing the stream down: the camera blade
   // may still be showing it, and stopping the tracks would blank it.
@@ -1269,15 +1321,16 @@ export function disableHands(): void {
  * has no business deciding that a bigger box means a bigger blade.
  */
 /**
- * When a hand last let go, on the performance.now() clock, or null.
+ * How a hand was moving at the moment it last let go, in screen pixels per ms
+ * of its raw palm position, with when that was (performance.now()), or null.
  *
- * A throw and a quick shove both move fast; what separates them is whether the
- * hand was still moving at the instant it let go. The release event arrives a
- * beat later than that instant (see RELEASE_MS), so this is how anything
- * listening for releases finds the instant itself.
+ * A throw and a quick shove both move fast; what separates them is whether
+ * the hand was still moving at the instant it let go, and that instant comes a
+ * beat before the release event (see RELEASE_MS). Measured on the raw palm,
+ * because the smoothed cursor lags a sudden flick by most of its length.
  */
-export function letGoAt(id: number): number | null {
-  return letGo.get(id) ?? null
+export function throwOf(id: number): { at: number; vx: number; vy: number; speed: number } | null {
+  return throws.get(id) ?? null
 }
 
 /**
