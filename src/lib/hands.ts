@@ -405,6 +405,11 @@ const THRUST_WINDOW_MS = 600
 const pinchSince = new Map<number, number>()
 /** When a held pinch's fingers first read apart, per hand — see RELEASE_MS. */
 const openSince = new Map<number, number>()
+/**
+ * When each hand last let go: the moment its fingers first came apart at the
+ * end of a pinch, or the moment it vanished while pinching. See letGoAt.
+ */
+const letGo = new Map<number, number>()
 /** When the finger pose last changed, per hand — see POSE_SETTLE_MS. */
 const poseChangedAt = new Map<number, number>()
 
@@ -906,6 +911,8 @@ async function ensureModel() {
 function dropHand(i: number) {
   const at = hands.findIndex((h) => h.id === i)
   if (at === -1) return
+  // A hand lost mid-pinch, usually to motion blur in a fast throw, let go now.
+  if (hands[at].pinched) letGo.set(i, performance.now())
   releasePress(i, hands[at])
   hands.splice(at, 1)
   filters.get(i)?.cursor.reset()
@@ -1061,6 +1068,9 @@ function loop(mine: number) {
     const pinched = hand.pinched
       ? wantsPinch || (opened !== undefined && now - opened < RELEASE_MS)
       : wantsPinch && held !== undefined && now - held >= PINCH_CONFIRM_MS && settledLongEnough
+    // The release is only reported RELEASE_MS after the fingers opened; the
+    // moment they opened is what a throw is measured around.
+    if (hand.pinched && !pinched) letGo.set(i, opened ?? now)
     if (!pinched) openSince.delete(i)
     hand.closeness = Math.max(0, Math.min(1, 1 - (gap - PINCH_ON) / (PINCH_OFF - PINCH_ON)))
 
@@ -1229,6 +1239,7 @@ export function disableHands(): void {
   spans.clear()
   pinchSince.clear()
   openSince.clear()
+  letGo.clear()
   poseChangedAt.clear()
   // Give the hold back rather than tearing the stream down: the camera blade
   // may still be showing it, and stopping the tracks would blank it.
@@ -1257,6 +1268,18 @@ export function disableHands(): void {
  * Published as a plain distance. This file does not know what is on screen and
  * has no business deciding that a bigger box means a bigger blade.
  */
+/**
+ * When a hand last let go, on the performance.now() clock, or null.
+ *
+ * A throw and a quick shove both move fast; what separates them is whether the
+ * hand was still moving at the instant it let go. The release event arrives a
+ * beat later than that instant (see RELEASE_MS), so this is how anything
+ * listening for releases finds the instant itself.
+ */
+export function letGoAt(id: number): number | null {
+  return letGo.get(id) ?? null
+}
+
 /**
  * How much a hand has grown on screen in the last moment: 1 is not at all,
  * 1.25 is a quarter bigger.

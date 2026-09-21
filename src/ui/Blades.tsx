@@ -4,7 +4,7 @@ import { useStore, type Blade } from '../store'
 import { BRIDGE_HTTP_URL } from '../config'
 import { withMedia } from '../lib/auth'
 import { sanitisePanelHtml } from './sanitise'
-import { frameSpan, peaceScroll, pointScroll, thrustOf } from '../lib/hands'
+import { frameSpan, letGoAt, peaceScroll, pointScroll, thrustOf } from '../lib/hands'
 import { targetFor, throwBlade } from '../lib/sync'
 import * as camera from '../lib/camera'
 
@@ -248,13 +248,15 @@ const Body = memo(function Body({ blade }: { blade: Blade }) {
  * it with a mouse or a finger. Its direction is the direction of the fastest
  * part of the movement, which picks the device on the map (DEVICES tab).
  *
- * The fastest part, not the last part. A hand's release is only known about a
- * seventh of a second after the fingers open (see RELEASE_MS in hands.ts),
- * and by then a real throw has slowed, and the hand is often swinging back.
- * Reading the direction off those last moments pointed throws the wrong way,
- * which is why a throw that was lit up as aimed at the iPad arrived as "no
- * device that way". A mouse lets go at once, so it looks back only briefly;
- * a fast drag followed by a pause is a put-down, not a throw.
+ * What makes it a throw is moving fast at the instant of letting go. A quick
+ * shove is just as fast, but the hand stops and then opens; a dart is let go
+ * mid-flight. So for a hand, speed and direction are measured around the
+ * moment the fingers came apart (letGoAt in hands.ts), not at the release
+ * event, which arrives a seventh of a second later when the throw has slowed
+ * and the hand is often swinging back. Measuring at the event pointed throws
+ * the wrong way; measuring the fastest part of the last half second counted
+ * a shove the same as a throw and threw nothing. A mouse lets go at once, so
+ * it looks back only briefly.
  *
  * A push at the screen still counts, aimed where the blade was carried (see
  * thrustOf in hands.ts). Nothing is thrown unless another device is open, so
@@ -263,29 +265,35 @@ const Body = memo(function Body({ blade }: { blade: Blade }) {
 
 /** A mouse or touch movement this fast, in px per ms, is a flick. */
 const FLICK = 1.1
-/** A hand movement this fast is a throw. */
-const HAND_FLICK = 1.5
+/** A hand moving this fast as it lets go is throwing. */
+const HAND_FLICK = 1.2
 /** How much a hand must grow on camera to count as pushed at the screen. */
 const THRUST = 1.2
 /** How far a blade must be carried towards a device for that to be the aim. */
 const AIM_PX = 80
-/** How far back from the release to look for the throw, by hand and otherwise. */
-const HAND_LOOKBACK_MS = 480
+/** Around a hand's let-go: from this long before it to this long after. */
+const LETGO_BEFORE_MS = 200
+const LETGO_AFTER_MS = 80
+/** Without a known let-go, how far back from the release to look. */
+const HAND_LOOKBACK_MS = 300
 const FLICK_LOOKBACK_MS = 150
 
 type Release = { dx: number; dy: number; vx: number; vy: number; speed: number; pointerId: number }
 type Sample = { t: number; x: number; y: number }
 
 /**
- * The fastest the pointer moved, over any stretch of about 70ms ending within
- * `lookback` of the last sample, and in which direction.
+ * The fastest the pointer moved, over any stretch of about 70ms ending between
+ * `from` and `to`, and in which direction.
  */
-function peakVelocity(trail: Sample[], lookback: number) {
-  const end = trail[trail.length - 1]
+function peakVelocity(trail: Sample[], from: number, to: number) {
   let best = { vx: 0, vy: 0, speed: 0 }
-  for (let j = trail.length - 1; j > 0 && end.t - trail[j].t <= lookback; j--) {
+  for (let j = trail.length - 1; j > 0; j--) {
+    if (trail[j].t > to) continue
+    if (trail[j].t < from) break
+    // Both ends inside the window: a stretch that merely ends in it can reach
+    // back to movement from before, and count a shove that had stopped.
     let i = j
-    while (i > 0 && trail[j].t - trail[i - 1].t <= 70) i--
+    while (i > 0 && trail[i - 1].t >= from && trail[j].t - trail[i - 1].t <= 70) i--
     const dt = trail[j].t - trail[i].t
     if (dt < 12) continue
     const vx = (trail[j].x - trail[i].x) / dt
@@ -400,7 +408,13 @@ function Card({
       window.removeEventListener('pointercancel', done)
       if (!onRelease || ev.type === 'pointercancel') return
       const last = trail[trail.length - 1]
-      const peak = peakVelocity(trail, id >= 9000 ? HAND_LOOKBACK_MS : FLICK_LOOKBACK_MS)
+      // For a hand, around the instant it let go if the tracker saw it (and
+      // saw it during this grab); otherwise the last moment before release.
+      const opened = id >= 9000 ? letGoAt(id - 9000) : null
+      const peak =
+        opened !== null && opened >= trail[0].t
+          ? peakVelocity(trail, opened - LETGO_BEFORE_MS, opened + LETGO_AFTER_MS)
+          : peakVelocity(trail, last.t - (id >= 9000 ? HAND_LOOKBACK_MS : FLICK_LOOKBACK_MS), last.t)
       onRelease({ dx: last.x - sx, dy: last.y - sy, ...peak, pointerId: id })
     }
     window.addEventListener('pointermove', move)
@@ -429,11 +443,21 @@ function Card({
   /** On letting go: put it down, or throw it. `from` is where it was picked up. */
   const release = (from: { x: number; y: number }) => (r: Release) => {
     setAim(null)
-    if (!throwable || expanded || !othersOnline()) return
+    if (!throwable || expanded) return
     const hand = r.pointerId >= 9000
-    const flicked = r.speed >= (hand ? HAND_FLICK : FLICK)
+    const need = hand ? HAND_FLICK : FLICK
+    const flicked = r.speed >= need
     const pushed = hand && thrustOf(r.pointerId - 9000) >= THRUST
-    if (!flicked && !pushed) return
+    if (!othersOnline()) {
+      // Say so only when it looked like a throw; a plain drag says nothing.
+      if (flicked) showNote('No other device is open. Power JARVIS up on the other one first.')
+      return
+    }
+    if (!flicked && !pushed) {
+      // Close to a throw: say what was missing rather than leaving him to guess.
+      if (hand && r.speed >= need * 0.45) showNote('Nearly. Let go while your hand is still moving fast.')
+      return
+    }
 
     // A throw goes the way its fastest movement went; a push with no real
     // movement goes where the blade was carried.
