@@ -130,15 +130,16 @@ const SKELETON_BETA = 0.03
  * keep one, so the press cannot flicker on the boundary.
  */
 /*
- * Tightened to 0.35, on his word: a pinch should only register when thumb and
- * finger are properly together. It was 0.40, then loosened to 0.45 when
- * pinches were not registering at all; that turned out to be the settling
- * window and the unreachable top of the screen (both fixed since), and at 0.45
- * a loose, half-closed hand was read as a pinch. The fingertip landmarks sit
- * at the centre of each fingertip, so fingers pressed together still leave a
- * gap of about a finger's width; 0.35 allows for that and no more.
+ * Tightened to 0.28, on his word, twice: a pinch should only register when
+ * thumb and finger are properly together. It was 0.40, then loosened to 0.45
+ * when pinches were not registering at all; that turned out to be the
+ * settling window and the unreachable top of the screen (both fixed since),
+ * and at 0.45 a loose, half-closed hand read as a pinch; 0.35 still caught too
+ * much. The fingertip landmarks sit at the centre of each fingertip, so tips
+ * pressed together still leave a gap of about a finger's width, near 0.2 of
+ * the hand; 0.28 allows for that and a little tracking noise, no more.
  */
-const PINCH_ON = 0.35
+const PINCH_ON = 0.28
 /*
  * Letting go takes clearly opening, well past where a pinch starts: a hand
  * dragging something relaxes its grip without meaning to, and at a tight
