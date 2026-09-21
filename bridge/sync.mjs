@@ -142,9 +142,17 @@ const sendTo = (socket, msg) => {
 
 function deviceList() {
   const online = new Set(clients.values())
+  // Two browsers on Windows are both "Windows PC" until he renames one; the
+  // second and later are numbered so the map and the notes can tell them apart.
+  const seen = new Map()
+  const named = (name) => {
+    const n = (seen.get(name) ?? 0) + 1
+    seen.set(name, n)
+    return n === 1 ? name : `${name} (${n})`
+  }
   return Object.entries(state.devices).map(([id, d]) => ({
     id,
-    name: d.name,
+    name: named(d.name),
     kind: d.kind,
     x: d.x,
     y: d.y,

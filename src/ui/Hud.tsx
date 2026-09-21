@@ -7,7 +7,7 @@ import { Blades, ThrowAim } from './Blades'
 import { Effects } from './Effects'
 import { Pointer } from './Pointer'
 import { GestureGuide } from './GestureGuide'
-import { diag as handDiag } from '../lib/hands'
+import { diag as handDiag, hands as trackedHands } from '../lib/hands'
 
 const statusText: Record<Phase, string> = {
   offline: 'OFFLINE',
@@ -162,9 +162,15 @@ export function Hud() {
   // The tracker's real frame rate, beside the camera light. A throw is measured
   // frame by frame, so this is the first thing to look at when one fails.
   const [fps, fps_] = useState(0)
+  // Which hands the camera can see right now, by the side it takes them for.
+  const [seen, seen_] = useState('')
   useEffect(() => {
     if (!gestures) return
-    const t = window.setInterval(() => fps_(handDiag.fps), 1000)
+    const t = window.setInterval(() => {
+      fps_(handDiag.fps)
+      const sides = trackedHands.map((h) => (h.handedness === 'right' ? 'RIGHT' : 'LEFT')).sort()
+      seen_(sides.length ? sides.join(' + ') : 'NO HANDS')
+    }, 400)
     return () => window.clearInterval(t)
   }, [gestures])
   const looking = useStore((s) => s.looking)
@@ -377,7 +383,7 @@ export function Hud() {
       <Pointer />
       {(gestures || looking) && (
         <div className="hands-live">
-          {looking ? `LOOKING — ${looking.toUpperCase()}` : `CAMERA ON · ${fps} FPS · G TO STOP`}
+          {looking ? `LOOKING — ${looking.toUpperCase()}` : `CAMERA ON · ${fps} FPS · SEES ${seen || 'NO HANDS'} · G TO STOP`}
         </div>
       )}
       <GestureGuide />

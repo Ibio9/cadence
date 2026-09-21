@@ -650,9 +650,10 @@ function DevicesPanel() {
     <div className="tabpanel-body" data-hit-rescue>
       <p className="dev-hint">
         Every device with JARVIS open shows up here. Drag them to where they really sit, then throw a
-        blade towards one: pinch it, carry it that way, and push it at the screen as you let go. With a
+        blade towards one: pinch it, swing your hand that way and open your fingers mid-swing. With a
         mouse or a finger, flick it.
       </p>
+
 
       <div className="dev-map" ref={box}>
         {devices.length === 0 && <p className="tt-empty dev-empty">Connecting…</p>}

@@ -115,7 +115,7 @@ const MAP_H = 1
  * one other device open it only has to be thrown towards its side of the
  * room; with several, direction has to choose between them.
  */
-const CONE_ONE = (90 * Math.PI) / 180
+const CONE_ONE = (110 * Math.PI) / 180
 const CONE_MANY = (60 * Math.PI) / 180
 
 const angleTo = (from: Device, to: Device) => Math.atan2((to.y - from.y) * MAP_H, (to.x - from.x) * MAP_W)
@@ -140,6 +140,39 @@ export function targetFor(angle: number): Device | null {
     }
   }
   return off <= (others.length === 1 ? CONE_ONE : CONE_MANY) ? best : null
+}
+
+/** A direction on screen or on the map, in words: 'to the right', 'up and to the left'. */
+export function way(angle: number): string {
+  const names = [
+    'to the right', 'down and to the right', 'downwards', 'down and to the left',
+    'to the left', 'up and to the left', 'upwards', 'up and to the right',
+  ]
+  const i = Math.round(((angle + 2 * Math.PI) % (2 * Math.PI)) / (Math.PI / 4)) % 8
+  return names[i]
+}
+
+/**
+ * The open device nearest in direction to a throw, and which way it lies,
+ * whether or not the throw was close enough to reach it. For saying what went
+ * wrong when a throw reaches nothing.
+ */
+export function nearestTo(angle: number): { name: string; angle: number } | null {
+  const { devices } = useStore.getState()
+  const here = devices.find((d) => d.id === thisDevice().id)
+  if (!here) return null
+  let best: { name: string; angle: number } | null = null
+  let off = Infinity
+  for (const d of devices) {
+    if (d.id === here.id || !d.online) continue
+    const a = angleTo(here, d)
+    const diff = between(a, angle)
+    if (diff < off) {
+      off = diff
+      best = { name: d.name, angle: a }
+    }
+  }
+  return best
 }
 
 /** Send a blade to whichever device is that way. Null if nothing is. */

@@ -269,6 +269,7 @@ export type Side = 'left' | 'right'
  */
 const SWAP_HANDEDNESS = false
 
+
 /**
  * Which tracked hand a detection belongs to.
  *
@@ -399,10 +400,8 @@ const filters = new Map<number, Filters>()
 
 /** Recent cursor positions per hand, so a press can aim from before the pinch. */
 const trails = new Map<number, { x: number; y: number; at: number }[]>()
-/** Recent hand sizes per hand, for telling a push at the screen from a drag across it. */
-const spans = new Map<number, { at: number; span: number }[]>()
-/** Long enough to cover the push and the release that follows it. */
-const THRUST_WINDOW_MS = 600
+/** Recent thumb-to-finger gaps per hand, for how fast a pinch opened; see throwOf. */
+const gaps = new Map<number, { t: number; g: number }[]>()
 /** When the fingers first closed, per hand — see PINCH_CONFIRM_MS. */
 const pinchSince = new Map<number, number>()
 /** When a held pinch's fingers first read apart, per hand — see RELEASE_MS. */
@@ -412,8 +411,32 @@ const openSince = new Map<number, number>()
  * none of the smoothing the cursor gets. For measuring throws, see throwOf.
  */
 const palms = new Map<number, { t: number; x: number; y: number }[]>()
-/** Each hand's movement at the moment it last let go; see throwOf. */
-const throws = new Map<number, { at: number; vx: number; vy: number; speed: number }>()
+/** How each hand let go last time: moving how, and opening how; see throwOf. */
+export type LetGo = {
+  at: number
+  vx: number
+  vy: number
+  speed: number
+  /** How fast the gap between thumb and finger grew, per ms, at its quickest. */
+  snap: number
+  /** How wide it opened, as a fraction of the hand's size. */
+  wide: number
+}
+const throws = new Map<number, LetGo>()
+
+/** How fast and how wide a pinch opened, from just before it let go to now. */
+function snapOf(id: number, at: number) {
+  const trail = gaps.get(id) ?? []
+  let snap = 0
+  let wide = 0
+  for (let k = 1; k < trail.length; k++) {
+    if (trail[k].t < at - 70) continue
+    const dt = trail[k].t - trail[k - 1].t
+    if (dt >= 8) snap = Math.max(snap, (trail[k].g - trail[k - 1].g) / dt)
+    wide = Math.max(wide, trail[k].g)
+  }
+  return { snap, wide }
+}
 /** Around the moment of letting go: from this long before to this long after. */
 const THROW_BEFORE_MS = 180
 const THROW_AFTER_MS = 100
@@ -939,10 +962,12 @@ function dropHand(i: number) {
   const at = hands.findIndex((h) => h.id === i)
   if (at === -1) return
   // A hand lost mid-pinch has usually been lost to motion blur in a fast
-  // throw: the blur is the evidence. It let go now, moving as it last moved.
+  // throw: the blur is the evidence. It let go now, moving as it last moved:
+  // its final few frames, not the fastest of the last moment, which in a
+  // throw with a wind-up is as likely to be the wind-up.
   if (hands[at].pinched) {
     const now = performance.now()
-    throws.set(i, { at: now, ...palmPeak(i, now - THROW_BEFORE_MS - 120, now) })
+    throws.set(i, { at: now, ...palmPeak(i, now - 110, now), snap: 0, wide: 0 })
   }
   palms.delete(i)
   releasePress(i, hands[at])
@@ -952,7 +977,7 @@ function dropHand(i: number) {
   settling.delete(i)
   sideVote.delete(i)
   trails.delete(i)
-  spans.delete(i)
+  gaps.delete(i)
   pinchSince.delete(i)
   openSince.delete(i)
   poseChangedAt.delete(i)
@@ -1056,10 +1081,6 @@ function loop(mine: number) {
     })
 
     const span = dist(points[WRIST], points[MIDDLE_MCP]) || 1
-    const recent = spans.get(i) ?? []
-    recent.push({ at: now, span })
-    while (recent.length > 1 && now - recent[0].at > THRUST_WINDOW_MS) recent.shift()
-    spans.set(i, recent)
 
     /*
      * The pinch is measured in the camera's own geometry, not on screen.
@@ -1073,6 +1094,10 @@ function loop(mine: number) {
     const rawDist = (a: number, b: number) =>
       Math.hypot((marks[a].x - marks[b].x) * aspect, marks[a].y - marks[b].y)
     const gap = rawDist(THUMB_TIP, INDEX_TIP) / (rawDist(WRIST, MIDDLE_MCP) || 1)
+    const gapTrail = gaps.get(i) ?? []
+    gapTrail.push({ t: now, g: gap })
+    while (gapTrail.length > 2 && now - gapTrail[0].t > 600) gapTrail.shift()
+    gaps.set(i, gapTrail)
 
     let hand = hands.find((q) => q.id === i)
     if (!hand) {
@@ -1120,7 +1145,7 @@ function loop(mine: number) {
     // moment they opened is what a throw is measured around.
     if (hand.pinched && !pinched) {
       const at = opened ?? now
-      throws.set(i, { at, ...palmPeak(i, at - THROW_BEFORE_MS, at + THROW_AFTER_MS) })
+      throws.set(i, { at, ...palmPeak(i, at - THROW_BEFORE_MS, at + THROW_AFTER_MS), ...snapOf(i, at) })
     }
     if (!pinched) openSince.delete(i)
     hand.closeness = Math.max(0, Math.min(1, 1 - (gap - PINCH_ON) / (PINCH_OFF - PINCH_ON)))
@@ -1287,7 +1312,7 @@ export function disableHands(): void {
   settling.clear()
   sideVote.clear()
   trails.clear()
-  spans.clear()
+  gaps.clear()
   pinchSince.clear()
   openSince.clear()
   palms.clear()
@@ -1321,37 +1346,17 @@ export function disableHands(): void {
  * has no business deciding that a bigger box means a bigger blade.
  */
 /**
- * How a hand was moving at the moment it last let go, in screen pixels per ms
- * of its raw palm position, with when that was (performance.now()), or null.
+ * How a hand last let go, with when (performance.now()), or null: how its raw
+ * palm was moving, in screen pixels per ms, and how its pinch opened.
  *
- * A throw and a quick shove both move fast; what separates them is whether
- * the hand was still moving at the instant it let go, and that instant comes a
- * beat before the release event (see RELEASE_MS). Measured on the raw palm,
- * because the smoothed cursor lags a sudden flick by most of its length.
+ * A throw is a pinch snapped open: the gap between thumb and finger jumping
+ * wide in a frame or two, where putting something down lets it drift open.
+ * Measured from just before the fingers first read apart, because the release
+ * event arrives a beat later (see RELEASE_MS). The palm is measured raw, since
+ * the smoothed cursor lags any sudden movement by most of its length.
  */
-export function throwOf(id: number): { at: number; vx: number; vy: number; speed: number } | null {
+export function throwOf(id: number): LetGo | null {
   return throws.get(id) ?? null
-}
-
-/**
- * How much a hand has grown on screen in the last moment: 1 is not at all,
- * 1.25 is a quarter bigger.
- *
- * A hand pushed toward the camera grows; one moved across the screen does
- * not. That difference is the darts throw: grip a blade, push it at the
- * screen and let go. Measured as the biggest growth from any earlier sample
- * to any later one, so it survives the hand easing back as the fingers open.
- */
-export function thrustOf(id: number): number {
-  const recent = spans.get(id)
-  if (!recent || recent.length < 2) return 1
-  let low = recent[0].span
-  let best = 1
-  for (const p of recent) {
-    best = Math.max(best, p.span / (low || 1))
-    low = Math.min(low, p.span)
-  }
-  return best
 }
 
 /**

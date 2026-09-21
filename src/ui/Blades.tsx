@@ -4,8 +4,9 @@ import { useStore, type Blade } from '../store'
 import { BRIDGE_HTTP_URL } from '../config'
 import { withMedia } from '../lib/auth'
 import { sanitisePanelHtml } from './sanitise'
-import { frameSpan, peaceScroll, pointScroll, throwOf, thrustOf } from '../lib/hands'
-import { targetFor, throwBlade } from '../lib/sync'
+import { frameSpan, peaceScroll, pointScroll, throwOf } from '../lib/hands'
+import { isConnected } from '../lib/bridge'
+import { nearestTo, targetFor, thisDevice, throwBlade, way } from '../lib/sync'
 import * as camera from '../lib/camera'
 
 /**
@@ -243,38 +244,44 @@ const Body = memo(function Body({ blade }: { blade: Blade }) {
 /**
  * Throwing a blade to another device.
  *
- * A throw is a fast movement ending in a release, from wherever the blade
- * is: pinch it and flick your hand towards the device like a dart, or flick
- * it with a mouse or a finger. Its direction is the direction of the fastest
- * part of the movement, which picks the device on the map (DEVICES tab).
+ * By hand, a throw is a pinch snapped open. Pinch the blade, carry it towards
+ * the device you mean (the edge of the screen facing it lights up and names
+ * it), then flick your fingers open fast. Letting go normally, fingers
+ * drifting apart, puts it down as it always has. The snap is measured by the
+ * tracker as the gap between thumb and finger jumps wide (throwOf in
+ * hands.ts). Where it goes: the way the blade was carried, or failing that
+ * the way the hand was moving, or, with only one other device open, there.
  *
- * What makes it a throw is moving fast at the instant of letting go. A quick
- * shove is just as fast, but the hand stops and then opens; a dart is let go
- * mid-flight. So for a hand, speed and direction come from the tracker
- * (throwOf in hands.ts): the raw palm, measured around the moment the fingers
- * came apart, or the moment the hand vanished mid-swing, which a fast throw
- * blurs it into. Not from the pointer this file sees, which follows the
- * smoothed cursor and lags a flick by most of its length. A mouse lets go at
- * once, so it looks back only briefly.
- *
- * A push at the screen still counts, aimed where the blade was carried (see
- * thrustOf in hands.ts). Nothing is thrown unless another device is open, so
- * a quick drag with one device on behaves exactly as it always has.
+ * With a mouse or a finger, a throw is a flick: let go while moving fast.
+ * Nothing is thrown unless another device is open.
  */
 
 /** A mouse or touch movement this fast, in px per ms, is a flick. */
 const FLICK = 1.1
-/** A hand moving this fast as it lets go is throwing (raw palm, px per ms). */
-const HAND_FLICK = 1.3
-/** How much a hand must grow on camera to count as pushed at the screen. */
-const THRUST = 1.2
+/**
+ * A pinch opening this fast (gap per ms, as a fraction of the hand) and this
+ * wide is a snap. Letting go normally opens at a small fraction of this rate.
+ */
+const SNAP_RATE = 0.008
+const SNAP_WIDE = 1.1
 /** How far a blade must be carried towards a device for that to be the aim. */
 const AIM_PX = 80
+/** A hand moving this fast as it snaps aims by its movement, if not carried. */
+const HAND_AIM_SPEED = 0.8
 /** Without the tracker's measurement, how far back from the release to look. */
 const HAND_LOOKBACK_MS = 300
 const FLICK_LOOKBACK_MS = 150
 
-type Release = { dx: number; dy: number; vx: number; vy: number; speed: number; pointerId: number }
+type Release = {
+  dx: number
+  dy: number
+  vx: number
+  vy: number
+  speed: number
+  pointerId: number
+  snap?: number
+  wide?: number
+}
 type Sample = { t: number; x: number; y: number }
 
 /**
@@ -411,7 +418,14 @@ function Card({
         measured && measured.at >= trail[0].t
           ? measured
           : peakVelocity(trail, last.t - (id >= 9000 ? HAND_LOOKBACK_MS : FLICK_LOOKBACK_MS), last.t)
-      onRelease({ dx: last.x - sx, dy: last.y - sy, ...peak, pointerId: id })
+      // Where it had been carried to when the fingers began to open. The
+      // cursor rides the index fingertip, and a snap flicks that fingertip, so
+      // counting movement after that moment would let the snap itself aim.
+      const aimedFrom =
+        measured && measured.at >= trail[0].t
+          ? ([...trail].reverse().find((p) => p.t <= measured.at) ?? trail[0])
+          : last
+      onRelease({ dx: aimedFrom.x - sx, dy: aimedFrom.y - sy, ...peak, pointerId: id })
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', done)
@@ -441,33 +455,51 @@ function Card({
     setAim(null)
     if (!throwable || expanded) return
     const hand = r.pointerId >= 9000
-    const need = hand ? HAND_FLICK : FLICK
-    const flicked = r.speed >= need
-    const pushed = hand && thrustOf(r.pointerId - 9000) >= THRUST
-    if (!othersOnline()) {
-      // Say so only when it looked like a throw; a plain drag says nothing.
-      if (flicked) showNote('No other device is open. Power JARVIS up on the other one first.')
-      return
-    }
-    if (!flicked && !pushed) {
-      // Close to a throw: say what was missing rather than leaving him to guess.
-      if (hand && r.speed >= need * 0.4) {
-        showNote(`Nearly: speed ${r.speed.toFixed(1)}, a throw needs ${need}. Let go mid-swing.`)
+    const snap = r.snap ?? 0
+    const wide = r.wide ?? 0
+    const thrown = hand ? snap >= SNAP_RATE && wide >= SNAP_WIDE : r.speed >= FLICK
+    if (!thrown) {
+      // A snap that nearly made it: say how near, so it can be learnt.
+      if (hand && othersOnline() && snap >= SNAP_RATE * 0.5 && wide >= SNAP_WIDE * 0.8) {
+        showNote(`Nearly: that opened ${Math.round((snap / SNAP_RATE) * 100)}% as fast as a throw. Snap them open quicker.`)
       }
       return
     }
+    if (!othersOnline()) {
+      showNote('No other device is open. Power JARVIS up on the other one first.')
+      return
+    }
 
-    // A throw goes the way its fastest movement went; a push with no real
-    // movement goes where the blade was carried.
+    // Where to: the way it was carried, else the way the hand or pointer was
+    // going, else the one other device if there is only one.
     const carried = Math.hypot(r.dx, r.dy) >= AIM_PX
-    const angle = flicked ? Math.atan2(r.vy, r.vx) : carried ? Math.atan2(r.dy, r.dx) : null
+    let angle: number | null = carried
+      ? Math.atan2(r.dy, r.dx)
+      : r.speed >= (hand ? HAND_AIM_SPEED : FLICK)
+        ? Math.atan2(r.vy, r.vx)
+        : null
     if (angle === null) {
-      showNote('Flick it towards a device to throw it.')
+      const { devices } = useStore.getState()
+      const others = devices.filter((d) => d.online && d.id !== thisDevice().id)
+      if (others.length === 1) angle = nearestTo(0)?.angle ?? null
+    }
+    if (angle === null) {
+      showNote('Carry it towards a device first, then snap your fingers open.')
       return
     }
     const to = throwBlade(blade, angle)
     if (!to) {
-      showNote('No device that way. Arrange them in the DEVICES tab.')
+      // Say what it was read as and where the device actually is: a camera
+      // that flips left and right shows up here at once, as does a map laid
+      // out differently from the desk.
+      const near = nearestTo(angle)
+      showNote(
+        !isConnected()
+          ? 'Not connected to the other devices right now; try again in a moment.'
+          : near
+            ? `That read as a throw ${way(angle)}, but ${near.name} is ${way(near.angle)} on the map.`
+            : 'No other device is open.',
+      )
       setPos(from)
       return
     }
