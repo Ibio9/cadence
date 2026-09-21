@@ -11,23 +11,43 @@
  * overnight does not greet him with yesterday's date and yesterday's countdown.
  */
 
-/** School starts at 09:00 every weekday. Only the finish time moves. */
-const SCHOOL_END = {
-  1: '14:00', // Monday
-  2: '16:10', // Tuesday
-  3: '16:10', // Wednesday
-  4: '14:00', // Thursday
-  5: '16:10', // Friday
-}
+import { readFileSync } from 'node:fs'
 
 /**
- * Homework set on the same weekday every week. Mirrors SET_WORK in
- * src/lib/schedule.ts, which puts the placeholders on the list; edit both.
+ * His timetable, set work and weekly Response hours, from shared/week.json:
+ * the same file the interface draws its timetable from, so JARVIS and the
+ * screen cannot disagree about when he is free. Read once at start; the file
+ * changes with a deploy, not while the bridge runs.
  */
-const SET_WORK = [
-  { subject: 'Philosophy', weekday: 1, day: 'Monday' },
-  { subject: 'Maths', weekday: 3, day: 'Wednesday' },
-]
+const WEEK = JSON.parse(readFileSync(new URL('../shared/week.json', import.meta.url), 'utf8'))
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+/**
+ * One school day as a line: "09:15-10:40 Maths, 11:05-12:30 EPQ, ...".
+ * Back-to-back periods of the same thing are joined, and break is left out,
+ * because it is the same every day and said once above.
+ */
+function dayLine(dow) {
+  const list = WEEK.days[String(dow)]
+  if (!list) return null
+  const label = (p) =>
+    p.kind === 'free' ? 'free' : p.kind === 'lunch' ? 'lunch' : p.kind === 'lab' ? 'lab time' : p.subject
+  const joined = []
+  for (const p of list) {
+    if (p.kind === 'break') continue
+    const last = joined[joined.length - 1]
+    const gap = last ? toMinutes(p.start) - toMinutes(last.end) : Infinity
+    if (last && last.label === label(p) && gap <= 5) last.end = p.end
+    else joined.push({ start: p.start, end: p.end, label: label(p) })
+  }
+  return joined.map((p) => `${p.start}-${p.end} ${p.label}`).join(', ')
+}
+
+function toMinutes(hm) {
+  const [h, m] = hm.split(':').map(Number)
+  return h * 60 + m
+}
 
 /**
  * The dates that are actually fixed.
@@ -74,7 +94,6 @@ function dateLine(iso, now) {
  */
 export function personalContext(now = new Date(), { hosted = false } = {}) {
   const dow = now.getDay()
-  const endsAt = SCHOOL_END[dow]
   const todayLine = british(now, {
     weekday: 'long',
     day: 'numeric',
@@ -82,13 +101,18 @@ export function personalContext(now = new Date(), { hosted = false } = {}) {
     year: 'numeric',
   })
 
-  const school = endsAt
-    ? `Today he is at school 09:00 to ${endsAt}.`
+  const today = dayLine(dow)
+  const school = today
+    ? `Today (${DAY_NAMES[dow]}): tutor ${WEEK.tutor.start}, then ${today}.`
     : 'There is no school today.'
+  const week = [1, 2, 3, 4, 5].map((d) => `- ${DAY_NAMES[d]}: ${dayLine(d)}`).join('\n')
 
   const clock = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-  const setToday = SET_WORK.filter((w) => w.weekday === dow).map((w) => w.subject)
-  const setWork = SET_WORK.map((w) => `- ${w.subject} homework is set every ${w.day}.`).join('\n')
+  const setToday = WEEK.setWork.filter((w) => w.weekday === dow).map((w) => w.subject)
+  const setWork = WEEK.setWork
+    .map((w) => `- ${w.subject} homework is set every ${DAY_NAMES[w.weekday]}.`)
+    .join('\n')
+  const hours = WEEK.homework.minutes / 60
   const setLine = setToday.length
     ? `${setToday.join(' and ')} homework is set today.`
     : 'Nothing is routinely set today.'
@@ -127,12 +151,17 @@ opened; it may be later now.
 Work out every countdown from that date. Never ask him what day it is.
 
 HIS WEEK
-School is 09:00 every weekday. The finish time is what moves:
-- Monday and Thursday, school ends at 14:00.
-- Tuesday, Wednesday and Friday, school ends at 16:10.
+Tutor time ${WEEK.tutor.start}-${WEEK.tutor.end} every weekday, break 10:40-11:00, and
+lunch always ends at 14:00. Afternoon periods are 14:00-14:40, 14:45-15:25 and
+15:30-16:10.
+${week}
 ${school}
-Evenings and weekends are his own. Do not invent standing commitments for him;
-if something is not on his to-do list or in the fixed dates below, it is free.
+The frees are his to use. Tuesday's lab time is for the to-do list or TARA
+practice: when it comes up, recommend one or the other specifically, and for
+the TARA name the weakest question type rather than saying "practise".
+Evenings and weekends are otherwise his own. Do not invent standing
+commitments for him beyond the blocks the interface plans (below); if
+something is not on his to-do list or in the fixed dates, it is free.
 
 SET WORK
 ${setWork}
@@ -140,8 +169,18 @@ ${setLine}
 Teams does not email him when work is set and nothing can read it, so this is
 an assumption, not knowledge. On the day, the interface puts a placeholder on
 his list ("Philosophy homework"), marked (assumed), due a week later. That due
-day is a guess too. Treat set work as real when you plan: give it time in the
-free blocks before its due day, the nearest deadline first.
+day is a guess too. The interface sets aside ${hours} hours for it from
+${WEEK.homework.start} that evening, or the next evening before it is due if that one
+has gone.
+
+RESPONSE
+He owes one hour of Response a week in each of ${WEEK.response.subjects.join(', ')}.
+The interface puts the three on his list every Monday, due Sunday, and places
+each in the next free space that fits: the end-of-day frees and lab time
+first, then evenings, one a day where the week allows. A missed one moves on
+by itself; a ticked one stops being placed. list_tasks gives the PLANNED times,
+which are what his timetable shows: use them, and when he says he has done one,
+tick it with update_task (done: true).
 
 FIXED DATES
 ${upcoming || '- Nothing fixed left on the calendar.'}
@@ -172,7 +211,7 @@ whenever he makes the M gesture. When it does, in this order:
 1. His unread mail, summarised. Split it into what needs a reply, what is
    purely informational, and anything carrying a date or a deadline.
 2. The day, planned as an hourly timetable, built around school rather than
-   over it.
+   over it, with today's PLANNED blocks from list_tasks in their places.
 3. Any deadline inside the next fortnight, with the days remaining.
 4. One question: what he wants to do with the free blocks. One question, not a
    list of options. Except when an assumed placeholder is waiting and school has

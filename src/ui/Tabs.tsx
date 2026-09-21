@@ -1,7 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useStore, type Tab, type Todo } from '../store'
-import { dueLabel, isoDay, parseDue, setOn, upcoming } from '../lib/schedule'
+import {
+  dueLabel,
+  isoDay,
+  parseDue,
+  parseIso,
+  periodsFor,
+  plan,
+  setOn,
+  toMin,
+  upcoming,
+  type Block,
+  type Period,
+} from '../lib/schedule'
 import { OPENING_BRIEFING, NEWS_BRIEFING } from '../lib/briefing'
 
 /**
@@ -30,9 +42,51 @@ const TABS: { id: Exclude<Tab, null>; label: string }[] = [
 
 /* ------------------------------------------------------------------ timetable */
 
+/** What a period is called on the timetable. */
+function periodLabel(p: Period) {
+  switch (p.kind) {
+    case 'tutor':
+      return 'tutor time'
+    case 'break':
+      return 'break'
+    case 'lunch':
+      return 'lunch'
+    case 'free':
+      return 'free'
+    case 'lab':
+      return 'lab time · to-do or TARA'
+    default:
+      return p.subject ?? p.kind
+  }
+}
+
+const blockLength = (b: Block) => {
+  const mins = toMin(b.end) - toMin(b.start)
+  return mins % 60 ? `${mins} min` : `${mins / 60} hour${mins === 60 ? '' : 's'}`
+}
+
 function Timetable() {
   const todos = useStore((s) => s.todos)
-  const days = upcoming(7)
+  const toggle = useStore((s) => s.toggleTodo)
+  // The plan is worked out from the clock, so the clock has to tick for a
+  // missed block to move on while the tab is open.
+  const [now, now_] = useState(() => new Date())
+  useEffect(() => {
+    const t = window.setInterval(() => now_(new Date()), 60_000)
+    return () => window.clearInterval(t)
+  }, [])
+  const days = upcoming(7, now)
+  const blocks = plan(todos, now)
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  // Today open, the rest folded to what is planned in them; any can be opened.
+  const [open, open_] = useState<Set<string>>(() => new Set([isoDay(new Date())]))
+  const flip = (iso: string) =>
+    open_((s) => {
+      const next = new Set(s)
+      if (next.has(iso)) next.delete(iso)
+      else next.add(iso)
+      return next
+    })
 
   return (
     <div className="tabpanel-body" data-hit-rescue>
@@ -41,44 +95,98 @@ function Timetable() {
         // no date and everything overdue. Undated work has to surface somewhere
         // or it is invisible, and today is the only day it is actionable; late
         // work belongs on today because today is when it still has to happen.
-        const due = todos.filter((t) => t.due === d.iso)
+        // Planned items are left out here: they already have a time above.
+        const plannedIds = new Set(blocks.map((b) => b.todoId))
+        const due = todos.filter((t) => t.due === d.iso && !plannedIds.has(t.id) && t.kind !== 'response')
         const late = d.isToday ? todos.filter((t) => t.due && t.due < d.iso && !t.done) : []
         const loose = d.isToday ? todos.filter((t) => !t.due && !t.done) : []
         const items = [...late, ...due, ...loose]
-        const [y, m, day] = d.iso.split('-').map(Number)
-        const set = setOn(new Date(y, m - 1, day))
+        const date = parseIso(d.iso)
+        const set = setOn(date)
+        const mine = blocks.filter((b) => b.day === d.iso)
+        const expanded = open.has(d.iso)
+
+        // A block sitting in a free makes the free redundant on screen; lab
+        // time keeps its row because it is a named thing, not just a gap.
+        const periods = periodsFor(date).filter(
+          (p) =>
+            p.kind !== 'free' ||
+            !mine.some((b) => toMin(b.start) < toMin(p.end) && toMin(b.end) > toMin(p.start)),
+        )
+        type Row = { at: number; key: string; node: React.ReactNode }
+        const rows: Row[] = []
+        if (expanded) {
+          periods.forEach((p) => {
+            const live = d.isToday && nowMin >= toMin(p.start) && nowMin < toMin(p.end)
+            rows.push({
+              at: toMin(p.start),
+              key: `p${p.start}`,
+              node: (
+                <div className={`tt-row tt-${p.kind}${live ? ' tt-now' : ''}`}>
+                  <span className="tt-time">
+                    {p.start}–{p.end}
+                  </span>
+                  <span className="tt-what">{periodLabel(p)}</span>
+                </div>
+              ),
+            })
+          })
+        }
+        mine.forEach((b) => {
+          const live = d.isToday && nowMin >= toMin(b.start) && nowMin < toMin(b.end)
+          rows.push({
+            // Just after a period starting at the same minute, so lab time
+            // reads before the hour spent in it.
+            at: toMin(b.start) + 0.5,
+            key: `b${b.todoId || b.title}`,
+            node: (
+              <div className={`tt-row tt-plan tt-plan-${b.kind}${live ? ' tt-now' : ''}`}>
+                <span className="tt-time">
+                  {b.start}–{b.end}
+                </span>
+                <span className="tt-what">
+                  {b.title} <span className="tt-len">· {blockLength(b)}</span>
+                </span>
+                {b.todoId && (
+                  <button className="tt-tick" onClick={() => toggle(b.todoId)} aria-label={`Done: ${b.title}`}>
+                    ✓
+                  </button>
+                )}
+              </div>
+            ),
+          })
+        })
+        rows.sort((a, b) => a.at - b.at)
 
         return (
           <div className={d.isToday ? 'tt-day tt-today' : 'tt-day'} key={d.iso}>
-            <div className="tt-when">
+            <button className="tt-when" onClick={() => flip(d.iso)} aria-expanded={expanded}>
               <span className="tt-label">{d.label}</span>
               <span className="tt-school">
                 {d.school ? `school ${d.school.start} – ${d.school.end}` : 'no school'}
+                {set.length > 0 && ` · ${set.map((w) => w.subject).join(', ')} set`}
               </span>
-            </div>
+              <span className="tt-fold">{expanded ? '−' : '+'}</span>
+            </button>
 
-            {d.school && (
-              <div className="tt-slot tt-fixed">
-                {d.school.start} – {d.school.end} · school
+            {rows.map((r) => (
+              <div key={r.key}>{r.node}</div>
+            ))}
+
+            {items.length > 0 && (
+              <div className="tt-list">
+                {items.map((t) => (
+                  <div className={t.done ? 'tt-slot tt-done' : 'tt-slot'} key={t.id}>
+                    {t.text}
+                    {t.due && t.due < d.iso && <span className="tt-late"> · overdue</span>}
+                    {t.assumed && <span className="todo-assumed">assumed</span>}
+                  </div>
+                ))}
               </div>
             )}
 
-            {set.map((w) => (
-              <div className="tt-slot tt-fixed" key={w.subject}>
-                {w.subject} homework set
-              </div>
-            ))}
-
-            {items.length === 0 ? (
-              <div className="tt-slot tt-empty">nothing on the list</div>
-            ) : (
-              items.map((t) => (
-                <div className={t.done ? 'tt-slot tt-done' : 'tt-slot'} key={t.id}>
-                  {t.text}
-                  {t.due && t.due < d.iso && <span className="tt-late"> · overdue</span>}
-                  {t.assumed && <span className="todo-assumed">assumed</span>}
-                </div>
-              ))
+            {!expanded && rows.length === 0 && items.length === 0 && (
+              <div className="tt-slot tt-empty">nothing planned</div>
             )}
           </div>
         )
@@ -141,6 +249,9 @@ function TodoList() {
 
   const open = todos.filter((t) => !t.done).sort(byDue)
   const done = todos.filter((t) => t.done)
+  // Where the planner has put each item, so the list says when, not just by when.
+  const when = new Map(plan(todos).map((b) => [b.todoId, b]))
+  const today = isoDay(new Date())
 
   return (
     <div className="tabpanel-body" data-hit-rescue>
@@ -210,6 +321,13 @@ function TodoList() {
               <button className="todo-text" onClick={() => startText(t)} title="Edit">
                 {t.text}
                 {t.assumed && <span className="todo-assumed">assumed</span>}
+                {when.has(t.id) && (
+                  <span className="todo-planned">
+                    {when.get(t.id)!.day === today
+                      ? `today ${when.get(t.id)!.start}`
+                      : `${parseIso(when.get(t.id)!.day).toLocaleDateString('en-GB', { weekday: 'short' })} ${when.get(t.id)!.start}`}
+                  </span>
+                )}
               </button>
             )}
 

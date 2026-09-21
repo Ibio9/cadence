@@ -1,25 +1,26 @@
 /**
  * The shape of Ibrahim's week.
  *
- * Deliberately duplicated from bridge/personal.mjs rather than shared. The two
- * live on opposite sides of a socket and in different build systems, and the
- * alternative — a JSON file loaded by a Node bridge and imported by Vite — buys
- * one constant at the cost of a build step and a runtime fetch.
- *
- * The rule if it ever changes: edit both. There are exactly two places and
- * this comment is in one of them.
+ * The timetable itself lives in shared/week.json, read here by Vite and by
+ * bridge/personal.mjs through the file system. It used to be copied into both
+ * places by hand, which was tolerable for five finish times and is not for a
+ * full timetable: two copies of forty periods drift, and the symptom is JARVIS
+ * planning around a lesson the screen says is a free.
  */
+import WEEK from '../../shared/week.json'
 
-/** 0 is Sunday. School always starts at 09:00; only the finish moves. */
-const SCHOOL_END: Record<number, string> = {
-  1: '14:00', // Monday
-  2: '16:10',
-  3: '16:10',
-  4: '14:00', // Thursday
-  5: '16:10',
+export type PeriodKind = 'tutor' | 'lesson' | 'free' | 'lunch' | 'break' | 'lab' | 'sport' | 'society'
+export type Period = { start: string; end: string; kind: PeriodKind; subject?: string }
+
+/** Keyed by weekday, 1 is Monday; weekends are absent. */
+const DAYS = WEEK.days as Record<string, Period[]>
+
+/** The school day, tutor time first, or nothing on a weekend. */
+export function periodsFor(d: Date): Period[] {
+  const list = DAYS[String(d.getDay())]
+  if (!list) return []
+  return [{ ...WEEK.tutor, kind: 'tutor', subject: 'Tutor time' }, ...list]
 }
-
-export const SCHOOL_START = '09:00'
 
 export type Day = {
   /** 'YYYY-MM-DD', built from local parts so it names the day he is living in. */
@@ -45,8 +46,8 @@ export function isoDay(d: Date): string {
 }
 
 export function schoolFor(d: Date): Day['school'] {
-  const end = SCHOOL_END[d.getDay()]
-  return end ? { start: SCHOOL_START, end } : null
+  const list = DAYS[String(d.getDay())]
+  return list?.length ? { start: WEEK.tutor.start, end: list[list.length - 1].end } : null
 }
 
 /** Today and the next `count - 1` days. */
@@ -77,16 +78,13 @@ export function upcoming(count = 7, from = new Date()): Day[] {
  * Teams does not email an assignment when it is set and the school will not
  * let anything outside read Teams, so this is the next best thing: a standing
  * assumption. On the day a subject is set, a placeholder goes on the list,
- * marked as assumed until he says what the work actually is. Mirrored in
- * bridge/personal.mjs, like SCHOOL_END; edit both.
+ * marked as assumed until he says what the work actually is. From
+ * shared/week.json, which the bridge reads too.
  */
-export const SET_WORK: { subject: string; weekday: number }[] = [
-  { subject: 'Philosophy', weekday: 1 }, // Monday
-  { subject: 'Maths', weekday: 3 }, // Wednesday
-]
+export const SET_WORK: { subject: string; weekday: number }[] = WEEK.setWork
 
 /** Assumed due the same weekday a week later, until he says otherwise. */
-export const SET_WORK_DUE_DAYS = 7
+export const SET_WORK_DUE_DAYS: number = WEEK.setWorkDueDays
 
 /** What is set on this day, for the timetable. */
 export const setOn = (d: Date) => SET_WORK.filter((w) => w.weekday === d.getDay())
@@ -175,3 +173,207 @@ export function parseDue(raw: string, now = new Date()): { text: string; due: st
   }
   return when ? { text: rest.trim(), due: isoDay(when) } : { text: raw.trim(), due: null }
 }
+
+/* ------------------------------------------------------------------ the plan */
+
+/** 'HH:MM' to minutes after midnight, and back. */
+export const toMin = (hm: string) => {
+  const [h, m] = hm.split(':').map(Number)
+  return h * 60 + m
+}
+export const fromMin = (n: number) =>
+  `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`
+
+/** The Monday that starts this week, and the Sunday that ends it. */
+export function weekOf(now = new Date()): { monday: string; sunday: string } {
+  const monday = addDays(now, -((now.getDay() + 6) % 7))
+  return { monday: isoDay(monday), sunday: isoDay(addDays(monday, 6)) }
+}
+
+/** The weekly Response hours, from shared/week.json. */
+export const RESPONSE: { subjects: string[]; minutes: number } = WEEK.response
+
+/** What the planner needs to know about a to-do item. */
+export type Plannable = {
+  id: string
+  text: string
+  done: boolean
+  due: string | null
+  kind?: 'setwork' | 'response'
+  subject?: string
+  /** For set work: the day it was set, whose evening the two hours belong to. */
+  setOn?: string
+}
+
+/** Time set aside for something on the list. */
+export type Block = {
+  day: string
+  start: string
+  end: string
+  kind: 'homework' | 'response'
+  title: string
+  /** Empty for an evening held for set work that has not been set yet. */
+  todoId: string
+}
+
+const parseIso = (iso: string) => {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+/**
+ * Stretches of a school day with nothing timetabled: frees and lab time,
+ * joined across the five-minute changeovers. Only these and the evening are
+ * offered to the planner; lunch and break are his.
+ */
+function studyWindows(d: Date): [number, number][] {
+  const out: [number, number][] = []
+  for (const p of periodsFor(d)) {
+    if (p.kind !== 'free' && p.kind !== 'lab') continue
+    const a = toMin(p.start)
+    const b = toMin(p.end)
+    const last = out[out.length - 1]
+    if (last && a - last[1] <= 5) last[1] = b
+    else out.push([a, b])
+  }
+  return out
+}
+
+/** The evening, or on a weekend the day. */
+function homeWindow(d: Date): [number, number] {
+  const w = d.getDay() === 0 || d.getDay() === 6 ? WEEK.weekend : WEEK.evening
+  return [toMin(w.start), toMin(w.end)]
+}
+
+/**
+ * Where the work goes, worked out afresh every time from the list and the
+ * clock. That is what makes it adaptive without any bookkeeping: a block whose
+ * time runs out before it is ticked is simply placed again, in the next space
+ * that fits, and a ticked item stops being placed at all.
+ *
+ * Set work gets two hours on the evening it is set. Work whose evening has
+ * gone takes the next evening before it is due, but never one that belongs
+ * to work set that day.
+ *
+ * Response hours go into school frees and lab time first, one a day, so they
+ * cost him no evenings at all where the week allows; then into evenings with
+ * nothing else in them; and only when the week has run short do they double
+ * up on an evening that already has something.
+ */
+export function plan(todos: Plannable[], now = new Date(), days = 7): Block[] {
+  const today = isoDay(now)
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const horizon: Date[] = Array.from({ length: days }, (_, i) => addDays(now, i))
+  const taken = new Map<string, [number, number][]>()
+  const blocks: Block[] = []
+  const evening = new Map<string, number>()
+  const school = new Map<string, number>()
+
+  const clashes = (day: string, a: number, b: number) =>
+    (taken.get(day) ?? []).some(([x, y]) => a < y && b > x)
+  const take = (block: Block) => {
+    blocks.push(block)
+    const list = taken.get(block.day) ?? []
+    list.push([toMin(block.start), toMin(block.end)])
+    taken.set(block.day, list)
+  }
+  /** Past anything already in the way, with a quarter of an hour between. */
+  const clear = (day: string, a: number, len: number) => {
+    for (const [x, y] of [...(taken.get(day) ?? [])].sort((p, q) => p[0] - q[0])) {
+      if (a < y && a + len > x) a = y + 15
+    }
+    return a
+  }
+
+  // -- set work ------------------------------------------------------------
+  const hwStart = toMin(WEEK.homework.start)
+  const hwLen = WEEK.homework.minutes
+  const setWork = todos.filter((t) => !t.done && t.kind === 'setwork')
+  const eveningFor = (t: Plannable, day: string) => {
+    const [a, b] = [hwStart, hwStart + hwLen]
+    // Kept until it ends, so the evening he is in the middle of stays put.
+    if ((day === today && b <= nowMin) || clashes(day, a, b)) return false
+    take({ day, start: fromMin(a), end: fromMin(b), kind: 'homework', title: t.text, todoId: t.id })
+    evening.set(day, (evening.get(day) ?? 0) + 1)
+    return true
+  }
+  const inHorizon = (day: string) => day >= today && day <= isoDay(horizon[horizon.length - 1])
+  // Each piece on its own evening first, so a new set of work always gets the
+  // evening it was set, whatever is running late.
+  const late = setWork.filter((t) => !(t.setOn && inHorizon(t.setOn) && eveningFor(t, t.setOn)))
+  late
+    .sort((a, b) => ((a.due ?? '9999') < (b.due ?? '9999') ? -1 : 1))
+    .forEach((t) => {
+      for (const d of horizon) {
+        const day = isoDay(d)
+        if (t.due && day >= t.due) break
+        if (t.setOn && day < t.setOn) continue
+        if (eveningFor(t, day)) break
+      }
+    })
+
+  // Evenings that will get set work later this week, shown before the work
+  // exists so the week reads true and nothing else is booked into them.
+  for (const d of horizon) {
+    const day = isoDay(d)
+    if (day <= today) continue
+    for (const w of setOn(d)) {
+      if (todos.some((t) => t.kind === 'setwork' && t.subject === w.subject && t.setOn === day)) continue
+      eveningFor({ id: '', text: `${w.subject} homework (expected)`, done: false, due: null }, day)
+    }
+  }
+
+  // -- response ------------------------------------------------------------
+  const len = RESPONSE.minutes
+  const pending = todos
+    .filter((t) => !t.done && t.kind === 'response')
+    .sort((a, b) => RESPONSE.subjects.indexOf(a.subject ?? '') - RESPONSE.subjects.indexOf(b.subject ?? ''))
+
+  /** Try one space; true if the hour went in. */
+  const tryWindow = (t: Plannable, day: string, wa: number, wb: number) => {
+    let a = clear(day, wa, len)
+    // A space whose start has gone by today is still usable from now on, from
+    // the quarter hour now falls in: anchored there, not to the minute, so the
+    // hour stays put for the quarter he spends deciding to start it.
+    if (day === today && a + len <= nowMin) a = clear(day, Math.max(a, Math.floor(nowMin / 15) * 15), len)
+    const b = a + len
+    if (b > wb || clashes(day, a, b)) return false
+    take({ day, start: fromMin(a), end: fromMin(b), kind: 'response', title: t.text, todoId: t.id })
+    return true
+  }
+
+  type Stage = 'school' | 'quiet evening' | 'any'
+  const place = (t: Plannable, stage: Stage) => {
+    for (const d of horizon) {
+      const day = isoDay(d)
+      if (t.due && day > t.due) break
+      if (stage === 'school') {
+        if (school.get(day)) continue
+        for (const [wa, wb] of studyWindows(d)) {
+          if (tryWindow(t, day, wa, wb)) {
+            school.set(day, 1)
+            return true
+          }
+        }
+        continue
+      }
+      if (stage === 'quiet evening' && evening.get(day)) continue
+      const windows = stage === 'any' ? [...studyWindows(d), homeWindow(d)] : [homeWindow(d)]
+      for (const [wa, wb] of windows) {
+        if (tryWindow(t, day, wa, wb)) {
+          evening.set(day, (evening.get(day) ?? 0) + 1)
+          return true
+        }
+      }
+    }
+    return false
+  }
+  pending
+    .filter((t) => !place(t, 'school'))
+    .filter((t) => !place(t, 'quiet evening'))
+    .forEach((t) => place(t, 'any'))
+
+  return blocks.sort((x, y) => (x.day + x.start < y.day + y.start ? -1 : 1))
+}
+
+export { parseIso }

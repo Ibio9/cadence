@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { setWorkSoFar } from './lib/schedule'
+import { RESPONSE, SET_WORK_DUE_DAYS, isoDay, parseIso, setWorkSoFar, weekOf } from './lib/schedule'
 
 export type Phase =
   | 'offline'   // waiting for the click that unlocks audio
@@ -81,6 +81,11 @@ export type Tab = 'timetable' | 'todo' | 'briefing' | 'news' | null
  * `assumed` marks a placeholder the weekly set-work rule put there (see
  * SET_WORK) rather than something he said. It clears the moment the item is
  * edited, by him or on his word, because from then on it is his.
+ *
+ * `kind` marks the two things the interface puts there itself, set work and
+ * the weekly Response hours, which is what the planner gives time to. It
+ * survives editing: filling in "Philosophy homework" as the Descartes essay
+ * does not stop it being the Philosophy homework.
  */
 export type Todo = {
   id: string
@@ -89,6 +94,10 @@ export type Todo = {
   due: string | null
   at: number
   assumed?: boolean
+  kind?: 'setwork' | 'response'
+  subject?: string
+  /** Set work only: the day it was set, whose evening gets the two hours. */
+  setOn?: string
 }
 
 export type Turn = {
@@ -316,9 +325,12 @@ type State = {
   openTab: (t: Tab) => void
   addTodo: (text: string, due?: string | null) => void
   /** Change the words or the day. Either counts as confirming an assumed item. */
-  updateTodo: (id: string, patch: { text?: string; due?: string | null }) => boolean
-  /** Put this week's set work on the list, once per piece; see SET_WORK. */
-  ensureSetWork: (now?: Date) => void
+  updateTodo: (id: string, patch: { text?: string; due?: string | null; done?: boolean }) => boolean
+  /**
+   * Put this week's set work and Response hours on the list, once each, and
+   * clear out last week's Response hours; see SET_WORK and RESPONSE.
+   */
+  ensureWeekly: (now?: Date) => void
   toggleTodo: (id: string) => void
   removeTodo: (id: string) => void
   focusBlade: (id: string | null) => void
@@ -390,6 +402,26 @@ function saveSetWorkSeen(keys: string[]) {
   }
 }
 
+/**
+ * The planner's fields, read back defensively. Placeholders saved before these
+ * fields existed ("Philosophy homework", assumed, due a week after it was set)
+ * are recognised by their shape so they still get their evening.
+ */
+function kindOf(t: Record<string, unknown>): Partial<Todo> {
+  const subject = typeof t.subject === 'string' ? t.subject : undefined
+  if (t.kind === 'response') return { kind: 'response', subject }
+  if (t.kind === 'setwork') {
+    return { kind: 'setwork', subject, ...(typeof t.setOn === 'string' ? { setOn: t.setOn } : null) }
+  }
+  const legacy = typeof t.text === 'string' && t.text.match(/^(\w+) homework$/)
+  if (t.assumed === true && legacy && typeof t.due === 'string') {
+    const set = parseIso(t.due)
+    set.setDate(set.getDate() - SET_WORK_DUE_DAYS)
+    return { kind: 'setwork', subject: legacy[1], setOn: isoDay(set) }
+  }
+  return {}
+}
+
 function loadTodos(): Todo[] {
   try {
     const raw = localStorage.getItem(TODO_KEY)
@@ -405,6 +437,7 @@ function loadTodos(): Todo[] {
         due: typeof t.due === 'string' ? t.due : null,
         at: Number(t.at) || Date.now(),
         ...(t.assumed === true ? { assumed: true } : null),
+        ...kindOf(t),
       }))
   } catch {
     return []
@@ -552,30 +585,69 @@ export const useStore = create<State>((set) => ({
         found = true
         const text = patch.text === undefined ? t.text : patch.text.trim().slice(0, 200) || t.text
         const due = patch.due === undefined ? t.due : patch.due
-        return { id: t.id, text, done: t.done, due, at: t.at }
+        const done = patch.done === undefined ? t.done : patch.done
+        // Any change is him taking it on, so the assumption goes; what kind of
+        // item it is stays.
+        const { assumed: _assumed, ...rest } = t
+        void _assumed
+        return { ...rest, text, due, done }
       }),
     }))
     return found
   },
 
-  ensureSetWork: (now = new Date()) => {
+  ensureWeekly: (now = new Date()) => {
     const seen = loadSetWorkSeen()
-    const fresh = setWorkSoFar(now).filter((w) => !seen.includes(w.key))
-    if (!fresh.length) return
+    const newId = () => `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+    const { monday, sunday } = weekOf(now)
+
+    const setWork: Todo[] = setWorkSoFar(now)
+      .filter((w) => !seen.includes(w.key))
+      .map((w) => ({
+        id: newId(),
+        text: `${w.subject} homework`,
+        done: false,
+        due: w.due,
+        at: Date.now(),
+        assumed: true,
+        kind: 'setwork',
+        subject: w.subject,
+        setOn: w.set,
+      }))
+
+    // An hour of Response a subject a week, due by Sunday. Added whenever the
+    // week is first seen, so opening on a Wednesday still gets all three.
+    const responseKeys = RESPONSE.subjects.map((subject) => ({
+      subject,
+      key: `response:${subject.toLowerCase()}:${monday}`,
+    }))
+    const response: Todo[] = responseKeys
+      .filter((r) => !seen.includes(r.key))
+      .map((r) => ({
+        id: newId(),
+        text: `${r.subject} response`,
+        done: false,
+        due: sunday,
+        at: Date.now(),
+        kind: 'response',
+        subject: r.subject,
+      }))
+
+    const state = useStore.getState()
+    // Last week's Response hours go, done or not: they are a weekly habit the
+    // interface put there, not something he wrote, and a missed hour from last
+    // week is not owed this week. Everything he added stays.
+    const stale = state.todos.some((t) => t.kind === 'response' && t.due && t.due < monday)
+    if (!setWork.length && !response.length && !stale) return
+
     set((s) => ({
       todos: [
-        ...s.todos,
-        ...fresh.map((w) => ({
-          id: `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-          text: `${w.subject} homework`,
-          done: false,
-          due: w.due,
-          at: Date.now(),
-          assumed: true,
-        })),
+        ...s.todos.filter((t) => !(t.kind === 'response' && t.due && t.due < monday)),
+        ...setWork,
+        ...response,
       ].slice(-200),
     }))
-    saveSetWorkSeen([...seen, ...fresh.map((w) => w.key)])
+    saveSetWorkSeen([...seen, ...setWork.map((w) => `${w.subject!.toLowerCase()}:${w.setOn}`), ...responseKeys.map((r) => r.key)])
   },
 
   toggleTodo: (id) =>

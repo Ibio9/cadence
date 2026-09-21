@@ -37,7 +37,14 @@ to a date, which is usually where the useful slack is.
 An item marked (assumed) is a placeholder the interface put there because
 that subject is always set on that weekday. The day is a guess too: a week
 after it was set. Ask him what the work actually is and when it is due, then
-fix it with update_task.`
+fix it with update_task.
+
+Also returns PLANNED: the time the interface has set aside this week, which is
+exactly what his timetable tab shows. Set work gets two hours on the evening
+it is set; each weekly Response hour (Economics, Maths, Philosophy) sits in
+the next free space that fits, and moves on by itself if the time passes
+without it being ticked. Plan around these rather than over them, and quote
+them as they are rather than inventing different times.`
 
 const ADD_DESCRIPTION = `Put something on Ibrahim's to-do list.
 
@@ -52,10 +59,11 @@ today's date rather than passing words like "tomorrow" through. If he gives a
 deadline ("due Friday", "by the 2nd"), always pass it as \`due\`, not in the
 text.`
 
-const UPDATE_DESCRIPTION = `Change an item on Ibrahim's to-do list: its words, its due day, or both.
+const UPDATE_DESCRIPTION = `Change an item on Ibrahim's to-do list: its words, its due day, or whether it is done.
 
-Only on his word. The main use is filling in an assumed placeholder once he
-tells you what was set: "Philosophy homework" becomes "Philosophy: Descartes
+Only on his word. Set \`done\` true when he says he has finished something
+("I've done my maths response"), which also takes it off the plan. The other
+main use is filling in an assumed placeholder once he tells you what was set: "Philosophy homework" becomes "Philosophy: Descartes
 essay, 800 words" and the guessed day becomes the real one. Also for "move the
 essay to Thursday" or "the maths sheet has no deadline". Never to tidy,
 reword or reschedule the list on your own initiative.
@@ -96,7 +104,7 @@ export function tasksServer(ask) {
 
         const items = Array.isArray(reply?.todos) ? reply.todos : []
         if (!items.length) {
-          return { content: [{ type: 'text', text: 'The to-do list is empty.' }] }
+          return { content: [{ type: 'text', text: 'The to-do list is empty, and nothing is planned.' }] }
         }
 
         // Rendered as lines rather than handed over as JSON. The model reads
@@ -106,14 +114,21 @@ export function tasksServer(ask) {
           const box = t.done ? '[done]' : '[ ]'
           const when = t.due ? ` (due ${t.due})` : ''
           const guess = t.assumed ? ' (assumed)' : ''
-          return `${box} ${t.text}${when}${guess} [id ${t.id}]`
+          const what = t.kind === 'response' ? ' (weekly Response hour)' : t.kind === 'setwork' ? ' (set work)' : ''
+          return `${box} ${t.text}${when}${what}${guess} [id ${t.id}]`
         })
         const open = items.filter((t) => !t.done).length
+        const planned = (Array.isArray(reply?.plan) ? reply.plan : []).map(
+          (b) => `- ${b.day} ${b.start}-${b.end}: ${b.title}`,
+        )
+        const plan = planned.length
+          ? `\n\nPLANNED:\n${planned.join('\n')}`
+          : '\n\nPLANNED: nothing set aside.'
         return {
           content: [
             {
               type: 'text',
-              text: `${items.length} item(s), ${open} still open:\n${lines.join('\n')}`,
+              text: `${items.length} item(s), ${open} still open:\n${lines.join('\n')}${plan}`,
             },
           ],
         }
@@ -180,9 +195,15 @@ export function tasksServer(ask) {
             .optional()
             .catch(undefined)
             .describe('YYYY-MM-DD, or "none" to clear it. Leave out to keep it.'),
+          done: z
+            .boolean()
+            .optional()
+            .catch(undefined)
+            .describe('true when he says it is finished, false to reopen it.'),
         },
         async (args) => {
           const task = String(args.task ?? '').trim()
+          const done = typeof args.done === 'boolean' ? args.done : undefined
           const text = typeof args.text === 'string' && args.text.trim() ? args.text.trim().slice(0, 200) : undefined
           const raw = typeof args.due === 'string' ? args.due.trim() : undefined
           let due
@@ -195,7 +216,7 @@ export function tasksServer(ask) {
               content: [{ type: 'text', text: `Not changed: "${raw}" is not a date. Use YYYY-MM-DD or "none".` }],
             }
           }
-          if (!task || (text === undefined && due === undefined)) {
+          if (!task || (text === undefined && due === undefined && done === undefined)) {
             return {
               isError: true,
               content: [{ type: 'text', text: 'Not changed: give the item id and what to change.' }],
@@ -204,7 +225,7 @@ export function tasksServer(ask) {
 
           let reply
           try {
-            reply = await ask('tasks', { op: 'update', task, text, due })
+            reply = await ask('tasks', { op: 'update', task, text, due, done })
           } catch (err) {
             return {
               isError: true,
@@ -214,7 +235,11 @@ export function tasksServer(ask) {
           if (reply?.error) {
             return { isError: true, content: [{ type: 'text', text: `Not changed: ${reply.error} Read the list again.` }] }
           }
-          const what = [text && `now "${text}"`, due === null ? 'no date' : due && `due ${due}`].filter(Boolean)
+          const what = [
+            text && `now "${text}"`,
+            due === null ? 'no date' : due && `due ${due}`,
+            done === true ? 'done' : done === false && 'reopened',
+          ].filter(Boolean)
           return { content: [{ type: 'text', text: `Changed: ${what.join(', ')}.` }] }
         },
       ),

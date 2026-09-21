@@ -39,6 +39,7 @@ type Frame = {
   due?: string | null
   /** Which to-do item an update is about; `id` is taken by the request. */
   task?: string
+  done?: boolean
   servers?: Array<string | { name?: string }>
 }
 
@@ -102,8 +103,9 @@ export type TaskRequest = {
   /** undefined leaves the day alone; null clears it. */
   due?: string | null
   task?: string
+  done?: boolean
 }
-export type TaskResult = { todos?: unknown[]; ok?: boolean; error?: string }
+export type TaskResult = { todos?: unknown[]; plan?: unknown[]; ok?: boolean; error?: string }
 
 let onTasks: ((req: TaskRequest) => TaskResult) | null = null
 export function watchTasks(fn: (req: TaskRequest) => TaskResult) {
@@ -223,7 +225,7 @@ function dispatch(ws: WebSocket) {
       } else {
         try {
           const op = msg.op === 'add' || msg.op === 'update' ? msg.op : 'list'
-          answer(onTasks({ op, text: msg.text, due: msg.due, task: msg.task }))
+          answer(onTasks({ op, text: msg.text, due: msg.due, task: msg.task, done: msg.done }))
         } catch (err) {
           answer({ error: String((err as Error)?.message ?? err) })
         }

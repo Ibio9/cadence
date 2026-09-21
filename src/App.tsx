@@ -39,6 +39,7 @@ import {
 import { startAnalyser, micLevel } from './lib/audio'
 import { probeCapabilities } from './lib/capabilities'
 import { env } from './config'
+import { plan } from './lib/schedule'
 
 /**
  * The conversation.
@@ -94,12 +95,12 @@ export default function App() {
   }, [])
 
   /*
-   * This week's set work goes on the list at load, before the briefing reads
-   * it, and is checked again every ten minutes so a tab left open over the
-   * weekend still picks up Monday's Philosophy.
+   * This week's set work and Response hours go on the list at load, before the
+   * briefing reads it, and are checked again every ten minutes so a tab left
+   * open over the weekend still picks up Monday's.
    */
   useEffect(() => {
-    const check = () => store.getState().ensureSetWork()
+    const check = () => store.getState().ensureWeekly()
     check()
     const every = window.setInterval(check, 10 * 60 * 1000)
     return () => window.clearInterval(every)
@@ -467,10 +468,13 @@ export default function App() {
         const found = s.updateTodo(String(req.task ?? ''), {
           text: typeof req.text === 'string' ? req.text : undefined,
           due: req.due,
+          done: typeof req.done === 'boolean' ? req.done : undefined,
         })
         return found ? { ok: true } : { error: 'There is no item with that id on the list.' }
       }
-      return { todos: s.todos }
+      // The plan goes with the list, so what JARVIS says matches what the
+      // timetable shows rather than being worked out twice.
+      return { todos: s.todos, plan: plan(s.todos) }
     })
 
     watchPanels((panel) => store.getState().pushPanel(panel))
