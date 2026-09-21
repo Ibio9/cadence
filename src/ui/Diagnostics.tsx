@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
+import { diag as handDiag, hands as tracked, throwOf } from '../lib/hands'
+import { way } from '../lib/sync'
 
 /**
  * The "why can't he hear me / why can't I hear him" panel.
@@ -102,6 +104,44 @@ export function Diagnostics() {
           {mouthOk ? '● speaking' : '● no sound produced'}
         </span>
       </div>
+
+      {handDiag.enabled && (
+        <>
+          <div className="diag-sec">HANDS · camera {handDiag.fps} fps</div>
+          {tracked.length === 0 && <Row k="seen" v="no hands" bad />}
+          {tracked.map((h) => {
+            const f = h.fingers
+            const ok = f.middle && f.ring && f.pinky
+            return (
+              <Row
+                key={h.id}
+                k={h.handedness === 'right' ? 'right hand' : 'left hand'}
+                v={
+                  `${h.pinched ? 'PINCHED' : 'open'} · closed ${Math.round(h.closeness * 100)}% · ` +
+                  `up: ${['index', 'middle', 'ring', 'pinky'].filter((n) => f[n as keyof typeof f]).join(' ') || 'none'}` +
+                  (ok ? ' · OK sign' : '')
+                }
+              />
+            )
+          })}
+          {[0, 1].map((id) => {
+            const t = throwOf(id)
+            if (!t) return null
+            return (
+              <Row
+                key={`t${id}`}
+                k={`last let-go (${id === 1 ? 'right' : 'left'})`}
+                v={
+                  `OK ${Math.round(t.ok * 100)}% of hold · opened ${t.wide.toFixed(2)} · ` +
+                  `index ${Math.hypot(t.px, t.py) < 1 ? 'not seen' : way(Math.atan2(t.py, t.px))} · ` +
+                  ago(performance.timeOrigin + t.at)
+                }
+              />
+            )
+          })}
+          <Row k="last verdict" v={handDiag.lastThrow || '— no blade let go yet'} />
+        </>
+      )}
 
       <div className="diag-sec">LISTENING</div>
       <Row k="recogniser" v={v.running ? 'running' : 'STOPPED'} bad={!v.running} />

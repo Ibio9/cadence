@@ -372,6 +372,8 @@ export const diag = {
   fps: 0,
   gesture: '' as string,
   lastError: '',
+  /** What the last let-go of a blade was judged to be, and why. Diagnostics shows it. */
+  lastThrow: '',
 }
 
 if (typeof window !== 'undefined') {
@@ -408,10 +410,10 @@ const gaps = new Map<number, { t: number; g: number }[]>()
  */
 const okPoses = new Map<number, { t: number; ok: boolean }[]>()
 
-/** Whether the OK sign was held through most of a stretch of time. */
-function okHeld(id: number, from: number, to: number) {
+/** How much of a stretch of time the OK sign was held, 0 to 1. */
+function okShare(id: number, from: number, to: number) {
   const frames = (okPoses.get(id) ?? []).filter((p) => p.t >= from && p.t <= to)
-  return frames.length >= 3 && frames.filter((p) => p.ok).length / frames.length >= 0.6
+  return frames.length >= 3 ? frames.filter((p) => p.ok).length / frames.length : 0
 }
 /** When the fingers first closed, per hand — see PINCH_CONFIRM_MS. */
 const pinchSince = new Map<number, number>()
@@ -432,8 +434,8 @@ export type LetGo = {
   snap: number
   /** How wide it opened, as a fraction of the hand's size. */
   wide: number
-  /** Whether the OK sign was held while it was pinched. */
-  ok: boolean
+  /** How much of the hold before letting go was the OK sign, 0 to 1. */
+  ok: number
   /** Which way the index pointed once it had opened, on screen. */
   px: number
   py: number
@@ -983,7 +985,7 @@ function dropHand(i: number) {
   // throw with a wind-up is as likely to be the wind-up.
   if (hands[at].pinched) {
     const now = performance.now()
-    throws.set(i, { at: now, ...palmPeak(i, now - 110, now), snap: 0, wide: 0, ok: false, px: 0, py: 0 })
+    throws.set(i, { at: now, ...palmPeak(i, now - 110, now), snap: 0, wide: 0, ok: 0, px: 0, py: 0 })
   }
   palms.delete(i)
   releasePress(i, hands[at])
@@ -1180,7 +1182,7 @@ function loop(mine: number) {
         at,
         ...palmPeak(i, at - THROW_BEFORE_MS, at + THROW_AFTER_MS),
         ...snapOf(i, at),
-        ok: okHeld(i, at - 450, at - 30),
+        ok: okShare(i, at - 450, at - 30),
         px: tipAt.x - baseAt.x,
         py: tipAt.y - baseAt.y,
       })
@@ -1388,11 +1390,11 @@ export function disableHands(): void {
  * How a hand last let go, with when (performance.now()), or null: how its raw
  * palm was moving, in screen pixels per ms, and how its pinch opened.
  *
- * A throw is the OK sign, held, then the index flicked out: thumb and index
- * pinched with the other three fingers up, then the gap between thumb and
- * index jumping open. `ok` says the sign was held through the pinch; `snap`
- * and `wide` say how fast and how far it opened; `px`, `py` say which way the
- * index points once it is out, which is where the throw goes. A pointing
+ * A throw is the OK sign, held, then let go: thumb and index pinched with the
+ * other three fingers up, then the index opening out. `ok` says how much of
+ * the hold was the sign; `snap` and `wide` say how fast and how far it
+ * opened; `px`, `py` say which way the index points once it is out, which is
+ * where the throw goes. A pointing
  * finger is a pose the camera sees sharply even at 30 frames a second, where
  * the speed of a fast movement is exactly what it blurs. The palm's movement
  * is kept too, measured raw.

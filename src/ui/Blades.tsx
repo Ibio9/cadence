@@ -4,7 +4,7 @@ import { useStore, type Blade } from '../store'
 import { BRIDGE_HTTP_URL } from '../config'
 import { withMedia } from '../lib/auth'
 import { sanitisePanelHtml } from './sanitise'
-import { frameSpan, peaceScroll, pointScroll, throwOf } from '../lib/hands'
+import { diag as handDiag, frameSpan, peaceScroll, pointScroll, throwOf } from '../lib/hands'
 import { isConnected } from '../lib/bridge'
 import { nearestTo, targetFor, throwBlade, way } from '../lib/sync'
 import * as camera from '../lib/camera'
@@ -246,10 +246,11 @@ const Body = memo(function Body({ blade }: { blade: Blade }) {
  *
  * Two ways by hand, both reliable at webcam frame rates:
  *
- *   - Flick it: make the OK sign on a blade (thumb and index pinched, the
- *     other three fingers up), then flick the index out. It goes the way the
- *     index points once it is out; the tracker reads that pose (throwOf in
- *     hands.ts), which a camera sees sharply where it would blur a fast swing.
+ *   - The OK sign: hold it on a blade (thumb and index pinched, the other
+ *     three fingers up), then let go. It goes the way the index points once
+ *     it is out. No speed is needed: every speed-based throw failed on a real
+ *     webcam, which blurs exactly the fast movement being measured, while a
+ *     held sign and a pointing finger are poses it sees sharply.
  *   - Carry it: carry the blade towards a device until that device's edge
  *     lights up, and let go.
  *
@@ -260,12 +261,8 @@ const Body = memo(function Body({ blade }: { blade: Blade }) {
 
 /** A mouse or touch movement this fast, in px per ms, is a flick. */
 const FLICK = 1.1
-/**
- * An index flicking out of the OK sign opens the pinch at least this fast
- * (gap per ms, as a fraction of the hand) and this wide.
- */
-const OK_FLICK_RATE = 0.004
-const OK_FLICK_WIDE = 0.9
+/** How much of the hold must be the OK sign for letting go to send. */
+const OK_SHARE = 0.6
 /** How far a blade must be carried for a mouse flick to aim by the carry. */
 const AIM_PX = 80
 /**
@@ -291,7 +288,7 @@ type Release = {
   pointerId: number
   snap?: number
   wide?: number
-  ok?: boolean
+  ok?: number
   px?: number
   py?: number
 }
@@ -521,25 +518,39 @@ function Card({
     }
     const hand = r.pointerId >= 9000
     if (hand) {
-      // The OK sign, held, then the index flicked out: thrown the way the
-      // index points. Any other release is putting it down.
-      if (!r.ok) return
-      const snap = r.snap ?? 0
-      const flicked = snap >= OK_FLICK_RATE && (r.wide ?? 0) >= OK_FLICK_WIDE
-      if (!othersOnline()) {
-        if (flicked) showNote('No other device is open. Power JARVIS up on the other one first.')
+      // The OK sign, held, then let go: sent the way the index points. Any
+      // other release is putting it down. Every verdict is written down for
+      // the diagnostics panel (D), so a throw that does nothing says why.
+      const share = r.ok ?? 0
+      const pct = Math.round(share * 100)
+      const carriedFar = Math.hypot(r.dx, r.dy) >= 150
+      if (r.ok === undefined) {
+        handDiag.lastThrow = 'put down: the tracker had no measurement of this release'
         return
       }
-      if (!flicked) {
-        if (snap >= OK_FLICK_RATE * 0.4) {
-          showNote(`Nearly: that flick was ${Math.round((snap / OK_FLICK_RATE) * 100)}% as quick as a throw. Flick the index out sharper.`)
+      if (share < OK_SHARE) {
+        handDiag.lastThrow = `put down: OK sign seen ${pct}% of the hold (needs ${OK_SHARE * 100}%)`
+        // A release in place with some of the sign in it was probably meant as
+        // a throw; a long drag was not, and says nothing.
+        if (othersOnline() && share >= 0.15 && !carriedFar) {
+          showNote(`Didn't send: saw the OK sign ${pct}% of the time you held it (needs ${OK_SHARE * 100}%). Keep your middle, ring and little fingers up.`)
         }
+        return
+      }
+      if (!othersOnline()) {
+        handDiag.lastThrow = 'OK sign, but no other device is open'
+        showNote('No other device is open. Power JARVIS up on the other one first.')
         return
       }
       const px = r.px ?? 0
       const py = r.py ?? 0
-      if (Math.hypot(px, py) < 1) return
-      launch(Math.atan2(py, px), from)
+      if (Math.hypot(px, py) < 1) {
+        handDiag.lastThrow = 'OK sign, but the index was not seen pointing anywhere'
+        return
+      }
+      const angle = Math.atan2(py, px)
+      handDiag.lastThrow = `OK sign ${pct}%, index pointing ${way(angle)}: sending`
+      launch(angle, from)
       return
     }
 
