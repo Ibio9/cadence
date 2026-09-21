@@ -1,6 +1,7 @@
 import type { AskHandlers } from './anthropic'
 import type { Blade, Panel } from '../store'
 import { BRIDGE_WS_URL } from '../config'
+import { socketProtocols } from './auth'
 
 /**
  * Client for the local bridge (see bridge/server.mjs).
@@ -255,7 +256,10 @@ function connect(): Promise<WebSocket> {
   firstReady = deferred()
 
   connecting = new Promise<WebSocket>((resolve, reject) => {
-    const ws = new WebSocket(BRIDGE_WS_URL)
+    // On a hosted bridge the session token rides as a subprotocol, the one
+    // place a browser WebSocket lets a credential travel without a URL.
+    // Undefined locally, which is exactly the old call.
+    const ws = new WebSocket(BRIDGE_WS_URL, socketProtocols())
     let settled = false
 
     /**

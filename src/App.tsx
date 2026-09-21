@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Scene } from './scene/Scene'
 import { Hud } from './ui/Hud'
 import { Boot } from './ui/Boot'
@@ -7,6 +7,8 @@ import { Diagnostics } from './ui/Diagnostics'
 import { TextInput } from './ui/TextInput'
 import { History } from './ui/History'
 import { Tabs } from './ui/Tabs'
+import { Gate } from './ui/Gate'
+import * as auth from './lib/auth'
 import { OPENING_BRIEFING, REREAD_MAIL, NEWS_BRIEFING } from './lib/briefing'
 import { useStore } from './store'
 import { startVoice, type Voice, type VoiceMode } from './lib/voice'
@@ -78,6 +80,18 @@ export default function App() {
   const store = useStore
   const phase = useStore((s) => s.phase)
   const history = useRef<Msg[]>([])
+
+  /**
+   * Whether INITIALISE can be offered yet.
+   *
+   * 'checking' until the bridge has said whether it wants a login, which is a
+   * single fetch and usually over before the page has finished painting. A
+   * hosted bridge with no valid session puts the passphrase screen up instead.
+   */
+  const [gate, setGate] = useState<'checking' | 'login' | 'ready'>('checking')
+  useEffect(() => {
+    void auth.probe().then((r) => setGate(r === 'login' ? 'login' : 'ready'))
+  }, [])
   const speaker = useRef<ReturnType<typeof createSpeaker> | null>(null)
   const voice = useRef<Voice | null>(null)
 
@@ -377,6 +391,9 @@ export default function App() {
     // only moves after the first await — so without this a double press boots
     // twice, arming two voice loops and two download polls.
     if (booting.current) return
+    // Space and a clap can both reach here, and neither knows about the gate.
+    // Powering on without a session would just fail at the socket.
+    if (!auth.isReady()) return
     booting.current = true
 
     try {
@@ -647,7 +664,7 @@ export default function App() {
    * about a feature nobody asked for would be worse than quietly doing without.
    */
   useEffect(() => {
-    if (phase !== 'offline') return
+    if (phase !== 'offline' || gate !== 'ready') return
     let live: { stop: () => void } | null = null
     let gone = false
     void listenForClap(() => {
@@ -661,7 +678,7 @@ export default function App() {
       live?.stop()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase])
+  }, [phase, gate])
 
   // -- the M, for the mail --------------------------------------------------
 
@@ -885,7 +902,10 @@ export default function App() {
       <History />
       <Tabs onAsk={startTurn} />
       <TextInput onSend={startTurn} />
-      <Ignition onStart={() => void powerOn()} />
+      {/* Plain conditionals, on purpose: both are full-screen overlays, and an
+          exit animation is how one gets stranded over the interface. */}
+      {gate === 'ready' && <Ignition onStart={() => void powerOn()} />}
+      {gate === 'login' && <Gate onDone={() => setGate('ready')} />}
     </>
   )
 }

@@ -1,5 +1,6 @@
 import DOMPurify from 'dompurify'
 import { BRIDGE_HTTP_URL } from '../config'
+import { withMedia } from '../lib/auth'
 
 /**
  * The safety boundary for model-authored markup.
@@ -54,7 +55,10 @@ function rewriteSrc(el: Element, attr: 'src' | 'poster', route: 'img' | 'media')
   if (!/^https?:\/\//i.test(raw)) return
   // Already ours. Proxying the proxy would ask the bridge to fetch itself.
   if (raw.startsWith(`${BRIDGE_HTTP_URL}/`)) return
-  el.setAttribute(attr, `${BRIDGE_HTTP_URL}/${route}?url=${encodeURIComponent(raw)}`)
+  // withMedia adds the short-lived media token on a hosted bridge: an <img>
+  // cannot send a header, so the credential has to be in the URL, and this
+  // one is scoped to fetching images and nothing else.
+  el.setAttribute(attr, withMedia(`${BRIDGE_HTTP_URL}/${route}?url=${encodeURIComponent(raw)}`))
 }
 
 function rewriteMedia(root: Element) {

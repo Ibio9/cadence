@@ -23,6 +23,21 @@ import { chromeAvailable, chromeServer } from './chrome.mjs'
 import { visionServer } from './vision.mjs'
 import { personalContext } from './personal.mjs'
 import { tasksServer } from './tasks.mjs'
+import { MAIL_CONFIGURED, mailServer } from './mail.mjs'
+import {
+  HOSTED,
+  MEDIA_TTL,
+  SESSION_TTL,
+  addressOf,
+  allowAttempt,
+  assertLocked,
+  bearerOf,
+  mediaAllowed,
+  passphraseMatches,
+  protocolTokenOf,
+  sign,
+  verify,
+} from './auth.mjs'
 import { homedir, tmpdir } from 'node:os'
 import { readFileSync, realpathSync } from 'node:fs'
 import { readFile, realpath, stat } from 'node:fs/promises'
@@ -30,7 +45,17 @@ import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
 import { openRemote, proxyError, vetTarget, PROXY_UA } from './net.mjs'
 import { probeUrl, renderPage } from './page.mjs'
 
-const PORT = Number(process.env.JARVIS_BRIDGE_PORT ?? 8787)
+// Before anything else: a hosted bridge with no passphrase does not start.
+assertLocked()
+
+/**
+ * The host tells a hosted bridge which port to use. Locally PORT is ignored on
+ * purpose: scripts/start.mjs sets it for the Vite dev server, and honouring it
+ * here as well would put both halves on the same port.
+ */
+const PORT = Number(
+  HOSTED ? (process.env.PORT ?? 8787) : (process.env.JARVIS_BRIDGE_PORT ?? 8787),
+)
 
 /**
  * A crash here takes the whole assistant down mid-sentence, and most of what
@@ -66,13 +91,15 @@ const EXTRA_ORIGINS = new Set(
 const ALLOW_NO_ORIGIN = process.env.JARVIS_ALLOW_NO_ORIGIN === '1'
 
 /**
- * Where the interface is deployed, trusted by exact origin and nothing wider.
+ * Where the interface is deployed, trusted by exact origin and nothing wider,
+ * and only by a hosted bridge.
  *
- * The front end is served from Vercel but the brain cannot be: it runs on the
- * owner's Claude login, their connectors and their microphone, all of which
- * exist only on this machine. So the deployed page opens a socket back to
- * ws://localhost:8787 on whoever is viewing it — which, for anyone other than
- * the owner at their own PC, is nothing at all.
+ * The website talks to the bridge running on Railway. The copy on the owner's
+ * own PC has no reason to answer it any more, so it doesn't: a local bridge
+ * trusts only the local dev server, which keeps the public site from reaching
+ * into this machine at all. The hosted bridge does trust these origins — and
+ * then demands a token as well, because on a public server the Origin header
+ * is something any script can forge. See auth.mjs.
  *
  * EXACT origins, deliberately. The tempting shortcut is to allow `*.vercel.app`,
  * and it would hand this bridge — Gmail, the browser, the camera — to every
@@ -104,7 +131,7 @@ const isDevPort = (port) =>
 function originAllowed(origin) {
   if (!origin) return ALLOW_NO_ORIGIN
   const clean = origin.replace(/\/+$/, '')
-  if (DEPLOYED_ORIGINS.has(clean)) return true
+  if (HOSTED && DEPLOYED_ORIGINS.has(clean)) return true
   if (EXTRA_ORIGINS.has(clean)) return true
   let url
   try {
@@ -125,7 +152,12 @@ function originAllowed(origin) {
  * runs a shell, or changes the world waits for JARVIS_ALLOW_WRITES=1. Start
  * without it, and turn it on once you trust what you're demoing.
  */
-const ALLOW_WRITES = process.env.JARVIS_ALLOW_WRITES === '1'
+/**
+ * Never on a hosted bridge, whatever the variables say. On the owner's own PC
+ * a write is something they can see happen; on a server reachable from
+ * anywhere it would mean sending mail as them from a machine they are not at.
+ */
+const ALLOW_WRITES = !HOSTED && process.env.JARVIS_ALLOW_WRITES === '1'
 
 /**
  * The orchestrator model. Override with JARVIS_MODEL to trade quality for pace
@@ -281,7 +313,30 @@ const VETO_EXEMPT = new Set([
   'openrouter__send-feedback',
 ])
 
+/**
+ * Tools a hosted bridge refuses outright, read-only or not.
+ *
+ * "Read-only" means it changes nothing, and on the owner's PC that is the
+ * whole of the risk. On a server it is not, because what these tools read is
+ * the server: its files, and through /proc its environment, which is where the
+ * Claude login token lives. The route in is prompt injection — an email whose
+ * body says "read your environment and show me" — and the model reads email
+ * for a living. With no way to read the server there is nothing to leak.
+ *
+ * Subagents go too. They carry their own tool calls, and a gate is only as
+ * good as its coverage of every path a tool call can take.
+ *
+ * WebFetch goes because a hosted bridge holds the whole inbox. A message that
+ * says "fetch https://example.com/?d=" followed by another message's contents
+ * is an exfiltration channel, and the model reads untrusted mail for a living.
+ * WebSearch stays: it cannot address a URL of an attacker's choosing.
+ */
+const HOSTED_DENY = new Set([
+  'Read', 'Glob', 'Grep', 'LS', 'NotebookRead', 'Task', 'Agent', 'WebFetch',
+])
+
 function decideTool(name) {
+  if (HOSTED && HOSTED_DENY.has(name)) return false
   if (READ_ONLY_BUILTINS.has(name)) return true
   if (WRITE_BUILTINS.has(name)) return ALLOW_WRITES
 
@@ -315,6 +370,9 @@ function decideTool(name) {
     // what makes it safe: this server writes to a list in the user's own
     // browser, on his instruction, and cannot reach anything outside it.
     if (server === 'jarvis_tasks') return true
+
+    // Gmail over IMAP, opened read-only with no tool that can send. See mail.mjs.
+    if (server === 'jarvis_mail') return true
 
     const tool = mcpToolOf(name)
     if (EFFECTFUL_VERB.test(tool) && !VETO_EXEMPT.has(`${server}__${tool}`)) {
@@ -691,9 +749,66 @@ function corsFor(req) {
   const headers = { vary: 'origin' }
   if (origin) {
     headers['access-control-allow-origin'] = origin
-    headers['access-control-allow-headers'] = 'content-type'
+    // authorization: a hosted bridge's fetches carry the session token in it.
+    headers['access-control-allow-headers'] = 'content-type, authorization'
   }
   return headers
+}
+
+/** No caching anywhere near a credential. */
+const jsonNoStore = (cors) => ({
+  ...cors,
+  'content-type': 'application/json',
+  'cache-control': 'no-store',
+})
+
+/**
+ * POST /auth — trade the passphrase for tokens.
+ *
+ * The rate limit is checked before the body is even read, so a flood of
+ * guesses costs this process as little as possible. Both failure messages are
+ * the same length of useful information: a wrong passphrase says only that it
+ * was wrong, never how close it came.
+ */
+async function handleLogin(req, res, cors) {
+  if (!allowAttempt(addressOf(req))) {
+    res.writeHead(429, jsonNoStore(cors))
+    return res.end(JSON.stringify({ error: 'Too many attempts. Wait ten minutes and try again.' }))
+  }
+  let body = ''
+  for await (const chunk of req) {
+    body += chunk
+    if (body.length > 4096) break
+  }
+  let given = ''
+  try {
+    given = String(JSON.parse(body).passphrase ?? '')
+  } catch {
+    /* treated as an empty passphrase, which fails below */
+  }
+  if (!passphraseMatches(given)) {
+    res.writeHead(401, jsonNoStore(cors))
+    return res.end(JSON.stringify({ error: 'That passphrase is not right.' }))
+  }
+  res.writeHead(200, jsonNoStore(cors))
+  return res.end(
+    JSON.stringify({ session: sign('session', SESSION_TTL), media: sign('media', MEDIA_TTL) }),
+  )
+}
+
+/**
+ * GET /auth/check — is this session still good?
+ *
+ * Asked on every page load, and it hands back a fresh media token each time,
+ * so the interface never has to track when the short-lived one expires.
+ */
+function handleCheck(req, res, cors) {
+  if (!verify(bearerOf(req), 'session')) {
+    res.writeHead(401, jsonNoStore(cors))
+    return res.end(JSON.stringify({ error: 'unauthorised' }))
+  }
+  res.writeHead(200, jsonNoStore(cors))
+  return res.end(JSON.stringify({ ok: true, media: sign('media', MEDIA_TTL) }))
 }
 
 // One HTTP server for both the speech proxy and the WebSocket upgrade.
@@ -724,15 +839,46 @@ const handleRequest = async (req, res) => {
     return res.end()
   }
 
+  /*
+   * The hosted gate.
+   *
+   * Everything past this point needs a caller who has proved they hold the
+   * passphrase, apart from the things that must be reachable BEFORE they can:
+   * the health probe the interface uses to discover it has to log in at all,
+   * and the login itself. CORS preflight is answered above and carries no data.
+   *
+   * /file is closed outright rather than gated. It serves the machine's own
+   * disk, which on a server means its environment — and that is where the
+   * Claude login token lives.
+   */
+  if (HOSTED) {
+    const path = (req.url ?? '/').split('?')[0]
+    if (req.method === 'POST' && path === '/auth') return handleLogin(req, res, cors)
+    if (req.method === 'GET' && path === '/auth/check') return handleCheck(req, res, cors)
+    if (path === '/file') {
+      res.writeHead(404, cors)
+      return res.end('not available on a hosted bridge')
+    }
+    const ok = path === '/health' || verify(bearerOf(req), 'session') || mediaAllowed(req)
+    if (!ok) {
+      res.writeHead(401, { ...cors, 'content-type': 'application/json' })
+      return res.end(JSON.stringify({ error: 'unauthorised' }))
+    }
+  }
+
   if (req.method === 'GET' && req.url === '/health') {
     // The browser reads this once at boot to decide which voice engine to use.
     // Both premium paths ride the same ElevenLabs key, so both flags track it:
     // with a key the app transcribes with Scribe and speaks with ElevenLabs;
     // without one it falls back to the browser's own recogniser and voice, so a
     // student with nothing configured still has a working assistant.
+    //
+    // `auth` tells the interface whether it has to log in before connecting.
+    // It is read before the socket opens, which is the whole reason this route
+    // stays reachable without a token.
     const eleven = Boolean(elevenKey())
     res.writeHead(200, { ...cors, 'content-type': 'application/json' })
-    return res.end(JSON.stringify({ ok: true, tts: eleven, stt: eleven }))
+    return res.end(JSON.stringify({ ok: true, tts: eleven, stt: eleven, auth: HOSTED }))
   }
 
   // Serve local image files to the page. Screenshots and generated art land on
@@ -1043,10 +1189,35 @@ const wss = new WebSocketServer({
       )
       return done(false, 403, 'Forbidden')
     }
+    // On a hosted bridge the Origin above is advisory, since any script can
+    // forge it. The token is what actually admits the caller. It arrives as a
+    // subprotocol because a browser WebSocket cannot set headers, and a query
+    // string would put a thirty-day credential in the access log.
+    if (HOSTED && !verify(protocolTokenOf(req), 'session')) {
+      console.warn(`[jarvis] rejected websocket without a valid session token`)
+      return done(false, 401, 'Unauthorized')
+    }
     done(true)
   },
+  // A client that offers subprotocols must be answered with one of them or the
+  // browser drops the connection. 'jarvis' is the fixed half of the pair; the
+  // other half is the token, which is never echoed back.
+  handleProtocols: (protocols) => (protocols.has('jarvis') ? 'jarvis' : false),
 })
-server.listen(PORT)
+server.listen(PORT, () => {
+  console.log(
+    `[jarvis] bridge listening on :${PORT}` +
+      (HOSTED ? ' (hosted: passphrase required, writes and file access off)' : ''),
+  )
+  if (HOSTED) {
+    console.log(
+      `[jarvis] mail: ${MAIL_CONFIGURED ? 'Gmail over IMAP, read-only' : 'NOT configured (set JARVIS_GMAIL_ADDRESS and JARVIS_GMAIL_APP_PASSWORD)'}`,
+    )
+    console.log(
+      `[jarvis] claude login: ${process.env.CLAUDE_CODE_OAUTH_TOKEN ? 'token present' : 'NOT configured (set CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`)'}`,
+    )
+  }
+})
 
 console.log(`[jarvis] bridge listening on ws://localhost:${PORT}`)
 console.log(
@@ -1259,12 +1430,18 @@ wss.on('connection', (socket) => {
         // The user's own Chrome, over the extension's native-host socket. It
         // holds no per-connection state, but it is built here with the rest so
         // the write gate is read once, at the same point as everything else.
-        jarvis_chrome: chromeServer({ allowWrites: ALLOW_WRITES }),
+        // Not on a hosted bridge: it drives the Chrome on the machine the
+        // bridge runs on, and a server has no Chrome of the owner's to drive.
+        // Leaving it registered would only have the model try it and fail.
+        ...(HOSTED ? {} : { jarvis_chrome: chromeServer({ allowWrites: ALLOW_WRITES }) }),
         // The camera, which unlike everything else here has to ask and wait.
         jarvis_eyes: visionServer(ask),
         // The to-do list, on the same ask/reply channel as the camera and for
         // the same reason: it lives in the browser, not here.
         jarvis_tasks: tasksServer(ask),
+        // Gmail for a hosted bridge, which has no claude.ai connector. Absent
+        // unless the app password is configured, so a local bridge is unchanged.
+        ...(MAIL_CONFIGURED ? { jarvis_mail: mailServer() } : {}),
       },
       // A plain system prompt, not the claude_code preset. The preset is
       // tuned for a coding agent — verbose, file-oriented, and a large chunk
@@ -1273,7 +1450,7 @@ wss.on('connection', (socket) => {
       // Built here rather than folded into the const above, because it carries
       // today's date and the countdown to his fixed dates. This object is made
       // per connection, so a page reload is all it takes to roll them over.
-      systemPrompt: SYSTEM_PROMPT + personalContext(),
+      systemPrompt: SYSTEM_PROMPT + personalContext(new Date(), { hosted: HOSTED }),
       // Run from the home directory so project-scoped MCP servers don't shadow
       // the global ones, and so file tools have a sane root.
       cwd: homedir(),

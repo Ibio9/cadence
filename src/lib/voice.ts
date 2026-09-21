@@ -1,4 +1,5 @@
 import { BRIDGE_HTTP_URL } from '../config'
+import { authHeaders } from './auth'
 import { getMic } from './audio'
 import { speakingNow, speakingSince } from './tts'
 import { startVad, type Vad } from './vad'
@@ -452,7 +453,7 @@ async function startElevenVoice(h: VoiceHandlers): Promise<Voice> {
     try {
       const res = await fetch(`${BRIDGE_HTTP_URL}/stt`, {
         method: 'POST',
-        headers: { 'content-type': blob.type || 'audio/webm' },
+        headers: { 'content-type': blob.type || 'audio/webm', ...authHeaders() },
         body: blob,
       })
       diag.idleMs = Math.round(performance.now() - t0)

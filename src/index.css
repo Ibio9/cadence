@@ -2569,3 +2569,88 @@ kbd {
   .boot-aura,
   .boot-word { animation: none; }
 }
+
+/* -- gate -----------------------------------------------------------------
+
+   The passphrase screen, shown in place of INITIALISE when a hosted bridge
+   needs a login. Same ground and corner ticks as everything else; one field,
+   one button, one line for the answer.
+*/
+.gate {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse at center, #04121c 0%, #01060c 70%);
+  --accent: var(--interface);
+}
+
+.gate-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  width: min(340px, calc(100vw - 48px));
+  padding: 30px 28px 22px;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  background: color-mix(in srgb, var(--accent) 5%, rgba(1, 6, 12, 0.7));
+  backdrop-filter: blur(10px);
+}
+
+.gate-title {
+  text-align: center;
+  font-size: 15px;
+  letter-spacing: 0.5em;
+  color: color-mix(in srgb, var(--accent) 88%, #fff);
+}
+
+.gate-sub {
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 42%, transparent);
+  margin-top: -8px;
+}
+
+.gate-field {
+  padding: 11px 12px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: transparent;
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  letter-spacing: 0.2em;
+  text-align: center;
+  transition: border-color 200ms ease;
+}
+.gate-field:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+
+.gate-go {
+  min-height: 42px;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: color-mix(in srgb, var(--accent) 92%, #fff);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+.gate-go:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 22%, transparent); color: #fff; }
+.gate-go:disabled { opacity: 0.45; cursor: default; }
+
+/* Reserved height, so a message appearing does not shove the card upward. */
+.gate-error {
+  min-height: 16px;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: #ff8a8a;
+}

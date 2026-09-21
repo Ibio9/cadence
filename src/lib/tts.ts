@@ -6,6 +6,7 @@ import {
   KOKORO_VOICE,
   BRIDGE_HTTP_URL,
 } from '../config'
+import { authHeaders } from './auth'
 import * as kokoro from './kokoro'
 import { caps } from './capabilities'
 
@@ -743,7 +744,7 @@ async function fetchCloudAudio(text: string): Promise<string | null> {
     try {
       const res = await fetch(`${BRIDGE_HTTP_URL}/tts`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ text }),
       })
       if (res.ok) return URL.createObjectURL(await res.blob())

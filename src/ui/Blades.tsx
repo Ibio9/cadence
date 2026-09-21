@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useStore, type Blade } from '../store'
 import { BRIDGE_HTTP_URL } from '../config'
+import { withMedia } from '../lib/auth'
 import { sanitisePanelHtml } from './sanitise'
 import { frameSpan, peaceScroll, pointScroll, pinchCount } from '../lib/hands'
 import * as camera from '../lib/camera'
@@ -56,12 +57,13 @@ function viaBridge(raw: string, route: 'img' | 'media'): string {
   }
   if (!/^https?:\/\//i.test(src)) return src
   if (src.startsWith(`${BRIDGE_HTTP_URL}/`)) return src
-  return `${BRIDGE_HTTP_URL}/${route}?url=${encodeURIComponent(src)}`
+  // The media token, on a hosted bridge. See sanitise.ts.
+  return withMedia(`${BRIDGE_HTTP_URL}/${route}?url=${encodeURIComponent(src)}`)
 }
 
 /** A whole document, rendered by the bridge so it can be framed at all. */
 const pageUrl = (url: string, mode: 'reader' | 'live') =>
-  `${BRIDGE_HTTP_URL}/page?mode=${mode}&url=${encodeURIComponent(url)}`
+  withMedia(`${BRIDGE_HTTP_URL}/page?mode=${mode}&url=${encodeURIComponent(url)}`)
 
 /**
  * The three embed hosts, and only these.
