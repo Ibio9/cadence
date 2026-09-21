@@ -130,24 +130,25 @@ const SKELETON_BETA = 0.03
  * keep one, so the press cannot flicker on the boundary.
  */
 /*
- * Tightened to 0.28, on his word, twice: a pinch should only register when
- * thumb and finger are properly together. It was 0.40, then loosened to 0.45
- * when pinches were not registering at all; that turned out to be the
- * settling window and the unreachable top of the screen (both fixed since),
- * and at 0.45 a loose, half-closed hand read as a pinch; 0.35 still caught too
- * much. The fingertip landmarks sit at the centre of each fingertip, so tips
+ * 0.25, on his word: a pinch should only register when thumb and finger are
+ * properly together. It was 0.40, then loosened to 0.45 when pinches were not
+ * registering at all; that turned out to be the settling window and the
+ * unreachable top of the screen (both fixed since), and at 0.45 a loose,
+ * half-closed hand read as a pinch. Tightened since through 0.35 and 0.28.
+ * The fingertip landmarks sit at the centre of each fingertip, so tips
  * pressed together still leave a gap of about a finger's width, near 0.2 of
- * the hand; 0.28 allows for that and a little tracking noise, no more.
+ * the hand; 0.25 is just past that.
  */
-const PINCH_ON = 0.28
+const PINCH_ON = 0.25
 /*
- * Letting go happens at almost the distance a pinch starts, on his word: at
- * 0.65, far wider than 0.28, opening the fingers took too long to count as
- * letting go. It is a hair above PINCH_ON rather than equal to it, so a pinch
- * held right at the line does not flicker on and off. The cost is that a grip
+ * Letting go happens at exactly the distance a pinch starts, on his word: at
+ * 0.65, far wider than the pinch, opening the fingers took too long to count
+ * as letting go. With no gap between the two lines, it is the timing that
+ * stops a pinch held right at the line from flickering: closing has to hold
+ * for PINCH_CONFIRM_MS, opening for RELEASE_MS. The cost is that a grip
  * relaxing mid-drag lets go; that is the trade he chose.
  */
-const PINCH_OFF = 0.32
+const PINCH_OFF = 0.25
 
 /** The span over which the cursor's ring tightens as the fingers close. */
 const CLOSENESS_BAND = 0.4

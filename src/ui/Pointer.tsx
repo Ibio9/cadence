@@ -22,8 +22,16 @@ import { BONES, INDEX_TIP, THUMB_TIP, TIPS, WRIST, diag, hands } from '../lib/ha
 
 /** Bones are drawn twice: a wide soft pass for the glow, a tight bright one
  *  on top for the line itself. One pass with a big shadow reads as fog. */
-const GLOW_WIDTH = 7
-const LINE_WIDTH = 2
+/*
+ * Turned down on his word: the skeleton was drawn as projected light and sat
+ * on top of whatever he was reading. It is now a faint outline, thin and dim
+ * with little glow, so the hand is there to follow without being the thing on
+ * screen. The cursor ring below keeps its strength, because that is what aims.
+ */
+const GLOW_WIDTH = 4
+const LINE_WIDTH = 1.2
+/** How much of the skeleton shows, bones and joints alike. */
+const SKELETON_ALPHA = 0.38
 
 export function Pointer() {
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -154,10 +162,10 @@ export function Pointer() {
         ctx.lineJoin = 'round'
 
         // -- bones: soft pass, then the bright line ------------------------
-        ctx.globalAlpha = 0.4 * lit
+        ctx.globalAlpha = 0.12 * lit
         ctx.strokeStyle = accent
         ctx.shadowColor = accent
-        ctx.shadowBlur = 22 * scale
+        ctx.shadowBlur = 8 * scale
         ctx.lineWidth = GLOW_WIDTH * scale
         ctx.beginPath()
         for (const [a, b] of BONES) {
@@ -166,8 +174,8 @@ export function Pointer() {
         }
         ctx.stroke()
 
-        ctx.globalAlpha = 1 * lit
-        ctx.shadowBlur = 6 * scale
+        ctx.globalAlpha = SKELETON_ALPHA * lit
+        ctx.shadowBlur = 2 * scale
         ctx.lineWidth = LINE_WIDTH * scale
         ctx.beginPath()
         for (const [a, b] of BONES) {
@@ -177,12 +185,12 @@ export function Pointer() {
         ctx.stroke()
 
         // -- joints ---------------------------------------------------------
-        ctx.globalAlpha = 0.95 * lit
+        ctx.globalAlpha = SKELETON_ALPHA * lit
         ctx.fillStyle = accent
-        ctx.shadowBlur = 4 * scale
+        ctx.shadowBlur = 0
         for (let i = 0; i < p.length; i++) {
           if (i === INDEX_TIP) continue // the cursor draws its own
-          const r = (TIPS.includes(i) ? 3.6 : i === WRIST ? 4 : 2.2) * scale
+          const r = (TIPS.includes(i) ? 2.2 : i === WRIST ? 2.4 : 1.4) * scale
           ctx.beginPath()
           ctx.arc(p[i].x, p[i].y, r, 0, Math.PI * 2)
           ctx.fill()
@@ -194,10 +202,10 @@ export function Pointer() {
         // press, visible before it happens.
         const t = p[THUMB_TIP]
         const x = p[INDEX_TIP]
-        ctx.globalAlpha = 0.45 + hand.closeness * 0.55
+        ctx.globalAlpha = 0.25 + hand.closeness * 0.55
         ctx.strokeStyle = hand.pinched ? '#ffffff' : accent
         ctx.shadowColor = hand.pinched ? '#ffffff' : accent
-        ctx.shadowBlur = (6 + hand.closeness * 16) * scale
+        ctx.shadowBlur = (2 + hand.closeness * 8) * scale
         ctx.lineWidth = (0.8 + hand.closeness * 1.6) * scale
         ctx.setLineDash(hand.pinched ? [] : [4 * scale, 4 * scale])
         ctx.beginPath()
@@ -217,7 +225,7 @@ export function Pointer() {
         ctx.globalAlpha = 0.75 + hand.closeness * 0.25
         ctx.strokeStyle = hand.pinched ? '#ffffff' : accent
         ctx.shadowColor = hand.pinched ? '#ffffff' : accent
-        ctx.shadowBlur = 14 * scale
+        ctx.shadowBlur = 8 * scale
         ctx.lineWidth = 1.5 * scale
         ctx.beginPath()
         ctx.arc(cx, cy, ring, 0, Math.PI * 2)
@@ -244,7 +252,7 @@ export function Pointer() {
         // Below the wrist, quiet. Worth showing because when a gesture is
         // misread this is the only way to see that it was read at all.
         if (hand.gesture !== 'none') {
-          ctx.globalAlpha = 0.72
+          ctx.globalAlpha = 0.45
           ctx.shadowBlur = 0
           ctx.fillStyle = accent
           ctx.font = `500 ${Math.round(9 * Math.min(scale, 1.4))}px ui-monospace, monospace`
