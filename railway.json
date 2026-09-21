@@ -1,7 +1,14 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "buildCommand": "echo 'bridge only: the interface is built and served by Vercel'"
+    "buildCommand": "echo 'bridge only: the interface is built and served by Vercel'",
+    "watchPatterns": [
+      "bridge/**",
+      "shared/**",
+      "package.json",
+      "package-lock.json",
+      "railway.json"
+    ]
   },
   "deploy": {
     "startCommand": "node bridge/server.mjs",

@@ -1353,6 +1353,39 @@ const RESULT_FAILURES = {
   default: 'The turn ended without an answer.',
 }
 
+/**
+ * A heartbeat for every connection.
+ *
+ * A browser that sleeps, loses its network or is closed without a goodbye
+ * leaves its socket looking open here for a long time. That device then
+ * shows as online on every other device's map, and a blade sent to it is
+ * relayed into nothing. Pinging every half minute and dropping whatever did
+ * not answer the last ping ends that; it also keeps an idle connection busy
+ * enough that the host's proxy does not cut it. The browser answers pings by
+ * itself.
+ */
+const HEARTBEAT_MS = 30_000
+wss.on('connection', (socket) => {
+  socket.isAlive = true
+  socket.on('pong', () => {
+    socket.isAlive = true
+  })
+})
+setInterval(() => {
+  for (const socket of wss.clients) {
+    if (socket.isAlive === false) {
+      socket.terminate()
+      continue
+    }
+    socket.isAlive = false
+    try {
+      socket.ping()
+    } catch {
+      /* terminated on the next beat */
+    }
+  }
+}, HEARTBEAT_MS).unref()
+
 wss.on('connection', (socket) => {
   console.log('[jarvis] client connected')
 

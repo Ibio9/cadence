@@ -1,5 +1,5 @@
 import { mergeArchive, mergeSeen, mergeTodos } from '../../shared/merge.js'
-import { onBridgeOpen, sendFrame, watchSync } from './bridge'
+import { onBridgeClose, onBridgeOpen, sendFrame, watchSync } from './bridge'
 import { rememberSeen, seenKeys, useStore, type Archived, type Blade, type Device, type Todo } from '../store'
 
 /**
@@ -253,6 +253,15 @@ export function startSync() {
     sendFrame({ type: 'hello', device: thisDevice() })
     pushLists()
     pushArchive()
+  })
+
+  // Cut off from the bridge, nothing else is reachable: say so on the map
+  // rather than lighting edges for sends that cannot happen. The bridge sends
+  // the real list again the moment the connection is back.
+  onBridgeClose(() => {
+    const s = useStore.getState()
+    s.setDevices(s.devices.map((d) => ({ ...d, online: false })))
+    s.setAim(null)
   })
 
   watchSync((msg) => {

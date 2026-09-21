@@ -155,6 +155,11 @@ export function watchSync(fn: (msg: Record<string, unknown>) => void) {
 
 /** Run on every connection, first and after each reconnect. */
 const openHooks: (() => void)[] = []
+/** Run when an open connection is lost. */
+const closeHooks: (() => void)[] = []
+export function onBridgeClose(fn: () => void) {
+  closeHooks.push(fn)
+}
 export function onBridgeOpen(fn: () => void) {
   openHooks.push(fn)
   if (socket?.readyState === WebSocket.OPEN) fn()
@@ -192,18 +197,43 @@ let everConnected = false
 /** Backoff for the automatic re-dial. It gives up after the last delay rather
  *  than retrying forever — a bridge that has been down for half a minute is
  *  usually one you stopped on purpose, and the next ask() re-dials anyway. */
-const RECONNECT_DELAYS = [500, 1000, 2000, 4000, 8000, 8000]
+/**
+ * Backing off to every five seconds, and never giving up.
+ *
+ * This used to stop after six tries, and worse, a failed try did not schedule
+ * the next one: after a drop it retried once, half a second later, and if the
+ * bridge was not back by then the page was cut off for good, still showing
+ * "reconnecting". A hosted bridge restarts on every deploy, and with its
+ * storage volume attached the old one stops before the new one starts, so it
+ * is routinely gone for longer than that. Everything that needs the bridge
+ * (sending a blade to another device, syncing, JARVIS himself) quietly
+ * stopped until a reload.
+ */
+const RECONNECT_DELAYS = [500, 1000, 2000, 3000, 5000]
 let attempt = 0
 let reconnectTimer = 0
 
 function scheduleReconnect() {
-  if (attempt >= RECONNECT_DELAYS.length) return
-  const delay = RECONNECT_DELAYS[attempt]
+  const delay = RECONNECT_DELAYS[Math.min(attempt, RECONNECT_DELAYS.length - 1)]
   attempt += 1
   clearTimeout(reconnectTimer)
   reconnectTimer = window.setTimeout(() => {
-    void connect().catch(() => {})
+    void connect().catch(() => scheduleReconnect())
   }, delay)
+}
+
+/** Back on the network, or back in front of him: try at once rather than waiting. */
+if (typeof window !== 'undefined') {
+  const now = () => {
+    if (!everConnected || socket || connecting) return
+    attempt = 0
+    clearTimeout(reconnectTimer)
+    void connect().catch(() => scheduleReconnect())
+  }
+  window.addEventListener('online', now)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') now()
+  })
 }
 
 /**
@@ -358,6 +388,7 @@ function connect(): Promise<WebSocket> {
       if (socket === ws) {
         socket = null
         onConnection?.('lost')
+        closeHooks.forEach((fn) => fn())
         scheduleReconnect()
       }
     }
