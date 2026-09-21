@@ -806,13 +806,22 @@ export default function App() {
             .then(() => store.getState().setGestures(true))
             .catch((err: Error) => {
               store.getState().setGestures(false)
+              // The browser's own wording ("Requested device not found") says
+              // what failed but not what to do; each case gets both. Hand
+              // control is the only thing that needs a camera, so sending and
+              // receiving blades carry on regardless.
+              const why: Record<string, string> = {
+                NotAllowedError:
+                  'Camera access is blocked for this site. Allow the camera in the browser, then press G again.',
+                NotFoundError:
+                  'No camera found on this device, so hand control is unavailable here. Plug in a webcam, or check Windows Settings → Privacy & security → Camera. Everything else, including sending blades, still works.',
+                NotReadableError:
+                  'The camera is in use by another app (Teams, Zoom, the Camera app?). Close it and press G again.',
+                OverconstrainedError: 'This camera cannot run in a mode hand control can use.',
+              }
               store
                 .getState()
-                .setError(
-                  err?.name === 'NotAllowedError'
-                    ? 'Camera access denied — gesture control is unavailable.'
-                    : `Gesture control failed to start: ${err?.message ?? err}`,
-                )
+                .setError(why[err?.name] ?? `Hand control failed to start: ${err?.message ?? err}`)
             })
         }
         return
