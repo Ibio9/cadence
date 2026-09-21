@@ -65,6 +65,31 @@ const EXTRA_ORIGINS = new Set(
 )
 const ALLOW_NO_ORIGIN = process.env.JARVIS_ALLOW_NO_ORIGIN === '1'
 
+/**
+ * Where the interface is deployed, trusted by exact origin and nothing wider.
+ *
+ * The front end is served from Vercel but the brain cannot be: it runs on the
+ * owner's Claude login, their connectors and their microphone, all of which
+ * exist only on this machine. So the deployed page opens a socket back to
+ * ws://localhost:8787 on whoever is viewing it — which, for anyone other than
+ * the owner at their own PC, is nothing at all.
+ *
+ * EXACT origins, deliberately. The tempting shortcut is to allow `*.vercel.app`,
+ * and it would hand this bridge — Gmail, the browser, the camera — to every
+ * site anyone has ever deployed to Vercel. Preview deployments are left out
+ * for the same reason: their URLs are minted per branch and are not something
+ * to pre-authorise. The apex mycadenceos.com is absent because it redirects to
+ * www before any script runs, so a page never executes on it.
+ *
+ * Whoever can deploy to these origins can drive this bridge while its owner has
+ * the page open. That is the same trust as the dev server on localhost:5173,
+ * just attached to a URL that is always up.
+ */
+const DEPLOYED_ORIGINS = new Set([
+  'https://www.mycadenceos.com',
+  'https://cadence-six-iota.vercel.app',
+])
+
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 
 /**
@@ -78,7 +103,9 @@ const isDevPort = (port) =>
 
 function originAllowed(origin) {
   if (!origin) return ALLOW_NO_ORIGIN
-  if (EXTRA_ORIGINS.has(origin.replace(/\/+$/, ''))) return true
+  const clean = origin.replace(/\/+$/, '')
+  if (DEPLOYED_ORIGINS.has(clean)) return true
+  if (EXTRA_ORIGINS.has(clean)) return true
   let url
   try {
     url = new URL(origin)
@@ -682,6 +709,17 @@ const handleRequest = async (req, res) => {
   const cors = corsFor(req)
 
   if (req.method === 'OPTIONS') {
+    /*
+     * Private Network Access. A page on a public HTTPS origin asking for
+     * something on localhost is exactly the case Chrome guards: before the
+     * real request it sends a preflight carrying this header, and refuses to
+     * proceed unless the answer opts in. Without it the deployed interface
+     * loads and then cannot reach its own brain. Only answered for origins
+     * that already passed the allowlist above.
+     */
+    if (req.headers['access-control-request-private-network'] === 'true') {
+      cors['access-control-allow-private-network'] = 'true'
+    }
     res.writeHead(204, cors)
     return res.end()
   }
