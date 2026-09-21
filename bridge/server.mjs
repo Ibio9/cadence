@@ -27,10 +27,13 @@ import { MAIL_CONFIGURED, mailServer, sendSignInLink } from './mail.mjs'
 import {
   HOSTED,
   MEDIA_TTL,
+  PASSPHRASE_ENABLED,
   SESSION_TTL,
   addressOf,
   allowLinkRequest,
+  allowPassphrase,
   allowRedeem,
+  passphraseMatches,
   assertLocked,
   bearerOf,
   mediaAllowed,
@@ -815,6 +818,28 @@ async function handleSendLink(req, res, cors) {
 }
 
 /**
+ * POST /auth — trade the passphrase for tokens, when one is set.
+ *
+ * Checked against the rate limit before the body is read, and every failure
+ * says the same thing, so a guess teaches nothing about how close it was.
+ */
+async function handlePassphrase(req, res, cors) {
+  if (!allowPassphrase(addressOf(req))) {
+    res.writeHead(429, jsonNoStore(cors))
+    return res.end(JSON.stringify({ error: 'Too many attempts. Wait an hour, or use the emailed link.' }))
+  }
+  const { passphrase } = await readJson(req)
+  if (!passphraseMatches(String(passphrase ?? ''))) {
+    res.writeHead(401, jsonNoStore(cors))
+    return res.end(JSON.stringify({ error: 'That is not it.' }))
+  }
+  res.writeHead(200, jsonNoStore(cors))
+  return res.end(
+    JSON.stringify({ session: sign('session', SESSION_TTL), media: sign('media', MEDIA_TTL) }),
+  )
+}
+
+/**
  * POST /auth/magic — trade a sign-in link for tokens.
  *
  * Each link works once. The same message for every failure, so a stranger
@@ -895,8 +920,15 @@ const handleRequest = async (req, res) => {
    */
   if (HOSTED) {
     const path = (req.url ?? '/').split('?')[0]
-    if (req.method === 'POST' && path === '/auth/email') return handleSendLink(req, res, cors)
-    if (req.method === 'POST' && path === '/auth/magic') return handleRedeem(req, res, cors)
+    // One way in, never both. With a passphrase set, the owner asked not to
+    // be emailed, so the link routes are off entirely: an endpoint that can
+    // send mail should not exist when nothing is meant to call it.
+    if (PASSPHRASE_ENABLED) {
+      if (req.method === 'POST' && path === '/auth') return handlePassphrase(req, res, cors)
+    } else {
+      if (req.method === 'POST' && path === '/auth/email') return handleSendLink(req, res, cors)
+      if (req.method === 'POST' && path === '/auth/magic') return handleRedeem(req, res, cors)
+    }
     if (req.method === 'GET' && path === '/auth/check') return handleCheck(req, res, cors)
     if (path === '/file') {
       res.writeHead(404, cors)
@@ -921,7 +953,9 @@ const handleRequest = async (req, res) => {
     // stays reachable without a token.
     const eleven = Boolean(elevenKey())
     res.writeHead(200, { ...cors, 'content-type': 'application/json' })
-    return res.end(JSON.stringify({ ok: true, tts: eleven, stt: eleven, auth: HOSTED }))
+    return res.end(
+      JSON.stringify({ ok: true, tts: eleven, stt: eleven, auth: HOSTED, passphrase: PASSPHRASE_ENABLED }),
+    )
   }
 
   // Serve local image files to the page. Screenshots and generated art land on
@@ -1250,7 +1284,9 @@ const wss = new WebSocketServer({
 server.listen(PORT, () => {
   console.log(
     `[jarvis] bridge listening on :${PORT}` +
-      (HOSTED ? ' (hosted: sign-in by emailed link, writes and file access off)' : ''),
+      (HOSTED
+        ? ` (hosted: sign-in by ${PASSPHRASE_ENABLED ? 'passphrase' : 'emailed link'}, writes and file access off)`
+        : ''),
   )
   if (HOSTED) {
     console.log(

@@ -24,6 +24,8 @@ type Tokens = { session: string; media: string }
 let tokens: Tokens | null = load()
 /** The bridge said it needs a login. Unknown until probe() has answered. */
 let required = false
+/** The bridge signs in by password rather than by emailed link. */
+let passphraseOn = false
 let probed = false
 let refresher = 0
 
@@ -90,7 +92,9 @@ function keepFresh() {
 export async function probe(): Promise<'open' | 'ready' | 'login'> {
   try {
     const r = await fetch(`${BRIDGE_HTTP_URL}/health`)
-    required = Boolean((await r.json()).auth)
+    const j = await r.json()
+    required = Boolean(j.auth)
+    passphraseOn = Boolean(j.passphrase)
   } catch {
     /*
      * Unreachable, so the bridge cannot tell us. What to assume depends on
@@ -146,6 +150,27 @@ async function redeemFromUrl(): Promise<'ok' | 'bad' | 'none'> {
   } catch {
     linkProblem = 'The bridge could not be reached.'
     return 'bad'
+  }
+}
+
+/** Which sign-in screen to show. */
+export const usesPassphrase = () => passphraseOn
+
+/** Sign in with the password. Null on success, or a sentence to show. */
+export async function login(passphrase: string): Promise<string | null> {
+  try {
+    const r = await fetch(`${BRIDGE_HTTP_URL}/auth`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ passphrase }),
+    })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) return String(j.error ?? 'Could not sign in.')
+    save({ session: String(j.session), media: String(j.media) })
+    keepFresh()
+    return null
+  } catch {
+    return 'The bridge could not be reached.'
   }
 }
 

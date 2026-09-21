@@ -48,6 +48,18 @@ const GMAIL_ADDRESS = (process.env.JARVIS_GMAIL_ADDRESS ?? '').trim()
 const GMAIL_APP_PASSWORD = (process.env.JARVIS_GMAIL_APP_PASSWORD ?? '').replace(/\s+/g, '')
 
 /**
+ * An optional passphrase, as well as the emailed link.
+ *
+ * The owner asked for one and chose it himself. No minimum length is imposed,
+ * because that choice is his to make; the costs of a short one are recorded
+ * here so they are not forgotten. It is one guess away for anyone who thinks
+ * of it, and it guards the whole inbox. The rate limit below stops blind
+ * guessing, not a good guess. The emailed link stays available alongside it.
+ */
+const PASSPHRASE = process.env.JARVIS_PASSPHRASE ?? ''
+export const PASSPHRASE_ENABLED = PASSPHRASE.length > 0
+
+/**
  * Refuse to start a hosted bridge that could not lock itself.
  *
  * Without the Gmail pair there is no way to deliver a sign-in link, and
@@ -75,7 +87,7 @@ export function assertLocked() {
 
 // Derived, with separators so no two different inputs can produce one key.
 const KEY = createHash('sha256')
-  .update(`jarvis-token-key:v2\0${CLAUDE_TOKEN}\0${GMAIL_APP_PASSWORD}\0${GMAIL_ADDRESS}`)
+  .update(`jarvis-token-key:v2\0${CLAUDE_TOKEN}\0${GMAIL_APP_PASSWORD}\0${GMAIL_ADDRESS}\0${PASSPHRASE}`)
   .digest()
 
 const DAY = 86_400_000
@@ -111,6 +123,18 @@ function open(token, scope) {
 }
 
 export const verify = (token, scope) => open(token, scope) !== null
+
+/**
+ * Constant-time, over digests: comparing the raw strings would leak the
+ * passphrase's length through the early return, and a character-by-character
+ * compare would leak how much of a guess was right.
+ */
+export function passphraseMatches(given) {
+  if (!PASSPHRASE_ENABLED || typeof given !== 'string') return false
+  const a = createHash('sha256').update(given).digest()
+  const b = createHash('sha256').update(PASSPHRASE).digest()
+  return timingSafeEqual(a, b)
+}
 
 /** A fresh single-use sign-in token for the emailed link. */
 export const signLink = () => sign('link', LINK_TTL, { n: randomBytes(12).toString('base64url') })
@@ -165,6 +189,13 @@ function limiter(perAddress, overall, windowMs) {
  * too few for anyone to fill his inbox.
  */
 export const allowLinkRequest = limiter(3, 8, 60 * 60_000)
+
+/**
+ * Passphrase guesses: five an address per ten minutes, twenty in total an
+ * hour. At that rate trying every three-letter lowercase word takes over a
+ * month. It does nothing against someone who simply guesses right first time.
+ */
+export const allowPassphrase = limiter(5, 20, 60 * 60_000)
 
 /** Redeeming is cheap to refuse, but still bounded. */
 export const allowRedeem = limiter(20, 100, 10 * 60_000)
