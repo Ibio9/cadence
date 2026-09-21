@@ -516,7 +516,18 @@ function fire(
 const INTERACTIVE = 'button, a[href], input, select, textarea, [role="button"]'
 
 /** How far a press may be pulled to reach one, in pixels. */
-const SNAP_RADIUS = 30
+const SNAP_RADIUS = 40
+
+/**
+ * Surfaces where a pinch means "grab", not "the nearest button please".
+ *
+ * A pinch on empty space is plainly aimed at something nearby, so it may be
+ * pulled onto the closest control. A pinch on one of these is not empty
+ * space: it is a grab of a blade, or a scroll of a panel, and pulling it onto
+ * a tab just above would turn a drag into a click. Rescue never crosses out
+ * of one of these.
+ */
+const SURFACES = '.bl, .tabpanel, .history, .gate-card, .log, .typebar'
 
 /**
  * What the press actually lands on.
@@ -543,12 +554,24 @@ function resolveTarget(x: number, y: number): Element | null {
   const own = direct.closest?.(INTERACTIVE)
   if (own) return own
 
+  /*
+   * Inside an opted-in zone, rescue within that zone. On empty space, rescue
+   * onto the nearest control of ANY zone within reach: the first version only
+   * rescued from inside a zone, so a pinch ten pixels under the tab strip —
+   * on nothing — clicked nothing, which is exactly what was reported. On a
+   * surface (a blade, a panel) there is no rescue at all; see SURFACES.
+   */
   const zone = direct.closest?.('[data-hit-rescue]')
-  if (!zone) return direct
+  const zones = zone
+    ? [zone]
+    : direct.closest?.(SURFACES)
+      ? []
+      : Array.from(document.querySelectorAll('[data-hit-rescue]'))
+  if (!zones.length) return direct
 
   let best: Element | null = null
   let bestDist = SNAP_RADIUS
-  for (const el of Array.from(zone.querySelectorAll(INTERACTIVE))) {
+  for (const el of zones.flatMap((z) => Array.from(z.querySelectorAll(INTERACTIVE)))) {
     const r = el.getBoundingClientRect()
     if (!r.width || !r.height) continue
     // Distance to the rectangle, which is zero inside it.
@@ -563,7 +586,43 @@ function resolveTarget(x: number, y: number): Element | null {
   return best ?? direct
 }
 
+/**
+ * The control each hand is over, lit so a pinch is never a guess.
+ *
+ * A mouse shows you what you are about to click by changing the cursor and
+ * the button's hover state. A hand had neither: synthetic events do not
+ * trigger :hover, so there was no way to tell a finger resting on a tab from
+ * one resting ten pixels under it, and that ten pixels is the difference
+ * between a click and nothing. This lights exactly what a pinch would press,
+ * using the same resolveTarget the press uses, so the two cannot disagree.
+ */
+const hovered = new Map<number, Element>()
+
+function highlight(id: number, el: Element | null) {
+  const prev = hovered.get(id)
+  if (prev === el) return
+  // Only unlight it if the other hand is not also on it.
+  if (prev && ![...hovered].some(([k, v]) => k !== id && v === prev)) {
+    prev.classList.remove('hand-hover')
+  }
+  if (el) {
+    el.classList.add('hand-hover')
+    hovered.set(id, el)
+  } else {
+    hovered.delete(id)
+  }
+}
+
+function clearHighlights() {
+  for (const el of hovered.values()) el.classList.remove('hand-hover')
+  hovered.clear()
+}
+
 function emit(h: Hand) {
+  // What a pinch would press right now, lit. Frozen while pinched, so the
+  // control being pressed stays lit for as long as it is held.
+  if (!h.pinched) highlight(h.id, resolveTarget(h.x, h.y)?.closest?.(INTERACTIVE) ?? null)
+
   let p = presses.get(h.id)
   if (!p) {
     p = { captured: null, wasPinched: false, downX: h.x, downY: h.y, clicked: false }
@@ -601,7 +660,16 @@ function emit(h: Hand) {
      */
     p.downX = h.x
     p.downY = h.y
-    fire(target, 'pointerdown', h, true, aim)
+    /*
+     * The TARGET comes from the aim point; the COORDINATES are the live ones.
+     *
+     * Every move that follows reports the live fingertip, and a drag measures
+     * each move against where the press began. Reporting the press at the aim
+     * point made the first move include the whole dip of the fingertip onto
+     * the thumb, so a grabbed blade leapt by that much before following the
+     * hand. Aim decides what is pressed; nothing else should use it.
+     */
+    fire(target, 'pointerdown', h, true)
 
     /**
      * PINCH IS A CLICK, the moment the fingers meet.
@@ -669,6 +737,8 @@ function emit(h: Hand) {
 /** Let go of anything still held. A press that outlives its hand leaves
  *  whatever was being dragged stuck to a cursor that no longer exists. */
 function releasePress(id: number, at: { x: number; y: number }) {
+  // A hand that has left is over nothing.
+  highlight(id, null)
   const p = presses.get(id)
   if (!p?.wasPinched) return
   const ghost = { id, x: at.x, y: at.y } as Hand
@@ -1113,6 +1183,7 @@ export function disableHands(): void {
   for (const h of hands) releasePress(h.id, h)
   hands.length = 0
   presses.clear()
+  clearHighlights()
   filters.clear()
   settling.clear()
   sideVote.clear()

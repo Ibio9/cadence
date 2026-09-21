@@ -2841,3 +2841,19 @@ kbd {
     width: auto;
   }
 }
+
+/* -- what a pinch would press -------------------------------------------------
+
+   Lit by the hand tracker (hands.ts, highlight) on the control under a
+   fingertip, because synthetic events never trigger :hover. It is the only way
+   to see, before pinching, whether the finger is on the tab or ten pixels
+   under it. Bright enough to read at a glance, and it never changes layout:
+   outline and shadow only, so nothing shifts under the finger.
+*/
+.hand-hover {
+  outline: 1px solid color-mix(in srgb, var(--accent) 90%, #fff) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 22px -4px color-mix(in srgb, var(--accent) 80%, transparent) !important;
+  color: #fff !important;
+  transition: outline-color 90ms ease, box-shadow 90ms ease;
+}
